@@ -259,25 +259,12 @@ enum StatusState {
 struct StatusDot: View {
     let state: StatusState
     let word: String
+    var wordColor = Color.faint
 
     var body: some View {
         HStack(spacing: Space.s2) {
             Circle().fill(state.color).frame(width: 7, height: 7)
-            MonoLabel(word)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// A `StatusDot` in system type, for native settings chrome.
-struct StatusLabel: View {
-    let dot: StatusDot
-    init(_ dot: StatusDot) { self.dot = dot }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle().fill(dot.state.color).frame(width: 7, height: 7)
-            Text(dot.word).font(.footnote).foregroundStyle(.secondary)
+            MonoLabel(word, color: wordColor)
         }
         .accessibilityElement(children: .combine)
     }
@@ -413,17 +400,193 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(Color.line).frame(height: 1) }
 }
 
-/// A setting's name with what it does under it, in system type: the label of a `Form` row.
-struct SettingLabel: View {
+// MARK: - Settings pages
+
+/// A settings page: the brand page head, then sections, scrolling together on `bg`.
+struct SettingsPage<Content: View>: View {
     let title: String
-    var detail: String?
-    init(_ title: String, _ detail: String? = nil) { self.title = title; self.detail = detail }
+    var lead: String?
+    @ViewBuilder var content: Content
+
+    init(_ page: AppModel.Page, @ViewBuilder content: () -> Content) {
+        self.init(title: page.title, lead: page.subtitle, content: content)
+    }
+
+    init(title: String, lead: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.lead = lead
+        self.content = content()
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-            if let detail { Text(detail).font(.footnote).foregroundStyle(.secondary) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.s6) {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    Text(title).ionianText(IonianType.title).foregroundStyle(Color.ink)
+                    if let lead {
+                        Text(lead).ionianText(IonianType.lead).foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: WindowLayout.lead, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                content
+            }
+            .padding(Space.s6)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(Color.bg.ignoresSafeArea())
+    }
+}
+
+/// A mono eyebrow, a `surface` card of rows split by `line` hairlines, and a muted note under it.
+struct SettingsSection<Accessory: View, Footer: View, Content: View>: View {
+    var header: String?
+    var accessory: Accessory
+    var footer: Footer
+    var content: Content
+
+    init(_ header: String? = nil, @ViewBuilder accessory: () -> Accessory, @ViewBuilder footer: () -> Footer,
+         @ViewBuilder content: () -> Content) {
+        self.header = header
+        self.accessory = accessory()
+        self.footer = footer()
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            if header != nil || Accessory.self != EmptyView.self {
+                HStack {
+                    if let header { MonoLabel(header, color: Color.muted).accessibilityAddTraits(.isHeader) }
+                    Spacer()
+                    accessory
+                }
+                .padding(.horizontal, Space.s1)
+            }
+            SettingsCard { content }
+            footer.padding(.horizontal, Space.s1)
+        }
+    }
+}
+
+extension SettingsSection where Accessory == EmptyView, Footer == EmptyView {
+    init(_ header: String? = nil, @ViewBuilder content: () -> Content) {
+        self.init(header, accessory: { EmptyView() }, footer: { EmptyView() }, content: content)
+    }
+}
+
+extension SettingsSection where Accessory == EmptyView, Footer == SettingsNote {
+    init(_ header: String? = nil, note: String, ink: Bool = false, @ViewBuilder content: () -> Content) {
+        self.init(header, accessory: { EmptyView() }, footer: { SettingsNote(note, ink: ink) }, content: content)
+    }
+}
+
+extension SettingsSection where Footer == EmptyView {
+    init(_ header: String? = nil, @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content) {
+        self.init(header, accessory: accessory, footer: { EmptyView() }, content: content)
+    }
+}
+
+/// The sentence under a section: `muted`, or `ink` when it's a problem to act on.
+struct SettingsNote: View {
+    let text: String
+    var ink = false
+    init(_ text: String, ink: Bool = false) { self.text = text; self.ink = ink }
+
+    var body: some View {
+        Text(text).ionianText(IonianType.small).foregroundStyle(ink ? Color.ink : Color.muted)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Rows on `surface` with a `line` edge and hairlines between them.
+struct SettingsCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Group(subviews: content) { rows in
+            VStack(spacing: 0) {
+                ForEach(rows.indices, id: \.self) { i in
+                    if i > 0 { Hairline() }
+                    rows[i].padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Color.surface))
+        .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Color.line))
+    }
+}
+
+/// A setting: its name, what it does under it, and the control at the trailing edge.
+struct SettingRow<Trailing: View>: View {
+    let title: String
+    var detail: String?
+    var trailing: Trailing
+
+    init(_ title: String, _ detail: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.detail = detail
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Space.s4) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).ionianText(IonianType.body).foregroundStyle(Color.ink)
+                if let detail {
+                    Text(detail).ionianText(IonianType.small).foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: Space.s4)
+            trailing
+        }
+        .frame(minHeight: 28)
+    }
+}
+
+extension SettingRow where Trailing == EmptyView {
+    init(_ title: String, _ detail: String? = nil) { self.init(title, detail) { EmptyView() } }
+}
+
+/// A native switch in a row. The label stays for VoiceOver.
+struct SettingToggle: View {
+    let title: String
+    var detail: String?
+    @Binding var isOn: Bool
+    init(_ title: String, _ detail: String? = nil, isOn: Binding<Bool>) {
+        self.title = title
+        self.detail = detail
+        _isOn = isOn
+    }
+
+    var body: some View {
+        SettingRow(title, detail) { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch) }
+    }
+}
+
+/// A text field on `surface`, `radius.sm`, `line` edge; `accent` while focused (MAC-07).
+struct BrandField: View {
+    let prompt: String
+    @Binding var text: String
+    @FocusState private var focused: Bool
+
+    init(_ prompt: String, text: Binding<String>) { self.prompt = prompt; _text = text }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+        TextField(prompt, text: $text, prompt: Text(prompt).foregroundStyle(Color.muted))
+            .textFieldStyle(.plain)
+            .ionianText(IonianType.body)
+            .foregroundStyle(Color.ink)
+            .focused($focused)
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+            .background(shape.fill(Color.surface))
+            .overlay(shape.strokeBorder(focused ? Color.accent : Color.line, lineWidth: focused ? FocusRing.width : 1))
     }
 }
 
@@ -470,6 +633,7 @@ struct MonoLinkButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .ionianText(IonianType.label)
+                .fixedSize()
                 .foregroundStyle(hovering || configuration.isPressed ? Color.accentHover : Color.accent)
                 .opacity(enabled ? 1 : 0.4)
                 .contentShape(Rectangle())

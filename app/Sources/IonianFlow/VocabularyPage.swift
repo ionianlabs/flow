@@ -33,22 +33,20 @@ struct VocabularyPage: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            Form {
+            SettingsPage(.vocabulary) {
                 VaultSection(sweeper: sweeper, actions: actions)
-                Section {
-                    TextField(text: $domain, prompt: Text("For example civil engineering")) {
-                        SettingLabel("Your field", "Helps the transcript cleanup pick the right words. Press Return to save.")
+                SettingsSection {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        SettingRow("Your field", "Helps the transcript cleanup pick the right words. Press Return to save.")
+                        BrandField("For example civil engineering", text: $domain)
+                            .onSubmit { store.setDomain(domain) }
                     }
-                    .onSubmit { store.setDomain(domain) }
-                    Toggle(isOn: $useVocabulary) {
-                        SettingLabel("Use vocabulary", "Off: Ionian Flow transcribes as if the list were empty. This restarts the recognizer.")
-                    }
-                    .onChange(of: useVocabulary) { actions.setUseVocabulary(useVocabulary) }
+                    SettingToggle("Use vocabulary", "Off: Ionian Flow transcribes as if the list were empty. This restarts the recognizer.", isOn: $useVocabulary)
+                        .onChange(of: useVocabulary) { actions.setUseVocabulary(useVocabulary) }
                 }
                 if !store.unreviewed.isEmpty && !sweeper.running { reviewSection }
                 termsSection
             }
-            .formStyle(.grouped)
             .navigationTitle(AppModel.Page.vocabulary.rawValue)
             .navigationDestination(for: String.self) { name in
                 CategoryPage(store: store, name: name)
@@ -68,14 +66,12 @@ struct VocabularyPage: View {
 
     private var reviewSection: some View {
         let n = store.unreviewed.count
-        return Section {
-            LabeledContent {
-                HStack(spacing: 12) {
-                    Button("Review…") { reviewing = true }
-                    Button("Reject All") { rejecting = true }
+        return SettingsSection {
+            SettingRow("\(n) new \(n == 1 ? "term" : "terms") from your vault.", "Already active.") {
+                HStack(spacing: Space.s4) {
+                    Button("Reject all ›") { rejecting = true }.buttonStyle(.monoLink)
+                    Button("Review…") { reviewing = true }.buttonStyle(.primaryCompact)
                 }
-            } label: {
-                Text("\(n) new \(n == 1 ? "term" : "terms") from your vault. Already active.")
             }
         }
     }
@@ -91,35 +87,46 @@ struct VocabularyPage: View {
     }
 
     private var termsSection: some View {
-        Section {
-            TextField("Search", text: $query, prompt: Text("Search, or type a new term and press Return"))
-                .labelsHidden()
+        VStack(alignment: .leading, spacing: Space.s2) {
+            MonoLabel("Terms", color: Color.muted).padding(.horizontal, Space.s1).accessibilityAddTraits(.isHeader)
+            BrandField("Search, or type a new term and press Return", text: $query)
                 .onSubmit { if !trimmedQuery.isEmpty && !exactMatch { add("Terms") } }
             if trimmedQuery.isEmpty {
                 if store.entries.isEmpty {
-                    Text("No words yet. Connect a vault above, or type a name and press Return.").foregroundStyle(.secondary)
-                }
-                ForEach(TermGroup.groups(store.entries), id: \.name) { group in
-                    NavigationLink(value: group.name) {
-                        LabeledContent(group.name, value: "\(group.entries.count)")
+                    SettingsNote("No words yet. Connect a vault above, or type a name and press Return.")
+                        .padding(.horizontal, Space.s1)
+                } else {
+                    SettingsCard {
+                        ForEach(TermGroup.groups(store.entries), id: \.name) { group in
+                            NavigationLink(value: group.name) {
+                                SettingRow(group.name) {
+                                    HStack(spacing: Space.s2) {
+                                        MonoLabel("\(group.entries.count)", color: Color.muted)
+                                        Text("›").ionianText(IonianType.body).foregroundStyle(Color.muted)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
             } else {
-                if !exactMatch { addRow }
-                ForEach(matches) { TermRow(entry: $0) { store.remove($0) } }
+                SettingsCard {
+                    if !exactMatch { addRow }
+                    ForEach(matches) { TermRow(entry: $0) { store.remove($0) } }
+                }
             }
-        } header: {
-            Text("Terms")
-        } footer: {
             HStack {
-                Text("\(store.entries.count) terms")
+                MonoLabel("\(store.entries.count) terms", color: Color.muted)
                 Spacer()
-                Button("Open as Markdown") {
+                Button("Open as Markdown ↗") {
                     store.ensureFile()
                     NSWorkspace.shared.open(store.url)
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.monoLink)
             }
+            .padding(.horizontal, Space.s1)
         }
     }
 
@@ -127,8 +134,9 @@ struct VocabularyPage: View {
         Menu {
             ForEach(VocabularyStore.categories, id: \.self) { c in Button("Add to \(c)") { add(c) } }
         } label: {
-            Text("Add “\(trimmedQuery)”")
+            Text("Add “\(trimmedQuery)”").ionianText(IonianType.body).foregroundStyle(Color.ink)
         } primaryAction: { add("Terms") }
+            .menuStyle(.button).buttonStyle(.plain)
             .help("Adds to Terms. The menu picks a category.")
     }
 
@@ -145,15 +153,12 @@ private struct CategoryPage: View {
 
     var body: some View {
         let entries = store.entries.filter { $0.category == name }
-        Form {
-            Section {
+        SettingsPage(title: name) {
+            SettingsSection(note: "Removing a vault term sends it to Ignore, so the next scan won't add it again.") {
                 ForEach(entries) { TermRow(entry: $0) { store.remove($0) } }
-                if entries.isEmpty { Text("No terms left here.").foregroundStyle(.secondary) }
-            } footer: {
-                Text("Removing a vault term sends it to Ignore, so the next scan won't add it again.")
+                if entries.isEmpty { SettingRow("No terms left here.") }
             }
         }
-        .formStyle(.grouped)
         .navigationTitle(name)
     }
 }
@@ -175,27 +180,19 @@ private struct VaultSection: View {
     var actions: VocabularyActions
 
     var body: some View {
-        Section("Vault") {
+        SettingsSection("Vault") {
             if let vault = Settings.vault {
-                LabeledContent {
-                    HStack(spacing: 12) {
-                        Button("Rescan") { actions.rescan() }.disabled(sweeper.running)
+                SettingRow(VaultSweeper.name(of: vault)) {
+                    HStack(spacing: Space.s4) {
+                        Button("Rescan ›") { actions.rescan() }.buttonStyle(.monoLink).disabled(sweeper.running)
                         vaultMenu
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(VaultSweeper.name(of: vault))
-                        TimelineView(.periodic(from: .now, by: 30)) { _ in status }
                     }
                 }
                 if sweeper.running { progress }
+                TimelineView(.periodic(from: .now, by: 30)) { _ in status }
             } else {
-                LabeledContent {
-                    vaultMenu
-                } label: {
-                    SettingLabel("Learn from your notes.", "Connect an Obsidian vault. Ionian Flow picks up names, acronyms and project words, "
-                        + "and keeps up as you write. The vault is only read.")
-                }
+                SettingRow("Learn from your notes.", "Connect an Obsidian vault. Ionian Flow picks up names, acronyms and project words, "
+                    + "and keeps up as you write. The vault is only read.") { vaultMenu }
             }
         }
     }
@@ -203,32 +200,32 @@ private struct VaultSection: View {
     @ViewBuilder private var progress: some View {
         switch sweeper.phase {
         case .reading(let done, let total) where total > 0, .learning(let done, let total) where total > 0:
-            ProgressView(value: Double(done), total: Double(total)) { Text("Learning from notes · \(done) of \(total)") }
+            ProgressView(value: Double(done), total: Double(total)) {
+                Text("Learning from notes · \(done) of \(total)").ionianText(IonianType.small).foregroundStyle(Color.muted)
+            }
         default:
-            ProgressView { Text("Starting") }.progressViewStyle(.linear)
+            ProgressView { Text("Starting").ionianText(IonianType.small).foregroundStyle(Color.muted) }.progressViewStyle(.linear)
         }
     }
 
     @ViewBuilder private var status: some View {
         if sweeper.running {
-            Text("Scanning").font(.footnote).foregroundStyle(.secondary)
+            SettingsNote("Scanning")
         } else if sweeper.failed {
-            HStack(spacing: 8) {
-                Text("The last scan failed. The log is here:").font(.footnote)
-                Button("Open Log") { NSWorkspace.shared.open(URL(fileURLWithPath: sweeper.logPath)) }
-                    .controlSize(.small)
+            HStack(spacing: Space.s3) {
+                SettingsNote("The last scan failed.", ink: true)
+                Button("Open log ↗") { NSWorkspace.shared.open(URL(fileURLWithPath: sweeper.logPath)) }.buttonStyle(.monoLink)
             }
         } else if let last = sweeper.lastScan {
-            Text("Synced " + RelativeDateTimeFormatter().localizedString(for: last, relativeTo: .now)
-                 + ". It rescans when your notes change.")
-                .font(.footnote).foregroundStyle(.secondary)
+            SettingsNote("Synced " + RelativeDateTimeFormatter().localizedString(for: last, relativeTo: .now)
+                         + ". It rescans when your notes change.")
         } else {
-            Text("Not scanned yet.").font(.footnote).foregroundStyle(.secondary)
+            SettingsNote("Not scanned yet.")
         }
     }
 
-    private var vaultMenu: some View {
-        Menu(Settings.vault == nil ? "Connect Vault" : "Change") {
+    @ViewBuilder private var vaultMenu: some View {
+        let menu = Menu(Settings.vault == nil ? "Connect Vault" : "Change ›") {
             let known = VaultSweeper.knownVaults()
             if !known.isEmpty {
                 Section("Obsidian vaults") {
@@ -243,7 +240,8 @@ private struct VaultSection: View {
                 Button("Disconnect", action: actions.disconnect)
             }
         }
-        .fixedSize()
+        .menuStyle(.button).menuIndicator(.hidden).fixedSize()
+        if Settings.vault == nil { menu.buttonStyle(.primaryCompact) } else { menu.buttonStyle(.monoLink) }
     }
 }
 
@@ -253,21 +251,14 @@ private struct TermRow: View {
     @State private var hovering = false
 
     var body: some View {
-        LabeledContent {
-            HStack(spacing: 8) {
-                if entry.source == .mine { Text("Added by you").font(.footnote).foregroundStyle(.secondary) }
+        SettingRow(entry.text, entry.aliases.isEmpty ? nil : "heard as " + entry.aliases.joined(separator: ", ")) {
+            HStack(spacing: Space.s3) {
+                if entry.source == .mine { MonoLabel("Added by you", color: Color.muted) }
                 Button("Remove") { onRemove(entry) }
-                    .buttonStyle(.link)
+                    .buttonStyle(.monoLink)
                     .opacity(hovering ? 1 : 0)
                     .help(entry.source == .mine ? "Remove this term" : "Remove it. The vault scan won't add it again.")
                     .accessibilityLabel("Remove \(entry.text)")
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.text)
-                if !entry.aliases.isEmpty {
-                    Text("heard as " + entry.aliases.joined(separator: ", ")).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                }
             }
         }
         .onHover { hovering = $0 }
@@ -285,46 +276,48 @@ struct ReviewSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Review new terms").font(.headline)
-                Text("Untick anything that isn't a name, product or term you use. Unticked terms go to Ignore, "
-                    + "so the next scan won't bring them back.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding([.horizontal, .top], 20)
-            Form {
-                ForEach(TermGroup.groups(entries), id: \.name) { group in
-                    Section(group.name) {
-                        ForEach(group.entries) { e in
-                            Toggle(e.text, isOn: Binding(
-                                get: { !removing.contains(e.id) },
-                                set: { keep in if keep { removing.remove(e.id) } else { removing.insert(e.id) } }
-                            ))
-                            .toggleStyle(.checkbox)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s6) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        Text("Review new terms").ionianText(IonianType.title).foregroundStyle(Color.ink)
+                        SettingsNote("Untick anything that isn't a name, product or term you use. Unticked terms go to Ignore, "
+                            + "so the next scan won't bring them back.")
+                    }
+                    ForEach(TermGroup.groups(entries), id: \.name) { group in
+                        SettingsSection(group.name) {
+                            ForEach(group.entries) { e in
+                                Toggle(isOn: Binding(
+                                    get: { !removing.contains(e.id) },
+                                    set: { keep in if keep { removing.remove(e.id) } else { removing.insert(e.id) } }
+                                )) {
+                                    Text(e.text).ionianText(IonianType.body).foregroundStyle(Color.ink)
+                                }
+                                .toggleStyle(.checkbox)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
                 }
+                .padding(Space.s6)
             }
-            .formStyle(.grouped)
-            Divider()
-            HStack(spacing: 12) {
-                Text(removing.isEmpty ? "Keeping all \(entries.count)" : "Removing \(removing.count) of \(entries.count)")
-                    .foregroundStyle(.secondary)
+            Hairline()
+            HStack(spacing: Space.s4) {
+                MonoLabel(removing.isEmpty ? "Keeping all \(entries.count)" : "Removing \(removing.count) of \(entries.count)", color: Color.muted)
                 Spacer()
-                Button("Reject All") { rejecting = true }
-                Button("Later", action: onDone).keyboardShortcut(.cancelAction)
+                Button("Reject all ›") { rejecting = true }.buttonStyle(.monoLink)
+                Button("Later", action: onDone).buttonStyle(.monoLink).keyboardShortcut(.cancelAction)
                 Button("Done") {
                     store.finishReview(of: entries, removing: removing)
                     onDone()
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.primaryCompact)
             }
-            .padding(16)
+            .padding(Space.s4)
         }
         .frame(width: 480, height: 600)
+        .background(Color.bg)
+        .tint(Color.btnBg)
         .confirmationDialog("Reject all \(entries.count) new terms?", isPresented: $rejecting) {
             Button("Reject All", role: .destructive) {
                 store.ignoreAll(entries)

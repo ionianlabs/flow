@@ -278,7 +278,7 @@ struct KeyChip: View {
 
     var body: some View {
         Text(text).ionianText(IonianType.code).foregroundStyle(Color.ink)
-            .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 / 2)
+            .padding(.horizontal, Space.s2)
             .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Color.codeBg))
             .fixedSize()
     }
@@ -421,11 +421,11 @@ struct SettingsPage<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.s6) {
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    Text(title).ionianText(IonianType.title).foregroundStyle(Color.ink)
+            VStack(alignment: .leading, spacing: Space.s5) {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text(title).ionianText(IonianType.card).foregroundStyle(Color.ink)
                     if let lead {
-                        Text(lead).ionianText(IonianType.lead).foregroundStyle(Color.muted)
+                        Text(lead).ionianText(IonianType.small).foregroundStyle(Color.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -434,7 +434,8 @@ struct SettingsPage<Content: View>: View {
                 .accessibilityAddTraits(.isHeader)
                 content
             }
-            .padding(Space.s6)
+            
+            .padding(Space.s5)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color.bg.ignoresSafeArea())
@@ -497,7 +498,7 @@ struct SettingsNote: View {
     init(_ text: String, ink: Bool = false) { self.text = text; self.ink = ink }
 
     var body: some View {
-        Text(text).ionianText(IonianType.small).foregroundStyle(ink ? Color.ink : Color.muted)
+        Text(text).ionianText(IonianType.caption).foregroundStyle(ink ? Color.ink : Color.muted)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -512,7 +513,7 @@ struct SettingsCard<Content: View>: View {
             VStack(spacing: 0) {
                 ForEach(rows.indices, id: \.self) { i in
                     if i > 0 { Hairline() }
-                    rows[i].padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+                    rows[i].padding(.horizontal, Space.s4).padding(.vertical, Space.s2)
                 }
             }
         }
@@ -537,16 +538,16 @@ struct SettingRow<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: Space.s4) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).ionianText(IonianType.body).foregroundStyle(Color.ink)
+                Text(title).ionianText(IonianType.small).foregroundStyle(Color.ink)
                 if let detail {
-                    Text(detail).ionianText(IonianType.small).foregroundStyle(Color.muted)
+                    Text(detail).ionianText(IonianType.caption).foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: Space.s4)
             trailing
         }
-        .frame(minHeight: 28)
+        .frame(minHeight: Space.s6)
     }
 }
 
@@ -566,7 +567,7 @@ struct SettingToggle: View {
     }
 
     var body: some View {
-        SettingRow(title, detail) { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch) }
+        SettingRow(title, detail) { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small) }
     }
 }
 
@@ -582,10 +583,10 @@ struct BrandField: View {
         let shape = RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
         TextField(prompt, text: $text, prompt: Text(prompt).foregroundStyle(Color.muted))
             .textFieldStyle(.plain)
-            .ionianText(IonianType.body)
+            .ionianText(IonianType.small)
             .foregroundStyle(Color.ink)
             .focused($focused)
-            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s1 + Space.s1 / 2)
             .background(shape.fill(Color.surface))
             .overlay(shape.strokeBorder(focused ? Color.accent : Color.line, lineWidth: focused ? FocusRing.width : 1))
     }

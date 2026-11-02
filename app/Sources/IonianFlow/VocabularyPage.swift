@@ -102,7 +102,7 @@ struct VocabularyPage: View {
                                 SettingRow(group.name) {
                                     HStack(spacing: Space.s2) {
                                         MonoLabel("\(group.entries.count)", color: Color.muted)
-                                        Text("›").ionianText(IonianType.body).foregroundStyle(Color.muted)
+                                        Text("›").ionianText(IonianType.small).foregroundStyle(Color.muted)
                                     }
                                 }
                                 .contentShape(Rectangle())
@@ -134,7 +134,7 @@ struct VocabularyPage: View {
         Menu {
             ForEach(VocabularyStore.categories, id: \.self) { c in Button("Add to \(c)") { add(c) } }
         } label: {
-            Text("Add “\(trimmedQuery)”").ionianText(IonianType.body).foregroundStyle(Color.ink)
+            Text("Add “\(trimmedQuery)”").ionianText(IonianType.small).foregroundStyle(Color.ink)
         } primaryAction: { add("Terms") }
             .menuStyle(.button).buttonStyle(.plain)
             .help("Adds to Terms. The menu picks a category.")
@@ -201,10 +201,10 @@ private struct VaultSection: View {
         switch sweeper.phase {
         case .reading(let done, let total) where total > 0, .learning(let done, let total) where total > 0:
             ProgressView(value: Double(done), total: Double(total)) {
-                Text("Learning from notes · \(done) of \(total)").ionianText(IonianType.small).foregroundStyle(Color.muted)
+                Text("Learning from notes · \(done) of \(total)").ionianText(IonianType.caption).foregroundStyle(Color.muted)
             }
         default:
-            ProgressView { Text("Starting").ionianText(IonianType.small).foregroundStyle(Color.muted) }.progressViewStyle(.linear)
+            ProgressView { Text("Starting").ionianText(IonianType.caption).foregroundStyle(Color.muted) }.progressViewStyle(.linear)
         }
     }
 
@@ -279,7 +279,7 @@ struct ReviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s6) {
                     VStack(alignment: .leading, spacing: Space.s2) {
-                        Text("Review new terms").ionianText(IonianType.title).foregroundStyle(Color.ink)
+                        Text("Review new terms").ionianText(IonianType.card).foregroundStyle(Color.ink)
                         SettingsNote("Untick anything that isn't a name, product or term you use. Unticked terms go to Ignore, "
                             + "so the next scan won't bring them back.")
                     }
@@ -290,7 +290,7 @@ struct ReviewSheet: View {
                                     get: { !removing.contains(e.id) },
                                     set: { keep in if keep { removing.remove(e.id) } else { removing.insert(e.id) } }
                                 )) {
-                                    Text(e.text).ionianText(IonianType.body).foregroundStyle(Color.ink)
+                                    Text(e.text).ionianText(IonianType.small).foregroundStyle(Color.ink)
                                 }
                                 .toggleStyle(.checkbox)
                                 .frame(maxWidth: .infinity, alignment: .leading)

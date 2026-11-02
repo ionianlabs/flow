@@ -332,7 +332,7 @@ private struct HowToSection: View {
                 }
                 step("Let go", "Clean text appears at your cursor.") {
                     Text("The launch moves to Thursday.")
-                        .ionianText(IonianType.body).foregroundStyle(Color.ink)
+                        .ionianText(IonianType.small).foregroundStyle(Color.ink)
                         .padding(.leading, 10).padding(.vertical, 2)
                         .overlay(alignment: .leading) { Rectangle().fill(Color.ink).frame(width: 2) }
                         .fixedSize(horizontal: false, vertical: true)
@@ -349,8 +349,8 @@ private struct HowToSection: View {
     private func step<V: View>(_ title: String, _ text: String, @ViewBuilder visual: () -> V) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             visual().frame(height: Self.visualHeight, alignment: .leading)
-            Text(title).ionianText(IonianType.body, weight: 600).foregroundStyle(Color.ink).padding(.top, 6)
-            Text(text).ionianText(IonianType.small).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            Text(title).ionianText(IonianType.small, weight: 600).foregroundStyle(Color.ink).padding(.top, 6)
+            Text(text).ionianText(IonianType.caption).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// The vocabulary file: names, acronyms and jargon the recognizer should get right. The format and
-/// the Python parser are in asr/vocab.py; keep the two in step. Edits rewrite single lines, so
+/// the Python parser are in asr/vocab.py; the shared Swift parser is VocabularyParser.swift. Edits rewrite single lines, so
 /// free text and anything else in the file stays as it was. The ASR server re-reads the file on
 /// its own when it changes.
 final class VocabularyStore: ObservableObject {
@@ -16,26 +16,10 @@ final class VocabularyStore: ObservableObject {
     }
 
     static let categories = ["People", "Organizations", "Projects", "Products", "Acronyms", "Terms"]
-    private static let start = "<!-- ionian-flow:vault:start", end = "<!-- ionian-flow:vault:end -->"
-    private static let oldStart = "<!-- openflow:vault:start", oldEnd = "<!-- openflow:vault:end -->"  // still read, never written
-    private static func isStart(_ s: String) -> Bool { s.hasPrefix(start) || s.hasPrefix(oldStart) }
-    private static func isEnd(_ s: String) -> Bool { s.hasPrefix(end) || s.hasPrefix(oldEnd) }
-    private static let template = """
-        # Ionian Flow Vocabulary
-
-        Domain:
-
-        Words Ionian Flow should recognize: names, acronyms, product and project words. One per line.
-        To fix a spelling, add what the recognizer writes instead as "(heard as: wrong spelling)".
-        Changes apply to the next dictation.
-
-        ## Terms
-
-        ## People
-
-        ## Ignore
-
-        """
+    private static let start = VocabularyParser.start, end = VocabularyParser.end
+    private static func isStart(_ s: String) -> Bool { VocabularyParser.isStart(s) }
+    private static func isEnd(_ s: String) -> Bool { VocabularyParser.isEnd(s) }
+    private static let template = VocabularyFile.template
 
     let url: URL
     @Published private(set) var entries: [Entry] = []
@@ -66,48 +50,12 @@ final class VocabularyStore: ObservableObject {
         pruneReviewed()
     }
 
-    private static let heardAs = try! NSRegularExpression(pattern: #"\s*\(heard as:\s*(.*?)\)\s*$"#, options: .caseInsensitive)
-
     private static func parse(_ lines: [String]) -> (domain: String?, domainLine: Int?, entries: [Entry], ignored: [String]) {
-        var domain: String?, domainLine: Int?
-        var entries: [Entry] = [], ignored: [String] = []
-        var seen = Set<String>(), ignoredKeys = Set<String>()
-        var inBlock = false
-        var category: String?
-        for (i, raw) in lines.enumerated() {
-            let s = raw.trimmingCharacters(in: .whitespaces)
-            if Self.isStart(s) { inBlock = true; category = nil; continue }
-            if Self.isEnd(s) { inBlock = false; category = nil; continue }
-            if !inBlock, domainLine == nil, s.lowercased().hasPrefix("domain:") {
-                domain = String(s.dropFirst(7)).trimmingCharacters(in: .whitespaces)
-                domainLine = i
-                continue
-            }
-            if inBlock, s.hasPrefix("### ") { category = String(s.dropFirst(4)).trimmingCharacters(in: .whitespaces); continue }
-            if s.hasPrefix("## ") { category = inBlock ? nil : String(s.dropFirst(3)).trimmingCharacters(in: .whitespaces); continue }
-            if s.hasPrefix("#") { if !inBlock { category = nil }; continue }
-            guard let cat = category, s.hasPrefix("- ") || s.hasPrefix("* ") else { continue }
-            var text = String(s.dropFirst(2)).trimmingCharacters(in: .whitespaces)
-            var aliases: [String] = []
-            let ns = text as NSString
-            if let m = heardAs.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) {
-                aliases = ns.substring(with: m.range(at: 1)).split(separator: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                text = ns.substring(to: m.range.location).trimmingCharacters(in: .whitespaces)
-            }
-            guard !text.isEmpty else { continue }
-            let key = text.lowercased()
-            if !inBlock, cat.lowercased() == "ignore" {
-                ignored.append(text)
-                ignoredKeys.insert(key)
-            } else if !seen.contains(key) {
-                seen.insert(key)
-                entries.append(Entry(text: text, category: cat, source: inBlock ? .vault : .mine, aliases: aliases, line: i))
-            }
+        let p = VocabularyParser.parse(lines: lines)
+        let entries = p.terms.map {
+            Entry(text: $0.text, category: $0.category, source: $0.isVault ? .vault : .mine, aliases: $0.aliases, line: $0.line)
         }
-        // Ignore only overrides the vault: a term you listed yourself stays.
-        entries.removeAll { $0.source == .vault && ignoredKeys.contains($0.id) }
-        return (domain, domainLine, entries, ignored)
+        return (p.domainLine == nil ? nil : p.domain, p.domainLine, entries, p.ignored)
     }
 
     // MARK: Review

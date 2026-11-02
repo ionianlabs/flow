@@ -266,6 +266,7 @@ struct StatusDot: View {
             Circle().fill(state.color).frame(width: 7, height: 7)
             MonoLabel(word, color: wordColor)
         }
+        .fixedSize()
         .accessibilityElement(children: .combine)
     }
 }

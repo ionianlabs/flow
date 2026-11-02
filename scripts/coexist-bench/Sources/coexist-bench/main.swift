@@ -300,6 +300,16 @@ func report(_ label: String) {
         partials, finals, pkDone, polDone, queued, f(w.pk), w.pk.count, f(w.pol), w.pol.count, f(w.proc), w.proc.max() ?? 0, w.errs.count))
 }
 
+/// Peak phys_footprint seen by a 2 s sampler (the minute lines only show instants).
+final class Peak: @unchecked Sendable { var mb = 0.0 }
+let peak = Peak()
+let sampler = Task {
+    while !Task.isCancelled {
+        peak.mb = max(peak.mb, physFootprintMB())
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+    }
+}
+
 let reporter = Task {
     var n = 0
     while !Task.isCancelled {
@@ -314,8 +324,8 @@ log("streaming starts: 'You' and 'Them' in real time")
 async let a: Void = runStream("You", you, offset: 0, stride: 2)
 async let b: Void = runStream("Them", them, offset: 7, stride: 2)
 _ = await (a, b)
-reporter.cancel()
+reporter.cancel(); sampler.cancel()
 report("end")
 var errs: [String] = []
 metrics.add { errs = metrics.allErrors }
-log("DONE errors total \(errs.count); peak footprint is the max of the minute lines; process peak rss \(String(format: "%.0f", { var u = rusage(); getrusage(RUSAGE_SELF, &u); return Double(u.ru_maxrss) / 1_048_576 }())) MB")
+log("DONE errors total \(errs.count); sampled peak footprint \(String(format: "%.0f", peak.mb)) MB; process peak rss \(String(format: "%.0f", { var u = rusage(); getrusage(RUSAGE_SELF, &u); return Double(u.ru_maxrss) / 1_048_576 }())) MB")

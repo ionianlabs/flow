@@ -62,6 +62,24 @@ while let line = readLine() {
     guard let data = line.data(using: .utf8),
         let req = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { continue }
+    if req["cmd"] as? String == "forward" {
+        // Raw forward timing: n tokens, full logits evaluated, fresh cache each run.
+        let n = req["n"] as? Int ?? 395
+        let ms: [Double] = await container.perform { context in
+            var out: [Double] = []
+            for _ in 0 ..< 6 {
+                let cache = try! context.model.newCache(parameters: nil)
+                let tokens = MLXArray(Array(repeating: Int32(1000), count: n))[.newAxis, .ellipsis]
+                let t = Date()
+                let logits = context.model(tokens, cache: cache)
+                eval(logits)
+                out.append(Date().timeIntervalSince(t) * 1000)
+            }
+            return out
+        }
+        emit(["forward_ms": ms])
+        continue
+    }
     if req["cmd"] as? String == "stats" {
         emit([
             "load_s": loadSeconds, "rss_mb": rssMB(peak: false), "peak_rss_mb": rssMB(peak: true),
@@ -85,8 +103,12 @@ while let line = readLine() {
         let input = try await container.prepare(
             input: UserInput(chat: msgs, additionalContext: ["enable_thinking": false]))
         var params = GenerateParameters(maxTokens: maxTokens, temperature: 0)
+        // mlx-swift-lm hands a prompt that fits in one prefill step to the decode iterator whole, which
+        // computes logits (a 262k-vocab lm_head) for every prompt position: ~2x slower prefill than
+        // Python. A step of n-1 prefills all but the last token without logits, like mlx-lm does.
+        params.prefill.stepSize = max(1, input.text.tokens.size - 1)
         if let step = ProcessInfo.processInfo.environment["LLM_BENCH_PREFILL_STEP"].flatMap(Int.init) {
-            params.prefill.stepSize = step  // experiment: default chunking splits a 400-token prompt
+            params.prefill.stepSize = step  // experiment override
         }
         let stream = try await container.generate(input: input, parameters: params)
         var out = ""

@@ -8,7 +8,9 @@ Two tasks, per model:
   (recall) and how much of the output is a real name (precision). Needs --vault and --gold.
 
 Models: "mlx:<hf id>" runs in-process like production; "ollama:<tag>" goes through a running
-Ollama server (localhost:11434).
+Ollama server (localhost:11434); "swift:<binary>[ <model dir>]" drives scripts/llm-bench (mlx-swift-lm)
+over JSON lines on stdin/stdout with the same messages, token limit and greedy decoding (the model dir
+defaults to the cached HF snapshot of the production model).
 
 Usage: uv run bench_llm.py mlx:mlx-community/gemma-4-e2b-it-4bit ollama:gemma4:e4b
        uv run bench_llm.py --task sweep --vault ~/notes --gold gold.json ollama:qwen3.5:4b
@@ -18,7 +20,9 @@ The gold file: {"notes": ["notes.md", ...], "must": [...], "ok": [...]} (case-in
 import argparse
 import json
 import re
+import shlex
 import statistics
+import subprocess
 import time
 import urllib.request
 
@@ -58,7 +62,17 @@ class MLX:
         from mlx_lm import load
 
         self.name = "mlx:" + model_id
+        t = time.perf_counter()
         self.model, self.tok = load(model_id)
+        self.load_s = time.perf_counter() - t
+
+    def stats(self) -> dict:
+        import resource
+
+        import mlx.core as mx
+
+        return {"peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1048576,
+                "mlx_active_mb": mx.get_active_memory() / 1048576, "mlx_peak_mb": mx.get_peak_memory() / 1048576}
 
     def ask(self, system_or_msgs, user=None, max_tokens=300, one_line=False):
         from mlx_lm import stream_generate
@@ -98,8 +112,52 @@ class Ollama:
             raise
 
 
+class Swift:
+    """scripts/llm-bench: the chat template, generation and one-line stop all run in Swift."""
+
+    def __init__(self, cmd: str):
+        import glob
+        import os
+
+        argv = shlex.split(cmd)
+        if len(argv) == 1:
+            snaps = glob.glob(os.path.expanduser(
+                "~/.cache/huggingface/hub/models--mlx-community--gemma-4-e2b-it-4bit/snapshots/*"))
+            argv.append(snaps[0])
+        self.name = "swift:" + argv[0]
+        t = time.perf_counter()
+        self.proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
+        self.stats()  # returns once the model is loaded
+        self.load_s = time.perf_counter() - t
+
+    def _call(self, obj: dict) -> dict:
+        self.proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        self.proc.stdin.flush()
+        return json.loads(self.proc.stdout.readline())
+
+    def stats(self) -> dict:
+        return self._call({"cmd": "stats"})
+
+    def ask(self, system_or_msgs, user=None, max_tokens=300, one_line=False):
+        msgs = system_or_msgs if user is None else [{"role": "system", "content": system_or_msgs},
+                                                    {"role": "user", "content": user}]
+        r = self._call({"messages": msgs, "max_tokens": max_tokens, "one_line": one_line})
+        if "error" in r:
+            raise RuntimeError(r["error"])
+        return r["text"]
+
+    def __del__(self):
+        try:
+            self.proc.stdin.close()
+            self.proc.wait(timeout=10)
+        except Exception:
+            pass
+
+
 def backend(spec: str):
     kind, _, name = spec.partition(":")
+    if kind == "swift":
+        return Swift(name)
     return MLX(name) if kind == "mlx" else Ollama(name)
 
 
@@ -107,7 +165,7 @@ def has(text: str, needle: str) -> bool:
     return needle[1:].lower() in text.lower() if needle.startswith("~") else needle in text
 
 
-def bench_polish(llm, show: bool) -> dict:
+def bench_polish(llm, show: bool, dump: list | None = None) -> dict:
     p = polish.Polisher.__new__(polish.Polisher)  # only for context(); no model, no thread
     llm.ask(polish.messages("warm up"), max_tokens=5, one_line=True)
     passed, times, fails = 0, [], []
@@ -118,6 +176,8 @@ def bench_polish(llm, show: bool) -> dict:
         out = polish.finish(text, llm.ask(polish.messages(text, context), max_tokens=polish.max_tokens(text),
                                           one_line=True), context)
         times.append(time.perf_counter() - t)
+        if dump is not None:
+            dump.append({"text": text, "out": out})
         ok = all(has(out, m) for m in must) and not any(has(out, m) for m in must_not)
         passed += ok
         if not ok:
@@ -154,6 +214,7 @@ def main():
     ap.add_argument("--vault")
     ap.add_argument("--gold")
     ap.add_argument("--chunk", type=int, default=sweep.CHUNK, help="characters per sweep LLM call")
+    ap.add_argument("--dump", help="write each polish case's final output to this JSON file, to diff backends")
     ap.add_argument("--show", action="store_true", help="print failures, misses and junk")
     args = ap.parse_args()
     gold = json.load(open(args.gold)) if args.gold else None
@@ -162,9 +223,14 @@ def main():
         llm = backend(spec)
         row = {"model": spec}
         if args.task in ("polish", "both"):
-            row |= bench_polish(llm, args.show)
+            dump = [] if args.dump else None
+            row |= bench_polish(llm, args.show, dump)
+            if dump is not None:
+                json.dump(dump, open(args.dump, "w"), ensure_ascii=False, indent=1)
         if args.task in ("sweep", "both") and gold:
             row |= bench_sweep(llm, args.vault, gold, args.show)
+        if hasattr(llm, "stats"):
+            row |= {"load_s": round(llm.load_s, 2)} | {k: round(v) for k, v in llm.stats().items() if k != "load_s"}
         print(json.dumps(row, ensure_ascii=False), flush=True)
         del llm
 

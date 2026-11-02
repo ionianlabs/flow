@@ -82,10 +82,10 @@ func runMixed(_ args: Args) async throws {
             }
         }
         for (id, text) in denglisch {
-            let aiff = wavDir.appendingPathComponent("\(id).aiff")
+            let aiff = wavDir.appendingPathComponent("\(id)-say.wav")
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/say")
-            p.arguments = ["-v", "Anna", "-o", aiff.path, "--data-format=LEI16@16000", text]
+            p.arguments = ["-v", "Anna", "-o", aiff.path, "--file-format=WAVE", "--data-format=LEI16@16000", text]
             try p.run(); p.waitUntilExit()
             try writeWav(try readSamples(aiff), to: wavDir.appendingPathComponent("\(id).wav"))
             try? FileManager.default.removeItem(at: aiff)

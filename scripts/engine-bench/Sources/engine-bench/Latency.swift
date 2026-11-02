@@ -80,6 +80,7 @@ func runLatency(_ args: Args) async throws {
         let releaseMs = (now() - release) * 1000
         await manager.reset()
         let words = wordEnds(timings)
+        if args.options["debug"] != nil { say(timings.prefix(14).map { "[\($0.token)]" }.joined()) }
         let lags = zip(appeared, words).map { ($0 - $1.end) * 1000 }
         let r = ClipLatency(
             id: clip.id, lang: clip.lang, text: text, firstPartialS: firstPartial,

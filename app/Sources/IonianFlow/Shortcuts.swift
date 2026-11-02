@@ -150,29 +150,23 @@ struct ShortcutRecorder: View {
     @State private var warning: String?
 
     var body: some View {
-        HStack(spacing: Space.s3) {
+        HStack(spacing: 8) {
             if let warning {
-                Text(warning).ionianText(IonianType.small).foregroundStyle(Color.ink)
+                Text(warning).font(.footnote).foregroundStyle(.secondary)
             }
             Button(action: toggle) {
                 let set = shortcut != nil && !recording
                 Text(recording ? "Press keys" : shortcut?.display ?? placeholder)
-                    .ionianText(IonianType.code)
-                    .textCase(recording ? .uppercase : nil)
-                    .foregroundStyle(set ? Color.ink : Color.muted)
-                    .padding(.horizontal, Space.s3)
-                    .frame(minWidth: 130, minHeight: 30)
-                    .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Color.codeBg))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                        .strokeBorder(Color.ink, lineWidth: 1).opacity(recording ? 1 : 0))  // no border at rest (MAC-10)
-                    .contentShape(Rectangle())
+                    .foregroundStyle(set || recording ? .primary : .secondary)
+                    .frame(minWidth: 110)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .tint(recording ? Color.accent : nil)
             .help(recording ? "Press the keys now. Delete removes the shortcut, Esc cancels."
                   : "Click, then press the key combination you want")
             if shortcut != nil && !recording {
-                Button("Reset ›") { set(nil) }
-                    .buttonStyle(.monoLink)
+                Button("Reset") { set(nil) }
+                    .buttonStyle(.link)
                     .help("Back to: \(placeholder)")
             }
         }

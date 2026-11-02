@@ -175,7 +175,6 @@ private struct MainView: View {
             }
             .navigationTitle(model.page.rawValue)
         }
-        .tint(Color.btnBg)
     }
 }
 
@@ -211,6 +210,7 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .tint(Color.btnBg)
         .safeAreaInset(edge: .top, spacing: 0) {
             Lockup().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 8)
         }

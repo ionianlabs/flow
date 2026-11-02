@@ -33,6 +33,15 @@ import SwiftUI
         "panel-empty": Surface(size: CGSize(width: 560, height: 700), backdrop: true, make: {
             AnyView(transcriptPreview(empty: true).frame(width: 400, height: 640))
         }),
+        "panel-ended": Surface(size: CGSize(width: 560, height: 700), backdrop: true, make: {
+            AnyView(transcriptPreview(ended: true).frame(width: 400, height: 640))
+        }),
+        "panel-min": Surface(size: CGSize(width: 400, height: 460), backdrop: true, make: {
+            AnyView(transcriptPreview(ended: true).frame(width: WindowLayout.transcriptMin.width, height: WindowLayout.transcriptMin.height))
+        }),
+        "panel-min-live": Surface(size: CGSize(width: 400, height: 460), backdrop: true, make: {
+            AnyView(transcriptPreview().frame(width: WindowLayout.transcriptMin.width, height: WindowLayout.transcriptMin.height))
+        }),
         "panel": Surface(size: CGSize(width: 560, height: 700), backdrop: true, make: {
             AnyView(transcriptPreview().frame(width: 400, height: 640))
         }),

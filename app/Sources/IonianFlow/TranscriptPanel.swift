@@ -110,7 +110,7 @@ private struct TranscriptView: View {
 
     @ViewBuilder private var header: some View {
         if model.ended != nil {
-            HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
+            HStack(alignment: .center, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("Saved").ionianText(IonianType.card).foregroundStyle(Color.ink)
                     if let url = model.fileURL {
@@ -121,19 +121,24 @@ private struct TranscriptView: View {
                     }
                 }
                 Spacer(minLength: Space.s2)
-                HStack(spacing: Space.s4) {
-                    Button("Copy ›") {
+                HStack(spacing: Space.s1) {
+                    Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(TranscriptStore.markdown(model), forType: .string)
-                    }
+                    } label: { Image(systemName: "doc.on.doc") }
                     .help("Copy as Markdown")
-                    Button("Folder ↗") {
+                    .accessibilityLabel("Copy as Markdown")
+                    Button {
                         if let url = model.fileURL { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                    }
+                    } label: { Image(systemName: "folder") }
                     .help("Show in Finder")
-                    Button("Close ›", action: onClose)
+                    .accessibilityLabel("Show in Finder")
+                    Button(action: onClose) { Image(systemName: "xmark") }
+                        .help("Close")
+                        .accessibilityLabel("Close")
                 }
-                .buttonStyle(.monoLink)
+                .buttonStyle(IconButtonStyle())
+                .fixedSize()
             }
         } else {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -153,7 +158,7 @@ private struct TranscriptView: View {
                 HStack(spacing: Space.s6) {
                     meter("You", color: Color.accent, level: model.level)
                         .help("Your microphone")
-                    meter("Them", color: Color.muted, level: model.themLevel)
+                    meter("Them", color: Color.tide, level: model.themLevel)
                         .help("What your Mac plays. Flat while nothing plays. If it stays flat while others talk, allow "
                             + "Ionian Flow in System Settings, Privacy & Security, Screen & System Audio Recording.")
                 }
@@ -181,7 +186,10 @@ private struct TranscriptView: View {
             VStack(spacing: Space.s2) {
                 Text(model.ended == nil ? "Listening" : "Nothing was said.")
                     .ionianText(IonianType.small, weight: 500).foregroundStyle(Color.muted)
-                MonoLabel("You: your mic · Them: what your Mac plays", color: Color.muted)
+                (Text("You").foregroundStyle(Color.accent) + Text(": your mic · ")
+                    + Text("Them").foregroundStyle(Color.tide) + Text(": what your Mac plays"))
+                    .ionianText(IonianType.label).foregroundStyle(Color.muted)
+                    .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if still {
@@ -221,11 +229,13 @@ private struct TranscriptView: View {
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if !following {
-                        Button("Latest ↓") {
+                        Button {
                             following = true
                             withAnimation(Self.smooth) { proxy.scrollTo(Self.end, anchor: .bottom) }
-                        }
-                        .buttonStyle(.monoLink)
+                        } label: { Image(systemName: "arrow.down") }
+                        .buttonStyle(IconButtonStyle())
+                        .help("Jump to the latest")
+                        .accessibilityLabel("Jump to the latest")
                         .padding(Space.s4)
                         .transition(.opacity)
                     }
@@ -261,11 +271,12 @@ private struct TranscriptView: View {
 
 private struct BlockView: View {
     let block: TranscriptModel.Block
+    private var color: Color { block.speaker == .you ? Color.accent : Color.tide }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
-                MonoLabel(block.speaker.rawValue, color: block.speaker == .you ? Color.accent : Color.muted)
+                MonoLabel(block.speaker.rawValue, color: color)
                 MonoLabel(TranscriptStore.format(block.start, "HH:mm"), color: Color.muted)  // faint is too weak on glass (COL-04)
             }
             // One flowing paragraph; text still being recognized is muted until the final decoder confirms it.
@@ -279,11 +290,45 @@ private struct BlockView: View {
             .contentTransition(.interpolate)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.leading, Space.s3)
+        .overlay(alignment: .leading) { Capsule().fill(color).frame(width: 2) }  // the speaker's rule
+    }
+}
+
+/// Teal for "Them", next to accent for "You". Darker in light mode for contrast on glass.
+private extension Color {
+    static let tide = Color(nsColor: NSColor(name: nil) {
+        $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 72 / 255, green: 200 / 255, blue: 182 / 255, alpha: 1)
+            : NSColor(srgbRed: 10 / 255, green: 122 / 255, blue: 112 / 255, alpha: 1)
+    })
+}
+
+/// A compact square icon button: muted glyph, ink with a faint well on hover. Fixed size, never wraps.
+private struct IconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Label(configuration: configuration) }
+
+    private struct Label: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var enabled
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(hovering || configuration.isPressed ? Color.ink : Color.muted)
+                .frame(width: 28, height: 28)
+                .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                    .fill(hovering || configuration.isPressed ? Color.codeBg : .clear))
+                .opacity(enabled ? 1 : 0.4)
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+        }
     }
 }
 
 /// The panel in the middle of a meeting, for the offscreen renderer (`--render panel`).
-@MainActor func transcriptPreview(empty: Bool = false) -> some View {
+@MainActor func transcriptPreview(empty: Bool = false, ended: Bool = false) -> some View {
     let model = TranscriptModel()
     let now = Date()
     model.started = now.addingTimeInterval(-754)
@@ -301,6 +346,10 @@ private struct BlockView: View {
         let start = now.addingTimeInterval(Double(i - lines.count) * 25)
         return TranscriptSegment(id: i + 1, speaker: line.0, start: start, end: start.addingTimeInterval(20),
                                  text: line.1, stage: line.2)
+    }
+    if ended {
+        model.ended = now
+        model.fileURL = URL(fileURLWithPath: "/tmp/2026-11-02 Release sync.md")
     }
     return TranscriptView(model: model, onStop: {}, onClose: {}, still: true)
 }

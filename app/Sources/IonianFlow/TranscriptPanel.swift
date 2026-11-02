@@ -158,7 +158,7 @@ private struct TranscriptView: View {
                 HStack(spacing: Space.s6) {
                     meter("You", color: Color.accent, level: model.level)
                         .help("Your microphone")
-                    meter("Them", color: Color.tide, level: model.themLevel)
+                    meter("Them", color: Color.muted, level: model.themLevel)
                         .help("What your Mac plays. Flat while nothing plays. If it stays flat while others talk, allow "
                             + "Ionian Flow in System Settings, Privacy & Security, Screen & System Audio Recording.")
                 }
@@ -186,8 +186,7 @@ private struct TranscriptView: View {
             VStack(spacing: Space.s2) {
                 Text(model.ended == nil ? "Listening" : "Nothing was said.")
                     .ionianText(IonianType.small, weight: 500).foregroundStyle(Color.muted)
-                (Text("You").foregroundStyle(Color.accent) + Text(": your mic · ")
-                    + Text("Them").foregroundStyle(Color.tide) + Text(": what your Mac plays"))
+                (Text("You").foregroundStyle(Color.accent) + Text(": your mic · Them: what your Mac plays"))
                     .ionianText(IonianType.label).foregroundStyle(Color.muted)
                     .multilineTextAlignment(.center)
             }
@@ -271,7 +270,7 @@ private struct TranscriptView: View {
 
 private struct BlockView: View {
     let block: TranscriptModel.Block
-    private var color: Color { block.speaker == .you ? Color.accent : Color.tide }
+    private var color: Color { block.speaker == .you ? Color.accent : Color.muted }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
@@ -293,15 +292,6 @@ private struct BlockView: View {
         .padding(.leading, Space.s3)
         .overlay(alignment: .leading) { Capsule().fill(color).frame(width: 2) }  // the speaker's rule
     }
-}
-
-/// Teal for "Them", next to accent for "You". Darker in light mode for contrast on glass.
-private extension Color {
-    static let tide = Color(nsColor: NSColor(name: nil) {
-        $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 72 / 255, green: 200 / 255, blue: 182 / 255, alpha: 1)
-            : NSColor(srgbRed: 10 / 255, green: 122 / 255, blue: 112 / 255, alpha: 1)
-    })
 }
 
 /// A compact square icon button: muted glyph, ink with a faint well on hover. Fixed size, never wraps.

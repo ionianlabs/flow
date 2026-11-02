@@ -344,8 +344,7 @@ private struct HowToSection: View {
                 LabeledContent {
                     Button("Open Setup Guide", action: actions.showSetupGuide)
                 } label: {
-                    Label("Keys need permissions.", systemImage: "exclamationmark.triangle.fill")
-                        .symbolRenderingMode(.multicolor)
+                    Text("Keys need permissions.")
                 }
             }
         }

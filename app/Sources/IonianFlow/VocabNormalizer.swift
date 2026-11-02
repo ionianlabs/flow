@@ -191,11 +191,11 @@ private final class FuzzyTerms {
                 let scalars = Array(key.unicodeScalars)
                 if keys[n] == nil || scalars.count < 5 || text[key] != nil
                     || spanWords.allSatisfy({ freq.common($0, zipf: n > 1 ? 4.0 : 3.0) }) { continue }
-                // extractOne: the best score from 0.6 up, the first of equals.
+                // extractOne: the best score above 0.6 (rapidfuzz drops exactly 0.6, e.g. 2 edits in 5 letters), the first of equals.
                 var best: (index: Int, score: Double)?
                 for (k, cand) in keys[n]!.enumerated() {
                     let score = Self.similarity(scalars, cand)
-                    if score >= 0.6, score > (best?.score ?? -1) { best = (k, score) }
+                    if score > 0.6, score > (best?.score ?? -1) { best = (k, score) }
                 }
                 guard let b = best else { continue }
                 let match = keyStrings[n]![b.index]
@@ -351,6 +351,17 @@ extension VocabNormalizer {
 
         print(ok ? "normalizer ok" : "normalizer FAILED")
         return ok
+    }
+
+    /// Dev hook for scripts/vocab_parity.py: `--wordfreq-zipf words.txt` prints "de en" Zipf values per line.
+    static func zipfFile(_ path: String) -> Bool {
+        guard let words = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
+        let f = WordFrequencyTable.shared
+        for w in words.components(separatedBy: "\n") {
+            let lw = w.lowercased()
+            print(String(format: "%.2f %.2f", f.zipf(lw, lang: .de), f.zipf(lw, lang: .en)))
+        }
+        return true
     }
 
     /// Dev hook for scripts/vocab_parity.py: `--vocab-normalize vocab.md lines.txt` prints each line normalized.

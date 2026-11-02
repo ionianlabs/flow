@@ -9,6 +9,10 @@ if let i = CommandLine.arguments.firstIndex(of: "--vocab-normalize"), CommandLin
     exit(VocabNormalizer.normalizeFile(vocabulary: CommandLine.arguments[i + 1], input: CommandLine.arguments[i + 2]) ? 0 : 1)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--wordfreq-zipf"), CommandLine.arguments.count > i + 1 {
+    exit(VocabNormalizer.zipfFile(CommandLine.arguments[i + 1]) ? 0 : 1)
+}
+
 if CommandLine.arguments.contains("--selftest") {
     let fillers = FillerFilter.selfTest()
     let formatting = TextFormatter.selfTest()

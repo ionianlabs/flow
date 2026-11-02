@@ -256,8 +256,8 @@ private struct TermRow: View {
         LabeledContent {
             HStack(spacing: 8) {
                 if entry.source == .mine { Text("Added by you").font(.footnote).foregroundStyle(.secondary) }
-                Button { onRemove(entry) } label: { Image(systemName: "minus.circle") }
-                    .buttonStyle(.borderless)
+                Button("Remove") { onRemove(entry) }
+                    .buttonStyle(.link)
                     .opacity(hovering ? 1 : 0)
                     .help(entry.source == .mine ? "Remove this term" : "Remove it. The vault scan won't add it again.")
                     .accessibilityLabel("Remove \(entry.text)")

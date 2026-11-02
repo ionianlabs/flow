@@ -35,8 +35,8 @@ struct AppActions {
     var vocabulary: VocabularyActions
 }
 
-/// The Ionian Flow window: settings and the vocabulary, one page each, in Ionian Flow's own look (see
-/// Theme.swift) inside a regular macOS window with a native sidebar and grouped forms. While it's open Ionian Flow is a regular app (Dock,
+/// The Ionian Flow window: settings and the vocabulary, one page each, in Ionian Flow's brand skin (see
+/// Theme.swift) on a native split view and sidebar. While it's open Ionian Flow is a regular app (Dock,
 /// ⌘-Tab, an app menu, and with it ⌘C/⌘V in text fields); closed, it's back to the menu bar only.
 final class MainWindow {
     let model: AppModel
@@ -166,16 +166,16 @@ private struct MainView: View {
         } detail: {
             Group {
                 switch model.page {
-                case .general: SettingsForm { GeneralPage(model: model, actions: actions) }
-                case .shortcuts: SettingsForm { ShortcutsPage(model: model, actions: actions) }
-                case .dictation: SettingsForm { DictationPage(actions: actions) }
-                case .transcription: SettingsForm { TranscriptionPage(model: model, actions: actions) }
+                case .general: GeneralPage(model: model, actions: actions)
+                case .shortcuts: ShortcutsPage(model: model, actions: actions)
+                case .dictation: DictationPage(actions: actions)
+                case .transcription: TranscriptionPage(model: model, actions: actions)
                 case .vocabulary: VocabularyPage(store: store, sweeper: sweeper, actions: actions.vocabulary, query: query, open: category)
                 }
             }
             .navigationTitle(model.page.rawValue)
         }
-        .tint(Color.accent)
+        .tint(Color.btnBg)
     }
 }
 
@@ -201,7 +201,7 @@ private struct Sidebar: View {
         List(selection: Binding(get: { model.page }, set: { if let page = $0 { model.page = page } })) {
             ForEach(AppModel.Page.allCases) { page in
                 HStack {
-                    Label(page.rawValue, systemImage: page.symbol)
+                    Label { Text(page.rawValue).ionianText(IonianType.small) } icon: { Image(systemName: page.symbol) }
                     if page == .vocabulary && sweeper.running {
                         Spacer()
                         ProgressView().controlSize(.mini)
@@ -216,9 +216,9 @@ private struct Sidebar: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                if model.transcribing { StatusLabel(model.transcribingStatus) }
-                StatusLabel(model.recognizerStatus)
-                Text("On this Mac · \(version)").font(.footnote).foregroundStyle(.tertiary)
+                if model.transcribing { StatusDot(state: .working, word: "Transcribing", wordColor: Color.muted) }
+                StatusDot(state: model.recognizerStatus.state, word: model.recognizerStatus.word, wordColor: Color.muted)
+                MonoLabel("On this Mac · \(version)")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -233,19 +233,6 @@ private struct Sidebar: View {
     }
 }
 
-extension AppModel {
-    var transcribingStatus: StatusDot { StatusDot(state: .working, word: "Transcribing") }
-}
-
-/// A settings page: a native grouped form.
-private struct SettingsForm<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        Form { content }.formStyle(.grouped)
-    }
-}
-
 private struct GeneralPage: View {
     @ObservedObject var model: AppModel
     var actions: AppActions
@@ -253,36 +240,35 @@ private struct GeneralPage: View {
     @State private var login = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        StatsSection(model: model)
-        HowToSection(model: model, actions: actions)
-        Section("Speech model") {
-            LabeledContent {
-                HStack(spacing: 12) {
-                    StatusLabel(model.recognizerStatus)
-                    Button("Restart", action: actions.restartASR)
-                    Button("Open Log", action: actions.openLog)
-                }
-            } label: {
-                SettingLabel("Recognizer", "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.")
-            }
-        }
-        Section("App") {
-            LabeledContent {
-                Button("Open", action: actions.showSetupGuide)
-            } label: {
-                SettingLabel("Setup guide", "Permissions, your dictation key and a field to try it.")
-            }
-            Toggle(isOn: $sounds) { SettingLabel("Sounds", "A short sound when dictation starts and ends.") }
-                .onChange(of: sounds) { Settings.sounds = sounds }
-            Toggle("Launch at login", isOn: $login)
-                .onChange(of: login) {
-                    do {
-                        if login { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                    } catch {
-                        NSLog("Ionian Flow: launch at login failed: %@", error.localizedDescription)
-                        login = SMAppService.mainApp.status == .enabled
+        SettingsPage(.general) {
+            StatsSection(model: model)
+            HowToSection(model: model, actions: actions)
+            SettingsSection("Speech model") {
+                SettingRow("Recognizer", "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.") {
+                    HStack(spacing: Space.s4) {
+                        StatusDot(state: model.recognizerStatus.state, word: model.recognizerStatus.word, wordColor: Color.muted)
+                        Button("Restart ›", action: actions.restartASR)
+                        Button("Open log ↗", action: actions.openLog)
                     }
+                    .buttonStyle(.monoLink)
                 }
+            }
+            SettingsSection("App") {
+                SettingRow("Setup guide", "Permissions, your dictation key and a field to try it.") {
+                    Button("Open ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
+                }
+                SettingToggle("Sounds", "A short sound when dictation starts and ends.", isOn: $sounds)
+                    .onChange(of: sounds) { Settings.sounds = sounds }
+                SettingToggle("Launch at login", isOn: $login)
+                    .onChange(of: login) {
+                        do {
+                            if login { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                        } catch {
+                            NSLog("Ionian Flow: launch at login failed: %@", error.localizedDescription)
+                            login = SMAppService.mainApp.status == .enabled
+                        }
+                    }
+            }
         }
     }
 }
@@ -295,18 +281,14 @@ private struct StatsSection: View {
     var body: some View {
         let _ = model.statsRevision
         let empty = Stats.words == 0 && Stats.transcribedSeconds == 0
-        Section {
-            LabeledContent("Words dictated", value: Stats.words.formatted())
-            LabeledContent("Meetings transcribed", value: Self.duration(Stats.transcribedSeconds))
-            LabeledContent("Saved over typing", value: (Stats.savedSeconds >= 60 ? "≈ " : "") + Self.duration(Stats.savedSeconds))
-        } header: {
-            HStack {
-                Text("So far")
-                Spacer()
-                if !empty { Button("Reset…") { confirmReset = true }.buttonStyle(.link).textCase(nil) }
-            }
-        } footer: {
-            if empty { Text("Your first dictation starts the count. Flow keeps only the totals, never the text.") }
+        SettingsSection("So far", accessory: {
+            if !empty { Button("Reset ›") { confirmReset = true }.buttonStyle(.monoLink) }
+        }, footer: {
+            if empty { SettingsNote("Your first dictation starts the count. Flow keeps only the totals, never the text.") }
+        }) {
+            stat("Words dictated", Stats.words.formatted())
+            stat("Meetings transcribed", Self.duration(Stats.transcribedSeconds))
+            stat("Saved over typing", (Stats.savedSeconds >= 60 ? "≈ " : "") + Self.duration(Stats.savedSeconds))
         }
         .confirmationDialog("Reset the totals to zero.", isPresented: $confirmReset) {
             Button("Reset") {
@@ -314,6 +296,10 @@ private struct StatsSection: View {
                 model.statsRevision += 1
             }
         }
+    }
+
+    private func stat(_ title: String, _ value: String) -> some View {
+        SettingRow(title) { Text(value).ionianText(IonianType.code).foregroundStyle(Color.muted) }
     }
 
     /// "0 min", "42 min", "3 h", "6 h 40 min".
@@ -335,17 +321,9 @@ private struct HowToSection: View {
     var body: some View {
         let _ = model.shortcutsRevision
         let key = Settings.dictationKey
-        if !model.hotkeyActive {
-            Section {
-                LabeledContent {
-                    Button("Open Setup Guide", action: actions.showSetupGuide)
-                } label: {
-                    Text("Keys need permissions.")
-                }
-            }
-        }
-        Section("How it works") {
-            HStack(alignment: .top, spacing: 20) {
+        if !model.hotkeyActive { PermissionsNotice(actions: actions) }
+        SettingsSection("How it works") {
+            HStack(alignment: .top, spacing: Space.s5) {
                 step("Hold the key", "Hold \(key.name) wherever you can type.") {
                     Key(label: key.keyLabel, size: key == .fn ? 16 : 24, held: true).scaleEffect(0.8, anchor: .leading)
                 }
@@ -354,26 +332,40 @@ private struct HowToSection: View {
                 }
                 step("Let go", "Clean text appears at your cursor.") {
                     Text("The launch moves to Thursday.")
+                        .ionianText(IonianType.body).foregroundStyle(Color.ink)
                         .padding(.leading, 10).padding(.vertical, 2)
-                        .overlay(alignment: .leading) { Rectangle().fill(Color.accent).frame(width: 2) }
+                        .overlay(alignment: .leading) { Rectangle().fill(Color.ink).frame(width: 2) }
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.vertical, 8)
-            LabeledContent("Transcribe a meeting") {
+            .padding(.vertical, Space.s2)
+            SettingRow("Transcribe a meeting") {
                 KeyChip(Settings.transcriptionShortcut?.display ?? "Double-tap \(key.name)")
             }
-            LabeledContent("Cancel while dictating") { KeyChip(Settings.cancelShortcut.display) }
+            SettingRow("Cancel while dictating") { KeyChip(Settings.cancelShortcut.display) }
         }
     }
 
     private func step<V: View>(_ title: String, _ text: String, @ViewBuilder visual: () -> V) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             visual().frame(height: Self.visualHeight, alignment: .leading)
-            Text(title).font(.headline).padding(.top, 6)
-            Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(title).ionianText(IonianType.body, weight: 600).foregroundStyle(Color.ink).padding(.top, 6)
+            Text(text).ionianText(IonianType.small).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Keys can't work without permissions: a plain sentence and the way to fix it.
+private struct PermissionsNotice: View {
+    var actions: AppActions
+
+    var body: some View {
+        SettingsSection {
+            SettingRow("Keys need permissions.") {
+                Button("Open setup guide ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
+            }
+        }
     }
 }
 
@@ -386,47 +378,38 @@ private struct ShortcutsPage: View {
     @State private var cancel: Shortcut? = Settings.cancelShortcut == .escape ? nil : Settings.cancelShortcut
 
     var body: some View {
-        Section {
-            Picker(selection: $key) {
-                ForEach(DictationKey.allCases) { Text($0.name).tag($0) }
-            } label: {
-                SettingLabel("Dictate", "Hold this key while you talk.")
-            }
-            .onChange(of: key) { Settings.dictationKey = key; actions.applyShortcuts() }
-            LabeledContent {
-                ShortcutRecorder(shortcut: $transcription, placeholder: "Double-tap \(key.name)") {
-                    Settings.transcriptionShortcut = transcription
-                    actions.applyShortcuts()
+        SettingsPage(.shortcuts) {
+            SettingsSection(note: model.hotkeyActive
+                ? "Click a shortcut, then press the keys. Combinations need ⌘, ⌥ or ⌃."
+                : "Shortcuts don't work yet. Allow Input Monitoring and Accessibility, then restart Flow.",
+                ink: !model.hotkeyActive) {
+                SettingRow("Dictate", "Hold this key while you talk.") {
+                    Picker("Dictate", selection: $key) {
+                        ForEach(DictationKey.allCases) { Text($0.name).tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                    .onChange(of: key) { Settings.dictationKey = key; actions.applyShortcuts() }
                 }
-            } label: {
-                SettingLabel("Transcribe a meeting", "Opens the transcript panel. The same keys stop it.")
-            }
-            LabeledContent {
-                ShortcutRecorder(shortcut: $handsFree, placeholder: "Menu bar only") {
-                    Settings.handsFreeShortcut = handsFree
-                    actions.applyShortcuts()
+                SettingRow("Transcribe a meeting", "Opens the transcript panel. The same keys stop it.") {
+                    ShortcutRecorder(shortcut: $transcription, placeholder: "Double-tap \(key.name)") {
+                        Settings.transcriptionShortcut = transcription
+                        actions.applyShortcuts()
+                    }
                 }
-            } label: {
-                SettingLabel("Hands-free dictation", "Dictate without holding a key. Tap the key to finish.")
-            }
-            LabeledContent {
-                ShortcutRecorder(shortcut: $cancel, placeholder: "Esc", requireModifier: false) {
-                    Settings.cancelShortcut = cancel ?? .escape
-                    actions.applyShortcuts()
+                SettingRow("Hands-free dictation", "Dictate without holding a key. Tap the key to finish.") {
+                    ShortcutRecorder(shortcut: $handsFree, placeholder: "Menu bar only") {
+                        Settings.handsFreeShortcut = handsFree
+                        actions.applyShortcuts()
+                    }
                 }
-            } label: {
-                SettingLabel("Cancel a dictation", "Nothing is pasted.")
+                SettingRow("Cancel a dictation", "Nothing is pasted.") {
+                    ShortcutRecorder(shortcut: $cancel, placeholder: "Esc", requireModifier: false) {
+                        Settings.cancelShortcut = cancel ?? .escape
+                        actions.applyShortcuts()
+                    }
+                }
             }
-        } footer: {
-            if model.hotkeyActive {
-                Text("Click a shortcut, then press the keys. Combinations need ⌘, ⌥ or ⌃.")
-            } else {
-                Text("Shortcuts don't work yet. Allow Input Monitoring and Accessibility, then restart Flow.")
-                    .foregroundStyle(.primary)
-            }
-        }
-        if !model.hotkeyActive {
-            Section { Button("Open Setup Guide", action: actions.showSetupGuide) }
+            if !model.hotkeyActive { PermissionsNotice(actions: actions) }
         }
     }
 }
@@ -439,38 +422,36 @@ private struct DictationPage: View {
     @State private var keepMicWarm = Settings.keepMicWarm
 
     var body: some View {
-        Section {
-            Picker(selection: $language) {
-                Text("Detect automatically").tag("auto")
-                Text("Deutsch").tag("de-DE")
-                Text("English").tag("en-US")
-            } label: {
-                SettingLabel("Language", "Flow detects German and English per dictation.")
-            }
-            .onChange(of: language) { Settings.language = language }
-            Picker("Microphone", selection: $microphone) {
-                Text("Automatic" + (AudioDevices.resolve("auto").map { " (\($0.name))" } ?? "")).tag("auto")
-                Text("System default").tag("default")
-                Divider()
-                ForEach(AudioDevices.inputs(), id: \.uid) { d in
-                    Text(d.name + (d.isBluetooth ? " (Bluetooth)" : "")).tag(d.uid)
+        SettingsPage(.dictation) {
+            SettingsSection("Input", note: "A Bluetooth headset mic drops the headset to low-quality call audio, so Automatic uses the built-in mic.") {
+                SettingRow("Language", "Flow detects German and English per dictation.") {
+                    Picker("Language", selection: $language) {
+                        Text("Detect automatically").tag("auto")
+                        Text("Deutsch").tag("de-DE")
+                        Text("English").tag("en-US")
+                    }
+                    .labelsHidden().fixedSize()
+                    .onChange(of: language) { Settings.language = language }
+                }
+                SettingRow("Microphone") {
+                    Picker("Microphone", selection: $microphone) {
+                        Text("Automatic" + (AudioDevices.resolve("auto").map { " (\($0.name))" } ?? "")).tag("auto")
+                        Text("System default").tag("default")
+                        Divider()
+                        ForEach(AudioDevices.inputs(), id: \.uid) { d in
+                            Text(d.name + (d.isBluetooth ? " (Bluetooth)" : "")).tag(d.uid)
+                        }
+                    }
+                    .labelsHidden().fixedSize()
+                    .onChange(of: microphone) { actions.setMicrophone(microphone) }
                 }
             }
-            .onChange(of: microphone) { actions.setMicrophone(microphone) }
-        } header: {
-            Text("Input")
-        } footer: {
-            Text("A Bluetooth headset mic drops the headset to low-quality call audio, so Automatic uses the built-in mic.")
-        }
-        Section {
-            Toggle(isOn: $trailingSpace) { SettingLabel("Add a space after the text", "So the next dictation doesn't run into this one.") }
-                .onChange(of: trailingSpace) { Settings.trailingSpace = trailingSpace }
-            Toggle(isOn: $keepMicWarm) { SettingLabel("Keep the mic ready for 30 s", "No clipped first word when you dictate in quick succession.") }
-                .onChange(of: keepMicWarm) { actions.setKeepMicWarm(keepMicWarm) }
-        } header: {
-            Text("Text")
-        } footer: {
-            Text("A ready mic starts the next dictation at once. The orange mic indicator stays on a little longer.")
+            SettingsSection("Text", note: "A ready mic starts the next dictation at once. The orange mic indicator stays on a little longer.") {
+                SettingToggle("Add a space after the text", "So the next dictation doesn't run into this one.", isOn: $trailingSpace)
+                    .onChange(of: trailingSpace) { Settings.trailingSpace = trailingSpace }
+                SettingToggle("Keep the mic ready for 30 s", "No clipped first word when you dictate in quick succession.", isOn: $keepMicWarm)
+                    .onChange(of: keepMicWarm) { actions.setKeepMicWarm(keepMicWarm) }
+            }
         }
     }
 }
@@ -482,32 +463,24 @@ private struct TranscriptionPage: View {
 
     var body: some View {
         let _ = model.shortcutsRevision
-        Section {
-            LabeledContent {
-                Button(model.transcribing ? "Stop" : "Start", action: actions.toggleTranscription)
-                    .buttonStyle(.borderedProminent)
-            } label: {
-                SettingLabel(model.transcribing ? "Transcribing" : "Meeting transcription",
-                             "\(ShortcutHints.transcribe) to start or stop. You: your mic. Them: what your Mac plays.")
-            }
-            LabeledContent {
-                HStack(spacing: 8) {
-                    Button("Change…", action: actions.chooseTranscriptsFolder)
-                    Button("Open", action: actions.openTranscripts)
+        SettingsPage(.transcription) {
+            SettingsSection(note: "Always get consent when transcribing others.") {
+                SettingRow(model.transcribing ? "Transcribing" : "Meeting transcription",
+                           "\(ShortcutHints.transcribe) to start or stop. You: your mic. Them: what your Mac plays.") {
+                    Button(model.transcribing ? "Stop" : "Start", action: actions.toggleTranscription).buttonStyle(.primaryCompact)
                 }
-            } label: {
-                SettingLabel("Transcripts folder", model.transcriptsFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                SettingRow("Transcripts folder", model.transcriptsFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
+                    HStack(spacing: Space.s4) {
+                        Button("Change ›", action: actions.chooseTranscriptsFolder)
+                        Button("Open ↗", action: actions.openTranscripts)
+                    }
+                    .buttonStyle(.monoLink)
+                }
             }
-        } footer: {
-            Text("Always get consent when transcribing others.")
-        }
-        Section {
-            Toggle("Cancel speaker echo", isOn: $cancelEcho)
-                .onChange(of: cancelEcho) { Settings.cancelEcho = cancelEcho }
-        } header: {
-            Text("Audio")
-        } footer: {
-            Text("On speakers your mic also hears the other side. This removes the speaker audio from your mic. Headphones don't need it.")
+            SettingsSection("Audio", note: "On speakers your mic also hears the other side. This removes the speaker audio from your mic. Headphones don't need it.") {
+                SettingToggle("Cancel speaker echo", isOn: $cancelEcho)
+                    .onChange(of: cancelEcho) { Settings.cancelEcho = cancelEcho }
+            }
         }
     }
 }

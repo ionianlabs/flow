@@ -18,7 +18,7 @@ import SwiftUI
             + "erstens das Budget, zweitens die Roadmap und drittens das Hiring, can you confirm the numbers by noon?"),
         "hud-empty": hud(text: ""),
         "hud-handsfree": hud(text: "", locked: true),
-        "settings-general": Surface(size: CGSize(width: 820, height: 980), make: { AnyView(mainViewForRender(page: .general)) }),
+        "settings-general": Surface(size: CGSize(width: 820, height: 1120), make: { AnyView(mainViewForRender(page: .general)) }),
         "settings-shortcuts": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .shortcuts)) }),
         "settings-dictation": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .dictation)) }),
         "settings-transcription": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .transcription)) }),

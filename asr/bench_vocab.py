@@ -6,7 +6,13 @@ the server's Engine in-process with boosting off and at a few strengths.
 
 Usage: uv run bench_vocab.py                 (needs the cached Nemotron model)
        uv run bench_vocab.py --grid 1:3 2:5  (start:strength pairs)
+       uv run bench_vocab.py --dump DIR      (also keep the clips: DIR/manifest.jsonl, wav/, Vocabulary.md,
+                                              and this engine's per-clip results as DIR/hyp-python-*.jsonl)
+       uv run bench_vocab.py --score DIR     (score every DIR/hyp-*.jsonl, {"id", "text"} per line, the same way;
+                                              other engines run DIR's manifest and write their own hyp files)
 """
+
+import json
 
 import argparse
 import logging
@@ -122,14 +128,27 @@ def quiet_clips() -> list[np.ndarray]:
     return [np.zeros(48000, np.int16)] + [(rng.normal(0, level, 48000)).astype(np.int16) for level in (30, 150, 600)]
 
 
-def run(engine, clips, label, show):
-    hits = total = false = 0
-    invented = [transcribe(engine, audio, lang) for audio in quiet_clips() for lang in ("de", "en")]
-    invented = [t for t in invented if t]
-    errs = {True: [0, 0], False: [0, 0]}
+def clip_ids(clips) -> list[str]:
+    return [f"{lang}-{i:02d}-{int(is_term)}" for i, (lang, _, is_term, _) in enumerate(clips)]
+
+
+def run(engine, clips, label, show, record=None):
+    """record: a list to collect {"id", "text"} per clip (quiet clips as quiet-N), for --dump."""
+    quiet = [transcribe(engine, audio, lang) for audio in quiet_clips() for lang in ("de", "en")]
     t = time.perf_counter()
-    for lang, ref, is_term, audio in clips:
-        hyp = transcribe(engine, audio, lang)
+    hyps = [transcribe(engine, audio, lang) for lang, _, _, audio in clips]
+    secs = time.perf_counter() - t
+    if record is not None:
+        record += [{"id": f"quiet-{i}", "text": q} for i, q in enumerate(quiet)]
+        record += [{"id": i, "text": h} for i, h in zip(clip_ids(clips), hyps)]
+    report(clips, hyps, quiet, label, show, secs)
+
+
+def report(clips, hyps, quiet, label, show, secs=0.0):
+    hits = total = false = 0
+    invented = [t for t in quiet if t]
+    errs = {True: [0, 0], False: [0, 0]}
+    for (lang, ref, is_term, audio), hyp in zip(clips, hyps):
         e, n = wer(ref, hyp)
         errs[is_term][0] += e
         errs[is_term][1] += n
@@ -140,7 +159,6 @@ def run(engine, clips, label, show):
         false += len(wrong)
         if show and (hyp.rstrip(".?!") != ref.rstrip(".?!")):
             print(f"    {'T' if is_term else 'C'} {hyp}" + (f"   <- inserted {wrong}" if wrong else ""))
-    secs = time.perf_counter() - t
     print(f"{label:>16}  terms {hits:>2}/{total} ({hits / total:4.0%})  "
           f"WER terms {errs[True][0] / errs[True][1]:5.1%}  WER controls {errs[False][0] / errs[False][1]:5.1%}  "
           f"false inserts {false}  invented in silence/noise {len(invented)}/8  {secs:5.1f} s", flush=True)
@@ -154,11 +172,17 @@ def main():
     ap.add_argument("--vocabulary", help="also load this vocabulary file's terms, e.g. a vault sweep, to test a "
                     "realistic list size")
     ap.add_argument("--show", action="store_true", help="print every transcript that differs from the reference")
+    ap.add_argument("--dump", metavar="DIR", help="keep the clips and per-clip results in DIR")
+    ap.add_argument("--score", metavar="DIR", help="score DIR/hyp-*.jsonl against DIR/manifest.jsonl and exit")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
+    if args.score:
+        return score(args.score, args.show)
 
     with tempfile.TemporaryDirectory() as d:
         clips = synthesize(d)
+        if args.dump:
+            dump_clips(args.dump, clips)
         path = os.path.join(d, "Vocabulary.md")
         extra = [t.text for t in vocab.load(args.vocabulary).terms] if args.vocabulary else []
         vocab.write_atomic(path, "## Terms\n" + "".join(f"- {t}\n" for t in TERMS + extra))
@@ -171,14 +195,52 @@ def main():
             engine.vocab_path, engine.boost, engine.vocab_mtime = path, boost, None
             engine.vocab, engine.booster = vocab.Vocabulary(), None
 
+        def go(label, name):
+            record = [] if args.dump else None
+            run(engine, clips, label, args.show, record)
+            if args.dump:
+                with open(os.path.join(args.dump, f"hyp-python-{name}.jsonl"), "w") as f:
+                    f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in record)
+
         setup("", None)
-        run(engine, clips, "raw model", args.show)
+        go("raw model", "raw")
         setup(path, None)
-        run(engine, clips, "normalize", args.show)
+        go("normalize", "normalize")
         for pair in args.grid:
             start, strength = map(float, pair.split(":"))
             setup(path, {"start": start, "boost": strength})
-            run(engine, clips, f"+ boost {start:g}:{strength:g}", args.show)
+            go(f"+ boost {start:g}:{strength:g}", f"boost-{start:g}-{strength:g}")
+
+
+def dump_clips(out: str, clips):
+    """WAVs exactly as the engine gets them (with the 0.25 s lead-in), the term list and a manifest."""
+    os.makedirs(os.path.join(out, "wav"), exist_ok=True)
+    with open(os.path.join(out, "manifest.jsonl"), "w") as f:
+        for i, audio in enumerate(quiet_clips()):
+            for lang in ("de", "en"):
+                n = 2 * i + (lang == "en")
+                sf.write(os.path.join(out, "wav", f"quiet-{n}.wav"), audio, 16000, subtype="PCM_16")
+                f.write(json.dumps({"id": f"quiet-{n}", "lang": lang, "kind": "quiet", "wav": f"wav/quiet-{n}.wav",
+                                    "ref": ""}) + "\n")
+        for cid, (lang, ref, is_term, audio) in zip(clip_ids(clips), clips):
+            sf.write(os.path.join(out, "wav", f"{cid}.wav"), audio, 16000, subtype="PCM_16")
+            f.write(json.dumps({"id": cid, "lang": lang, "kind": "term" if is_term else "control",
+                                "wav": f"wav/{cid}.wav", "ref": ref,
+                                "terms": [t for t in TERMS if has(t, ref)]}, ensure_ascii=False) + "\n")
+    vocab.write_atomic(os.path.join(out, "Vocabulary.md"), "## Terms\n" + "".join(f"- {t}\n" for t in TERMS))
+
+
+def score(out: str, show: bool):
+    manifest = [json.loads(line) for line in open(os.path.join(out, "manifest.jsonl"))]
+    quiet_ids = [m["id"] for m in manifest if m["kind"] == "quiet"]
+    rows = [m for m in manifest if m["kind"] != "quiet"]
+    clips = [(m["lang"], m["ref"], m["kind"] == "term", None) for m in rows]
+    for name in sorted(os.listdir(out)):
+        if not (name.startswith("hyp-") and name.endswith(".jsonl")):
+            continue
+        hyp = {r["id"]: r["text"] for r in map(json.loads, open(os.path.join(out, name)))}
+        report(clips, [hyp.get(m["id"], "") for m in rows], [hyp.get(i, "") for i in quiet_ids],
+               name[4:-6][:16], show)
 
 
 if __name__ == "__main__":

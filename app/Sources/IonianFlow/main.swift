@@ -5,12 +5,17 @@ import UserNotifications
 
 IonianFont.register()
 
+if let i = CommandLine.arguments.firstIndex(of: "--vocab-normalize"), CommandLine.arguments.count > i + 2 {
+    exit(VocabNormalizer.normalizeFile(vocabulary: CommandLine.arguments[i + 1], input: CommandLine.arguments[i + 2]) ? 0 : 1)
+}
+
 if CommandLine.arguments.contains("--selftest") {
     let fillers = FillerFilter.selfTest()
     let formatting = TextFormatter.selfTest()
     let echo = Transcriber.echoSelfTest()
     let vocabulary = VocabularyStore.selfTest()
-    exit(fillers && formatting && echo && vocabulary ? 0 : 1)
+    let normalizer = VocabNormalizer.selfTest()
+    exit(fillers && formatting && echo && vocabulary && normalizer ? 0 : 1)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {

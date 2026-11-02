@@ -156,6 +156,8 @@ private struct MainView: View {
     var store: VocabularyStore
     @ObservedObject var sweeper: VaultSweeper
     var actions: AppActions
+    var query = ""  // starting state for the offscreen renderer
+    var category: String?
 
     var body: some View {
         NavigationSplitView {
@@ -168,13 +170,7 @@ private struct MainView: View {
                 case .shortcuts: SettingsForm { ShortcutsPage(model: model, actions: actions) }
                 case .dictation: SettingsForm { DictationPage(actions: actions) }
                 case .transcription: SettingsForm { TranscriptionPage(model: model, actions: actions) }
-                case .vocabulary:
-                    GeometryReader { geo in
-                        VocabularyPage(store: store, sweeper: sweeper, actions: actions.vocabulary)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.bg)
+                case .vocabulary: VocabularyPage(store: store, sweeper: sweeper, actions: actions.vocabulary, query: query, open: category)
                 }
             }
             .navigationTitle(model.page.rawValue)
@@ -517,7 +513,7 @@ private struct TranscriptionPage: View {
 }
 
 /// The window's content for the offscreen renderer (`--render settings-general`): a running app, no ASR.
-@MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil) -> some View {
+@MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil, query: String = "", category: String? = nil) -> some View {
     Settings.registerDefaults()
     let model = AppModel()
     model.page = page
@@ -529,5 +525,5 @@ private struct TranscriptionPage: View {
         toggleTranscription: {}, restartASR: {}, openLog: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
         vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }))
-    return MainView(model: model, store: store, sweeper: sweeper, actions: actions)
+    return MainView(model: model, store: store, sweeper: sweeper, actions: actions, query: query, category: category)
 }

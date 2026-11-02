@@ -238,32 +238,13 @@ struct MonoLabel: View {
     var body: some View { Text(text).ionianText(IonianType.label).foregroundStyle(color) }
 }
 
-/// A page's headline in `type.section` and an optional muted lead (SEC-01..03).
-struct PageHead: View {
-    let title: String
-    var lead: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text(title).ionianText(IonianType.section).foregroundStyle(Color.ink)
-                .fixedSize(horizontal: false, vertical: true)
-            if let lead {
-                Text(lead).ionianText(IonianType.lead).foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
 /// Window and panel sizes and the content widths that have no Space token (MAC-22). One place.
 enum WindowLayout {
-    static let content: CGFloat = 620
     static let lead: CGFloat = 520
     static let sidebar: CGFloat = 210
     static let main = CGSize(width: 820, height: 640)
     static let mainMin = CGSize(width: 700, height: 500)
     static let setup = CGSize(width: 700, height: 720)
-    static let review = CGSize(width: 480, height: 600)
     static let transcript = CGSize(width: 400, height: 600)
     static let transcriptMin = CGSize(width: 300, height: 320)
     static let pill = CGSize(width: 720, height: 280)
@@ -504,25 +485,4 @@ extension ButtonStyle where Self == PrimaryButtonStyle {
 
 extension ButtonStyle where Self == MonoLinkButtonStyle {
     static var monoLink: MonoLinkButtonStyle { MonoLinkButtonStyle() }
-}
-
-/// A text field on `surface` with `radius.sm` and a `line` edge (MAC-07).
-struct WellFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration.textFieldStyle(.plain).ionianText(IonianType.small)
-            .foregroundStyle(Color.ink)
-            .padding(.horizontal, Space.s3)
-            .frame(height: 36)
-            .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Color.surface))
-            .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Color.line))
-    }
-}
-
-/// Picks a button style at runtime (e.g. primary until something is set up, then a link).
-struct AnyButtonStyle: ButtonStyle {
-    private let make: (Configuration) -> AnyView
-
-    init<S: ButtonStyle>(_ style: S) { make = { AnyView(style.makeBody(configuration: $0)) } }
-
-    func makeBody(configuration: Configuration) -> some View { make(configuration) }
 }

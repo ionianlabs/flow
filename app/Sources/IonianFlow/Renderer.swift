@@ -25,6 +25,10 @@ import SwiftUI
         "onboarding-0": onboarding(0), "onboarding-1": onboarding(1), "onboarding-2": onboarding(2),
         "onboarding-3": onboarding(3), "onboarding-4": onboarding(4),
         "vocabulary": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularySample())) }),
+        "vocabulary-large": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge())) }),
+        "vocabulary-large-category": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), category: "People")) }),
+        "vocabulary-search": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), query: "ar")) }),
+        "vocabulary-add": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), query: "Lindgren")) }),
         "vocabulary-empty": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .vocabulary)) }),
         "vocabulary-review": Surface(size: CGSize(width: 480, height: 600), make: {
             let store = VocabularyStore(url: vocabularySample(), watch: false)
@@ -108,6 +112,24 @@ import SwiftUI
             <!-- ionian-flow:vault:end -->
 
             """
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    /// ~45 invented terms across categories: the case that used to overwhelm the page.
+    private static func vocabularyLarge() -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ionian-flow-render-vocabulary-large.md")
+        func block(_ name: String, _ items: [String]) -> String { "### \(name)\n" + items.map { "- \($0)" }.joined(separator: "\n") + "\n\n" }
+        let people = ["Lena", "Marco", "Jana Weber", "Tobias Keller", "Sofia Marin", "Henrik Voss", "Amara Okafor", "Pavel Novak", "Ines Duarte", "Kai Lindner",
+                      "Mira Sandoval", "Oskar Brandt", "Yuki Tanaka", "Elena Rossi"]
+        let projects = ["Harbor Bridge", "Northwind Logistics", "Project Lantern", "Blue Heron", "Cedar Yard", "Mill Street Depot", "Quarry Line", "Tidewater"]
+        let acronyms = ["QA", "RFI", "SLA", "ETA", "BIM", "KPI", "OKR", "SOP"]
+        let products = ["Gemma", "Parakeet", "Obsidian", "Figma", "Linear", "Notion"]
+        let places = ["Rotterdam", "Gdansk", "Porto", "Tallinn", "Ghent"]
+        let text = "# Ionian Flow Vocabulary\n\nDomain: civil engineering\n\n## Terms\n- ACME\n- pull request (heard as: pool request)\n- retaining wall\n\n## People\n- Marco\n\n## Ignore\n\n"
+            + "<!-- ionian-flow:vault:start x -->\n## From vault: Northwind Notes\n\n"
+            + block("People", people) + block("Projects", projects) + block("Acronyms", acronyms) + block("Products", products) + block("Places", places)
+            + "<!-- ionian-flow:vault:end -->\n"
         try? text.write(to: url, atomically: true, encoding: .utf8)
         return url
     }

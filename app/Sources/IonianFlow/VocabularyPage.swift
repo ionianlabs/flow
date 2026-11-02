@@ -188,7 +188,7 @@ private struct VaultSection: View {
                         vaultMenu
                     }
                 }
-                if sweeper.running { progress }
+                if sweeper.running { progress.tint(Color.btnBg) }
                 TimelineView(.periodic(from: .now, by: 30)) { _ in status }
             } else {
                 SettingRow("Learn from your notes.", "Connect an Obsidian vault. Ionian Flow picks up names, acronyms and project words, "
@@ -292,7 +292,7 @@ struct ReviewSheet: View {
                                 )) {
                                     Text(e.text).ionianText(IonianType.small).foregroundStyle(Color.ink)
                                 }
-                                .toggleStyle(.checkbox)
+                                .toggleStyle(.checkbox).tint(Color.btnBg)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }

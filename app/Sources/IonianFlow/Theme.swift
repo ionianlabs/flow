@@ -567,7 +567,7 @@ struct SettingToggle: View {
     }
 
     var body: some View {
-        SettingRow(title, detail) { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small) }
+        SettingRow(title, detail) { Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Color.btnBg) }
     }
 }
 

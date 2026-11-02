@@ -72,6 +72,12 @@ How the vault scan works:
   ticket keys, file names and words the recognizer already knows ("Python", "Inbox") are dropped.
   Ionian Flow's own transcripts are skipped, so the recognizer's mistakes don't become vocabulary. The
   vault card shows the progress, and a notification says how many terms it learned.
+- **Few terms, on purpose:** more biased terms mean more false insertions and a bigger glossary. A term
+  needs two notes (one is enough only for a note alias, title or `[[link|alias]]`), a score above a
+  floor (notes × mentions × recency, recent notes count up to 5× more), at most 120 are kept
+  (`--limit`), and one run adds at most 25 new ones (`--max-new`); the rest come in on later runs if
+  they still rank. Terms already in the file keep their place. In the review sheet and the banner,
+  Reject all sends every new term to Ignore (after a confirmation).
 - **One model for everything** (`asr/bench_llm.py`, October 2026): Gemma 4 E2B passed all 16 cleanup
   cases at ~130 ms, where Qwen 3.5 and larger Gemma/Nemotron models translated a segment or took 2 to 6 times
   as long. For the vault scan Qwen 3.5 4B finds more names (86 % vs. 60 % on hand-labelled notes) but

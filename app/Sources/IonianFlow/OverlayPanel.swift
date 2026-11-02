@@ -124,12 +124,12 @@ struct ReadingShape: InsettableShape {
     }
 }
 
-/// The listening pill made real (MAC-12): glass, live text over a mono meta line, the wave, and the
+/// The listening pill made real (MAC-12): glass, one line of live text, a mono timer, the wave, and the
 /// language in its own glass circle. Empty it stays compact; once text arrives it jumps once to a fixed
 /// reading width (MAC-18).
 struct OverlayView: View {
     static let maxLines = 8
-    private static let minHeight: CGFloat = 62
+    private static let minHeight: CGFloat = 52
     /// Pill plus language circle, once text appears.
     static let readingWidth: CGFloat = 640
     private static let langSize: CGFloat = 42
@@ -162,11 +162,9 @@ struct OverlayView: View {
 
     private var pill: some View {
         HStack(spacing: Space.s4) {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                transcript
-                meta
-            }
-            .frame(maxWidth: model.text.isEmpty ? nil : .infinity, alignment: .leading)
+            transcript
+                .frame(maxWidth: model.text.isEmpty ? nil : .infinity, alignment: .leading)
+            meta
             Wave(level: model.level, active: !model.finishing)
         }
         .padding(.horizontal, Space.s6)
@@ -189,14 +187,15 @@ struct OverlayView: View {
             .accessibilityLabel("Language \(code.prefix(2))")
     }
 
-    /// `IONIAN FLOW · 00:07`, or the hands-free hint.
+    /// `00:07`, or the hands-free hint `⌥ to finish`, next to the wave.
     private var meta: some View {
         TimelineView(.periodic(from: model.startedAt, by: 1)) { timeline in
             let seconds = max(0, Int(timeline.date.timeIntervalSince(model.startedAt)))
             let line = model.locked && !model.finishing
-                ? "Hands-free · press \(Settings.dictationKey.name) to finish"
-                : "Ionian Flow · " + String(format: "%02d:%02d", seconds / 60, seconds % 60)
-            MonoLabel(line, color: Color.muted).lineLimit(1)
+                ? "\(Settings.dictationKey.keyLabel) to finish"
+                : String(format: "%02d:%02d", seconds / 60, seconds % 60)
+            MonoLabel(line, color: Color.muted).lineLimit(1).fixedSize()
+                .help(model.locked ? "Hands-free: press \(Settings.dictationKey.name) to finish" : "")
         }
     }
 

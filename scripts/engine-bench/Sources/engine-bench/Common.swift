@@ -93,12 +93,17 @@ func jsonLine<T: Encodable>(_ v: T) throws -> Data { try jsonEncoder.encode(v) +
 /// starts a word. Tokens with no letters/digits (lone punctuation) join the previous word.
 func wordEnds(_ timings: [TokenTiming]) -> [(word: String, start: Double, end: Double)] {
     var out: [(String, Double, Double)] = []
+    var pendingStart: Double?  // a lone "▁" token: the next piece starts a word
     for t in timings {
         let startsWord = t.token.hasPrefix("▁") || t.token.hasPrefix(" ")
         let piece = t.token.replacingOccurrences(of: "▁", with: "").trimmingCharacters(in: .whitespaces)
-        if piece.isEmpty { continue }
-        if startsWord || out.isEmpty {
-            out.append((piece, t.startTime, t.endTime))
+        if piece.isEmpty {
+            if startsWord { pendingStart = t.startTime }
+            continue
+        }
+        if startsWord || pendingStart != nil || out.isEmpty {
+            out.append((piece, pendingStart ?? t.startTime, t.endTime))
+            pendingStart = nil
         } else {
             out[out.count - 1].0 += piece
             out[out.count - 1].2 = t.endTime

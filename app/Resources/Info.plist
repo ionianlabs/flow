@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>dev.ionian.flow</string>
+    <key>CFBundleName</key>
+    <string>Ionian Flow</string>
+    <key>CFBundleDisplayName</key>
+    <string>Ionian Flow</string>
+    <key>CFBundleExecutable</key>
+    <string>IonianFlow</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>ATSApplicationFontsPath</key>
+    <string>Fonts</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Ionian Flow hears you while you hold the dictation key. Audio stays on your Mac.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Ionian Flow transcribes what your Mac plays, like the other side of a call, while you record a meeting. It stays on your Mac.</string>
+    <key>IonianFlowASRDir</key>
+    <string>__ASR_DIR__</string>
+</dict>
+</plist>

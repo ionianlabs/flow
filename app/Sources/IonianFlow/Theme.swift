@@ -210,7 +210,7 @@ struct AppIcon: View {
 struct Lockup: View {
     var body: some View {
         HStack(spacing: Space.s3) {
-            AppIcon(size: 38)
+            AppIcon(size: 28)
             (Text("ionian").foregroundStyle(Color.ink) + Text(" / flow").font(.ionian(IonianType.wordmark, weight: 500)).foregroundStyle(Color.faint))
                 .ionianText(IonianType.wordmark)
         }
@@ -259,7 +259,7 @@ struct PageHead: View {
 enum WindowLayout {
     static let content: CGFloat = 620
     static let lead: CGFloat = 520
-    static let sidebar: CGFloat = 224
+    static let sidebar: CGFloat = 210
     static let main = CGSize(width: 820, height: 640)
     static let mainMin = CGSize(width: 700, height: 500)
     static let setup = CGSize(width: 700, height: 720)
@@ -283,6 +283,20 @@ struct StatusDot: View {
         HStack(spacing: Space.s2) {
             Circle().fill(state.color).frame(width: 7, height: 7)
             MonoLabel(word)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A `StatusDot` in system type, for native settings chrome.
+struct StatusLabel: View {
+    let dot: StatusDot
+    init(_ dot: StatusDot) { self.dot = dot }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(dot.state.color).frame(width: 7, height: 7)
+            Text(dot.word).font(.footnote).foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }
@@ -418,69 +432,17 @@ struct Hairline: View {
     var body: some View { Rectangle().fill(Color.line).frame(height: 1) }
 }
 
-/// A group of settings: a mono label, then rows between `line` hairlines (MAC-03).
-struct SettingsGroup<Content: View>: View {
-    var title: String?
-    var footer: String?
-    var footerStyle: Color? = nil
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            if let title { MonoLabel(title) }
-            VStack(spacing: 0) {
-                Hairline()
-                Group(subviews: content) { rows in
-                    ForEach(rows.indices, id: \.self) { i in
-                        rows[i]
-                        if i < rows.count - 1 { Hairline() }
-                    }
-                }
-            }
-            if let footer {
-                Text(footer).ionianText(IonianType.small)
-                    .foregroundStyle(footerStyle ?? Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-/// A plain container: no border (SHP-05). A `surface` fill only when asked.
-struct Card<Content: View>: View {
-    var padding: CGFloat = 0
-    var filled = false
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background { if filled { RoundedRectangle(cornerRadius: Radius.md, style: .continuous).fill(Color.surface) } }
-    }
-}
-
-/// One setting: what it is (and what it does) on the left, the control on the right.
-struct SettingRow<Control: View>: View {
+/// A setting's name with what it does under it, in system type: the label of a `Form` row.
+struct SettingLabel: View {
     let title: String
     var detail: String?
-    @ViewBuilder var control: Control
+    init(_ title: String, _ detail: String? = nil) { self.title = title; self.detail = detail }
 
     var body: some View {
-        HStack(alignment: .center, spacing: Space.s4) {
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).ionianText(IonianType.small, weight: 500).foregroundStyle(Color.ink)
-                if let detail {
-                    Text(detail).ionianText(IonianType.small).foregroundStyle(Color.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .layoutPriority(1)  // the text wraps; the control keeps its own width
-            Spacer(minLength: Space.s2)
-            control.fixedSize()
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            if let detail { Text(detail).font(.footnote).foregroundStyle(.secondary) }
         }
-        .padding(.vertical, Space.s3)
-        .frame(minHeight: 52)
     }
 }
 

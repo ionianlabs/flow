@@ -36,7 +36,7 @@ struct AppActions {
 }
 
 /// The Ionian Flow window: settings and the vocabulary, one page each, in Ionian Flow's own look (see
-/// Theme.swift) inside a regular macOS window. While it's open Ionian Flow is a regular app (Dock,
+/// Theme.swift) inside a regular macOS window with a native sidebar and grouped forms. While it's open Ionian Flow is a regular app (Dock,
 /// ⌘-Tab, an app menu, and with it ⌘C/⌘V in text fields); closed, it's back to the menu bar only.
 final class MainWindow {
     let model: AppModel
@@ -52,9 +52,6 @@ final class MainWindow {
             defer: true
         )
         window.title = "Ionian Flow"
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.backgroundColor = IonianColor.bg
         window.isReleasedWhenClosed = false
         window.minSize = WindowLayout.mainMin
         let host = NSHostingView(rootView: MainView(model: model, store: store, sweeper: sweeper, actions: actions))
@@ -161,108 +158,95 @@ private struct MainView: View {
     var actions: AppActions
 
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView {
             Sidebar(model: model, sweeper: sweeper)
+                .navigationSplitViewColumnWidth(min: 180, ideal: WindowLayout.sidebar, max: 280)
+        } detail: {
             Group {
                 switch model.page {
-                case .general: PageScroll(page: .general) { GeneralPage(model: model, actions: actions) }
-                case .shortcuts: PageScroll(page: .shortcuts) { ShortcutsGroup(model: model, actions: actions) }
-                case .dictation: PageScroll(page: .dictation) { DictationPage(actions: actions) }
-                case .transcription: PageScroll(page: .transcription) { TranscriptionPage(model: model, actions: actions) }
-                case .vocabulary: VocabularyPage(store: store, sweeper: sweeper, actions: actions.vocabulary)
+                case .general: SettingsForm { GeneralPage(model: model, actions: actions) }
+                case .shortcuts: SettingsForm { ShortcutsPage(model: model, actions: actions) }
+                case .dictation: SettingsForm { DictationPage(actions: actions) }
+                case .transcription: SettingsForm { TranscriptionPage(model: model, actions: actions) }
+                case .vocabulary:
+                    GeometryReader { geo in
+                        VocabularyPage(store: store, sweeper: sweeper, actions: actions.vocabulary)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.bg)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.bg)
+            .navigationTitle(model.page.rawValue)
         }
-        .ignoresSafeArea()
-        .tint(Color.btnBg)
+        .tint(Color.accent)
     }
 }
 
-/// The lockup, the pages (⌘1–⌘5), and at the bottom whether the speech model is ready (MAC-03, MAC-04).
+extension AppModel.Page {
+    var symbol: String {
+        switch self {
+        case .general: return "gearshape"
+        case .shortcuts: return "keyboard"
+        case .dictation: return "mic"
+        case .transcription: return "text.bubble"
+        case .vocabulary: return "character.book.closed"
+        }
+    }
+}
+
+/// The app mark, the pages (⌘1–⌘5), and at the bottom whether the speech model is ready.
 private struct Sidebar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var sweeper: VaultSweeper
     private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Lockup()
-                .padding(.leading, Space.s6)
-                .padding(.top, Space.s8)
-                .padding(.bottom, Space.s7)
-            VStack(alignment: .leading, spacing: Space.s1) {
-                ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { i, page in
-                    NavItem(page: page, selected: model.page == page, busy: page == .vocabulary && sweeper.running) {
-                        model.page = page
+        List(selection: Binding(get: { model.page }, set: { if let page = $0 { model.page = page } })) {
+            ForEach(AppModel.Page.allCases) { page in
+                HStack {
+                    Label(page.rawValue, systemImage: page.symbol)
+                    if page == .vocabulary && sweeper.running {
+                        Spacer()
+                        ProgressView().controlSize(.mini)
                     }
-                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
                 }
+                .tag(page)
             }
-            .padding(.horizontal, Space.s6)
-            Spacer()
-            VStack(alignment: .leading, spacing: Space.s2) {
-                if model.transcribing { StatusDot(state: .working, word: "Transcribing") }
-                model.recognizerStatus
-                MonoLabel("On this Mac · \(version)")
-            }
-            .padding(.horizontal, Space.s6)
-            .padding(.bottom, Space.s5)
         }
-        .frame(width: WindowLayout.sidebar)
-        .frame(maxHeight: .infinity)
-        .background(Color.surface)
-        .overlay(alignment: .trailing) { Rectangle().fill(Color.line).frame(width: 1) }
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Lockup().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 8)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                if model.transcribing { StatusLabel(model.transcribingStatus) }
+                StatusLabel(model.recognizerStatus)
+                Text("On this Mac · \(version)").font(.footnote).foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .background {
+            ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { i, page in
+                Button(page.rawValue) { model.page = page }
+                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
+            }
+            .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+        }
     }
 }
 
-/// Text only: ink and medium when selected, muted otherwise. No fill, box or border (MAC-04).
-private struct NavItem: View {
-    let page: AppModel.Page
-    let selected: Bool
-    let busy: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Space.s2) {
-                Text(page.rawValue)
-                    .ionianText(IonianType.small, weight: selected ? 500 : 400)
-                    .foregroundStyle(selected || hovering ? Color.ink : Color.muted)
-                Spacer(minLength: 0)
-                if busy { ProgressView().controlSize(.mini) }
-            }
-            .frame(height: 32)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-    }
+extension AppModel {
+    var transcribingStatus: StatusDot { StatusDot(state: .working, word: "Transcribing") }
 }
 
-/// A settings page: its headline, then groups, scrolling when the window is short.
-private enum PageGap { static let value = Space.s7 }
-
-private struct PageScroll<Content: View>: View {
-    let page: AppModel.Page
+/// A settings page: a native grouped form.
+private struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: PageGap.value) {
-                PageHead(title: page.title, lead: page.subtitle)
-                    .frame(maxWidth: WindowLayout.lead, alignment: .leading)  // about 65 characters of the lead
-                content
-            }
-            .frame(maxWidth: WindowLayout.content, alignment: .leading)
-            .padding(.horizontal, Space.s7)
-            .padding(.top, Space.s8)
-            .padding(.bottom, Space.s7)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollContentBackground(.hidden)
+        Form { content }.formStyle(.grouped)
     }
 }
 
@@ -273,76 +257,60 @@ private struct GeneralPage: View {
     @State private var login = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PageGap.value) {
-            StatsCard(model: model)
-            HowToSteps(model: model, actions: actions)
-            SettingsGroup(title: "Speech model") {
-                SettingRow(title: "Recognizer", detail: "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.") {
-                    HStack(spacing: Space.s4) {
-                        model.recognizerStatus
-                        Button("Restart ›", action: actions.restartASR).buttonStyle(.monoLink)
-                        Button("Log ↗", action: actions.openLog).buttonStyle(.monoLink)
+        StatsSection(model: model)
+        HowToSection(model: model, actions: actions)
+        Section("Speech model") {
+            LabeledContent {
+                HStack(spacing: 12) {
+                    StatusLabel(model.recognizerStatus)
+                    Button("Restart", action: actions.restartASR)
+                    Button("Open Log", action: actions.openLog)
+                }
+            } label: {
+                SettingLabel("Recognizer", "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.")
+            }
+        }
+        Section("App") {
+            LabeledContent {
+                Button("Open", action: actions.showSetupGuide)
+            } label: {
+                SettingLabel("Setup guide", "Permissions, your dictation key and a field to try it.")
+            }
+            Toggle(isOn: $sounds) { SettingLabel("Sounds", "A short sound when dictation starts and ends.") }
+                .onChange(of: sounds) { Settings.sounds = sounds }
+            Toggle("Launch at login", isOn: $login)
+                .onChange(of: login) {
+                    do {
+                        if login { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                    } catch {
+                        NSLog("Ionian Flow: launch at login failed: %@", error.localizedDescription)
+                        login = SMAppService.mainApp.status == .enabled
                     }
                 }
-            }
-            SettingsGroup(title: "App") {
-                SettingRow(title: "Setup guide", detail: "Permissions, your dictation key and a field to try it.") {
-                    Button("Open ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
-                }
-                SettingRow(title: "Sounds", detail: "A short sound when dictation starts and ends.") {
-                    Toggle("Sounds", isOn: $sounds).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .onChange(of: sounds) { Settings.sounds = sounds }
-                }
-                SettingRow(title: "Launch at login") {
-                    Toggle("Launch at login", isOn: $login).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .onChange(of: login) {
-                            do {
-                                if login { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                            } catch {
-                                NSLog("Ionian Flow: launch at login failed: %@", error.localizedDescription)
-                                login = SMAppService.mainApp.status == .enabled
-                            }
-                        }
-                }
-            }
         }
     }
 }
 
-/// What Flow has done for you so far, as hairline-separated facts (feature-grid): words dictated,
-/// meetings transcribed, typing time saved. Numerals are solid ink (COL-03).
-private struct StatsCard: View {
+/// What Flow has done for you so far: words dictated, meetings transcribed, typing time saved.
+private struct StatsSection: View {
     @ObservedObject var model: AppModel
     @State private var confirmReset = false
 
     var body: some View {
         let _ = model.statsRevision
         let empty = Stats.words == 0 && Stats.transcribedSeconds == 0
-        VStack(alignment: .leading, spacing: Space.s3) {
+        Section {
+            LabeledContent("Words dictated", value: Stats.words.formatted())
+            LabeledContent("Meetings transcribed", value: Self.duration(Stats.transcribedSeconds))
+            LabeledContent("Saved over typing", value: (Stats.savedSeconds >= 60 ? "≈ " : "") + Self.duration(Stats.savedSeconds))
+        } header: {
             HStack {
-                MonoLabel("So far")
+                Text("So far")
                 Spacer()
-                if !empty {
-                    Button("Reset ›") { confirmReset = true }.buttonStyle(.monoLink)
-                }
+                if !empty { Button("Reset…") { confirmReset = true }.buttonStyle(.link).textCase(nil) }
             }
-            VStack(spacing: 0) {
-                Hairline()
-                HStack(alignment: .top, spacing: 0) {
-                    fact(Stats.words.formatted(), "words dictated", first: true)
-                    Rectangle().fill(Color.line).frame(width: 1)
-                    fact(Self.duration(Stats.transcribedSeconds), "of meetings transcribed")
-                    Rectangle().fill(Color.line).frame(width: 1)
-                    fact((Stats.savedSeconds >= 60 ? "≈ " : "") + Self.duration(Stats.savedSeconds), "saved over typing")
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                Hairline()
-            }
-            if empty {
-                Text("Your first dictation starts the count. Flow keeps only the totals, never the text.")
-                    .ionianText(IonianType.small).foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        } footer: {
+            if empty { Text("Your first dictation starts the count. Flow keeps only the totals, never the text.") }
         }
         .confirmationDialog("Reset the totals to zero.", isPresented: $confirmReset) {
             Button("Reset") {
@@ -350,19 +318,6 @@ private struct StatsCard: View {
                 model.statsRevision += 1
             }
         }
-    }
-
-    private func fact(_ value: String, _ label: String, first: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text(value).ionianText(IonianType.card).foregroundStyle(Color.ink)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).ionianText(IonianType.small).foregroundStyle(Color.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.leading, first ? 0 : Space.s4)
-        .padding(.trailing, Space.s2)
-        .padding(.vertical, Space.s4)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// "0 min", "42 min", "3 h", "6 h 40 min".
@@ -373,81 +328,61 @@ private struct StatsCard: View {
     }
 }
 
-/// How it works, in three steps (STE-01..08): hold your key, talk, let go. The other two keys sit below.
-private struct HowToSteps: View {
+/// How it works, in three steps: hold your key, talk, let go. The other two keys sit below.
+private struct HowToSection: View {
     @ObservedObject var model: AppModel
     var actions: AppActions
-    /// The wave visual is 52 pt tall (STE visual slot), the pill's wave is 30.
+    /// The wave visual is 52 pt tall, the pill's wave is 30.
     private static let waveScale: CGFloat = 52 / 30
-    private static let visualHeight: CGFloat = 92
-    /// `type.title` with a tight line height, so a step heading that wraps stays together.
-    private static let stepTitle = IonianTextStyle(family: .display, size: IonianType.title.size, weight: IonianType.title.weight,
-                                                    lineHeight: 1.15, tracking: IonianType.title.tracking, uppercase: false)
+    private static let visualHeight: CGFloat = 64
 
     var body: some View {
         let _ = model.shortcutsRevision
         let key = Settings.dictationKey
-        VStack(alignment: .leading, spacing: Space.s6) {
-            if !model.hotkeyActive {
-                HStack(spacing: Space.s3) {
-                    Text("Keys need permissions.").ionianText(IonianType.small).foregroundStyle(Color.ink)
-                    Button("Open the setup guide ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
+        if !model.hotkeyActive {
+            Section {
+                LabeledContent {
+                    Button("Open Setup Guide", action: actions.showSetupGuide)
+                } label: {
+                    Label("Keys need permissions.", systemImage: "exclamationmark.triangle.fill")
+                        .symbolRenderingMode(.multicolor)
                 }
             }
-            HStack(alignment: .top, spacing: Space.s6) {
-                step(1, title: "Hold the key", text: "Hold \(key.name) wherever you can type.") {
-                    Key(label: key.keyLabel, size: key == .fn ? 16 : 24, held: true)
+        }
+        Section("How it works") {
+            HStack(alignment: .top, spacing: 20) {
+                step("Hold the key", "Hold \(key.name) wherever you can type.") {
+                    Key(label: key.keyLabel, size: key == .fn ? 16 : 24, held: true).scaleEffect(0.8, anchor: .leading)
                 }
-                step(2, title: "Speak", text: "Talk as you would to a colleague.") {
+                step("Speak", "Talk as you would to a colleague.") {
                     Wave(bars: 11, scale: Self.waveScale)
                 }
-                step(3, title: "Let go", text: "Clean text appears at your cursor.") {
-                    Text("The launch moves to Thursday.").ionianText(IonianType.small).foregroundStyle(Color.ink)
-                        .padding(.leading, Space.s4).padding(.vertical, Space.s1)
+                step("Let go", "Clean text appears at your cursor.") {
+                    Text("The launch moves to Thursday.")
+                        .padding(.leading, 10).padding(.vertical, 2)
                         .overlay(alignment: .leading) { Rectangle().fill(Color.accent).frame(width: 2) }
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            VStack(spacing: 0) {
-                Hairline()
-                extra(Settings.transcriptionShortcut?.display ?? "Double-tap \(key.name)", "Transcribe a meeting. Saved as Markdown.")
-                Hairline()
-                extra(Settings.cancelShortcut.display, "Cancel while dictating. Nothing is pasted.")
-                Hairline()
+            .padding(.vertical, 8)
+            LabeledContent("Transcribe a meeting") {
+                KeyChip(Settings.transcriptionShortcut?.display ?? "Double-tap \(key.name)")
             }
+            LabeledContent("Cancel while dictating") { KeyChip(Settings.cancelShortcut.display) }
         }
     }
 
-    private func step<V: View>(_ n: Int, title: String, text: String, @ViewBuilder visual: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("\(n)").ionianText(.init(family: .mono, size: 12, weight: 400, lineHeight: 1.55, tracking: 0, uppercase: false))
-                .foregroundStyle(Color.faint)
-            visual()
-                .frame(height: Self.visualHeight, alignment: .leading)
-                .padding(.top, Space.s5)
-            Text(title).ionianText(Self.stepTitle).foregroundStyle(Color.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, Space.s5)
-            Text(text).ionianText(IonianType.small).foregroundStyle(Color.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, Space.s2)
+    private func step<V: View>(_ title: String, _ text: String, @ViewBuilder visual: () -> V) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            visual().frame(height: Self.visualHeight, alignment: .leading)
+            Text(title).font(.headline).padding(.top, 6)
+            Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, Space.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) { Hairline() }
-    }
-
-    private func extra(_ keys: String, _ text: String) -> some View {
-        HStack(spacing: Space.s3) {
-            KeyChip(keys)
-            Text(text).ionianText(IonianType.small).foregroundStyle(Color.muted)
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, Space.s3)
     }
 }
 
-private struct ShortcutsGroup: View {
+private struct ShortcutsPage: View {
     @ObservedObject var model: AppModel
     var actions: AppActions
     @State private var key = Settings.dictationKey
@@ -456,41 +391,47 @@ private struct ShortcutsGroup: View {
     @State private var cancel: Shortcut? = Settings.cancelShortcut == .escape ? nil : Settings.cancelShortcut
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            SettingsGroup(
-                footer: model.hotkeyActive ? "Click a shortcut, then press the keys. Combinations need ⌘, ⌥ or ⌃."
-                    : "Shortcuts don't work yet. Allow Input Monitoring and Accessibility, then restart Flow.",
-                footerStyle: model.hotkeyActive ? nil : Color.ink
-            ) {
-                SettingRow(title: "Dictate", detail: "Hold this key while you talk.") {
-                    Picker("Dictate", selection: $key) {
-                        ForEach(DictationKey.allCases) { Text($0.name).tag($0) }
-                    }
-                    .labelsHidden().fixedSize()
-                    .onChange(of: key) { Settings.dictationKey = key; actions.applyShortcuts() }
-                }
-                SettingRow(title: "Transcribe a meeting", detail: "Opens the transcript panel. The same keys stop it.") {
-                    ShortcutRecorder(shortcut: $transcription, placeholder: "Double-tap \(key.name)") {
-                        Settings.transcriptionShortcut = transcription
-                        actions.applyShortcuts()
-                    }
-                }
-                SettingRow(title: "Hands-free dictation", detail: "Dictate without holding a key. Tap the key to finish.") {
-                    ShortcutRecorder(shortcut: $handsFree, placeholder: "Menu bar only") {
-                        Settings.handsFreeShortcut = handsFree
-                        actions.applyShortcuts()
-                    }
-                }
-                SettingRow(title: "Cancel a dictation", detail: "Nothing is pasted.") {
-                    ShortcutRecorder(shortcut: $cancel, placeholder: "Esc", requireModifier: false) {
-                        Settings.cancelShortcut = cancel ?? .escape
-                        actions.applyShortcuts()
-                    }
-                }
+        Section {
+            Picker(selection: $key) {
+                ForEach(DictationKey.allCases) { Text($0.name).tag($0) }
+            } label: {
+                SettingLabel("Dictate", "Hold this key while you talk.")
             }
-            if !model.hotkeyActive {
-                Button("Open the setup guide ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
+            .onChange(of: key) { Settings.dictationKey = key; actions.applyShortcuts() }
+            LabeledContent {
+                ShortcutRecorder(shortcut: $transcription, placeholder: "Double-tap \(key.name)") {
+                    Settings.transcriptionShortcut = transcription
+                    actions.applyShortcuts()
+                }
+            } label: {
+                SettingLabel("Transcribe a meeting", "Opens the transcript panel. The same keys stop it.")
             }
+            LabeledContent {
+                ShortcutRecorder(shortcut: $handsFree, placeholder: "Menu bar only") {
+                    Settings.handsFreeShortcut = handsFree
+                    actions.applyShortcuts()
+                }
+            } label: {
+                SettingLabel("Hands-free dictation", "Dictate without holding a key. Tap the key to finish.")
+            }
+            LabeledContent {
+                ShortcutRecorder(shortcut: $cancel, placeholder: "Esc", requireModifier: false) {
+                    Settings.cancelShortcut = cancel ?? .escape
+                    actions.applyShortcuts()
+                }
+            } label: {
+                SettingLabel("Cancel a dictation", "Nothing is pasted.")
+            }
+        } footer: {
+            if model.hotkeyActive {
+                Text("Click a shortcut, then press the keys. Combinations need ⌘, ⌥ or ⌃.")
+            } else {
+                Text("Shortcuts don't work yet. Allow Input Monitoring and Accessibility, then restart Flow.")
+                    .foregroundStyle(.primary)
+            }
+        }
+        if !model.hotkeyActive {
+            Section { Button("Open Setup Guide", action: actions.showSetupGuide) }
         }
     }
 }
@@ -503,46 +444,38 @@ private struct DictationPage: View {
     @State private var keepMicWarm = Settings.keepMicWarm
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PageGap.value) {
-            SettingsGroup(
-                title: "Input",
-                footer: "A Bluetooth headset mic drops the headset to low-quality call audio, so Automatic uses the built-in mic."
-            ) {
-                SettingRow(title: "Language", detail: "Flow detects German and English per dictation.") {
-                    Picker("Language", selection: $language) {
-                        Text("Detect automatically").tag("auto")
-                        Text("Deutsch").tag("de-DE")
-                        Text("English").tag("en-US")
-                    }
-                    .labelsHidden().fixedSize()
-                    .onChange(of: language) { Settings.language = language }
-                }
-                SettingRow(title: "Microphone") {
-                    Picker("Microphone", selection: $microphone) {
-                        Text("Automatic" + (AudioDevices.resolve("auto").map { " (\($0.name))" } ?? "")).tag("auto")
-                        Text("System default").tag("default")
-                        Divider()
-                        ForEach(AudioDevices.inputs(), id: \.uid) { d in
-                            Text(d.name + (d.isBluetooth ? " (Bluetooth)" : "")).tag(d.uid)
-                        }
-                    }
-                    .labelsHidden().frame(maxWidth: 260)
-                    .onChange(of: microphone) { actions.setMicrophone(microphone) }
+        Section {
+            Picker(selection: $language) {
+                Text("Detect automatically").tag("auto")
+                Text("Deutsch").tag("de-DE")
+                Text("English").tag("en-US")
+            } label: {
+                SettingLabel("Language", "Flow detects German and English per dictation.")
+            }
+            .onChange(of: language) { Settings.language = language }
+            Picker("Microphone", selection: $microphone) {
+                Text("Automatic" + (AudioDevices.resolve("auto").map { " (\($0.name))" } ?? "")).tag("auto")
+                Text("System default").tag("default")
+                Divider()
+                ForEach(AudioDevices.inputs(), id: \.uid) { d in
+                    Text(d.name + (d.isBluetooth ? " (Bluetooth)" : "")).tag(d.uid)
                 }
             }
-            SettingsGroup(
-                title: "Text",
-                footer: "A ready mic starts the next dictation at once. The orange mic indicator stays on a little longer."
-            ) {
-                SettingRow(title: "Add a space after the text", detail: "So the next dictation doesn't run into this one.") {
-                    Toggle("Add a space", isOn: $trailingSpace).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .onChange(of: trailingSpace) { Settings.trailingSpace = trailingSpace }
-                }
-                SettingRow(title: "Keep the mic ready for 30 s", detail: "No clipped first word when you dictate in quick succession.") {
-                    Toggle("Keep the mic ready", isOn: $keepMicWarm).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .onChange(of: keepMicWarm) { actions.setKeepMicWarm(keepMicWarm) }
-                }
-            }
+            .onChange(of: microphone) { actions.setMicrophone(microphone) }
+        } header: {
+            Text("Input")
+        } footer: {
+            Text("A Bluetooth headset mic drops the headset to low-quality call audio, so Automatic uses the built-in mic.")
+        }
+        Section {
+            Toggle(isOn: $trailingSpace) { SettingLabel("Add a space after the text", "So the next dictation doesn't run into this one.") }
+                .onChange(of: trailingSpace) { Settings.trailingSpace = trailingSpace }
+            Toggle(isOn: $keepMicWarm) { SettingLabel("Keep the mic ready for 30 s", "No clipped first word when you dictate in quick succession.") }
+                .onChange(of: keepMicWarm) { actions.setKeepMicWarm(keepMicWarm) }
+        } header: {
+            Text("Text")
+        } footer: {
+            Text("A ready mic starts the next dictation at once. The orange mic indicator stays on a little longer.")
         }
     }
 }
@@ -554,30 +487,32 @@ private struct TranscriptionPage: View {
 
     var body: some View {
         let _ = model.shortcutsRevision
-        VStack(alignment: .leading, spacing: PageGap.value) {
-            SettingsGroup(footer: "Always get consent when transcribing others.") {
-                SettingRow(title: model.transcribing ? "Transcribing" : "Meeting transcription",
-                           detail: "\(ShortcutHints.transcribe) to start or stop. You: your mic. Them: what your Mac plays.") {
-                    Button(model.transcribing ? "Stop" : "Start", action: actions.toggleTranscription)
-                        .buttonStyle(.primary)
-                }
-                SettingRow(title: "Transcripts folder",
-                           detail: model.transcriptsFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
-                    HStack(spacing: Space.s4) {
-                        Button("Change ›", action: actions.chooseTranscriptsFolder).buttonStyle(.monoLink)
-                        Button("Open ↗", action: actions.openTranscripts).buttonStyle(.monoLink)
-                    }
-                }
+        Section {
+            LabeledContent {
+                Button(model.transcribing ? "Stop" : "Start", action: actions.toggleTranscription)
+                    .buttonStyle(.borderedProminent)
+            } label: {
+                SettingLabel(model.transcribing ? "Transcribing" : "Meeting transcription",
+                             "\(ShortcutHints.transcribe) to start or stop. You: your mic. Them: what your Mac plays.")
             }
-            SettingsGroup(
-                title: "Audio",
-                footer: "On speakers your mic also hears the other side. This removes the speaker audio from your mic. Headphones don't need it."
-            ) {
-                SettingRow(title: "Cancel speaker echo") {
-                    Toggle("Cancel speaker echo", isOn: $cancelEcho).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .onChange(of: cancelEcho) { Settings.cancelEcho = cancelEcho }
+            LabeledContent {
+                HStack(spacing: 8) {
+                    Button("Change…", action: actions.chooseTranscriptsFolder)
+                    Button("Open", action: actions.openTranscripts)
                 }
+            } label: {
+                SettingLabel("Transcripts folder", model.transcriptsFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
             }
+        } footer: {
+            Text("Always get consent when transcribing others.")
+        }
+        Section {
+            Toggle("Cancel speaker echo", isOn: $cancelEcho)
+                .onChange(of: cancelEcho) { Settings.cancelEcho = cancelEcho }
+        } header: {
+            Text("Audio")
+        } footer: {
+            Text("On speakers your mic also hears the other side. This removes the speaker audio from your mic. Headphones don't need it.")
         }
     }
 }

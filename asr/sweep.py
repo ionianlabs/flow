@@ -5,9 +5,10 @@
    knows "Lena" in "ToP lead: Lena" is a person.
 2. Rules keep it honest: a name must appear in the note word for word, takes the note's spelling
    ("lumai" from a frontmatter slug becomes "LumAI"), and ticket keys, file names and ordinary
-   phrases are dropped. A name from a single note must look like one (capitalized, or shaped like
-   an acronym). Note aliases and [[link|alias]] texts always count.
-3. Terms are ranked by how many notes mention them; the result replaces the vault block of the
+   phrases are dropped. A term must come from at least two notes; only note aliases, titles and
+   [[link|alias]] texts count from one.
+3. Terms are ranked by notes, mentions and recency; only the best ~120 are kept, and one run adds at
+   most 25 new ones (the rest follow in later runs, if they still rank). The result replaces the vault block of the
    vocabulary file (see vocab.py). Your own sections and the Ignore list are never touched.
 
 The vault is only read. Re-runs are incremental: only new or changed notes are read again
@@ -35,6 +36,7 @@ CACHE = os.path.expanduser("~/Library/Application Support/Ionian Flow/sweep-cach
 CATEGORIES = ["People", "Organizations", "Projects", "Products", "Acronyms", "Terms"]
 SKIP_DIRS = {"_templates", "templates", "_archive", "attachments", "node_modules"}
 CACHE_VERSION = 5
+MIN_SCORE = 2.5  # two notes with a couple of mentions each, or one alias in a fresh note
 
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
@@ -405,7 +407,7 @@ def read_vault(vault: str, cache: dict, model: str | None, load_llm) -> dict[str
 
 def rank(notes: dict[str, dict]) -> list[dict]:
     """One entry per term (spellings merged, the most frequent wins; the category by majority),
-    best first. A term from a single note has to look like a name."""
+    best first. A term from a single note has to be an alias, a title or a link text."""
     now = time.time()
     terms: dict[str, dict] = {}
     for note in notes.values():
@@ -424,10 +426,12 @@ def rank(notes: dict[str, dict]) -> list[dict]:
     ranked = []
     for t in terms.values():
         t["term"] = t["spellings"].most_common(1)[0][0]
-        if t["notes"] < 2 and not t["alias"] and not well_formed(t["term"]):
+        if t["notes"] < 2 and not t["alias"]:
             continue
         t["category"] = t["categories"].most_common(1)[0][0]
-        t["score"] = (1 + math.log(t["notes"])) * (1 + math.log(t["count"])) * (0.5 + t["recency"]) * (1.5 if t["alias"] else 1)
+        t["score"] = (1 + math.log(t["notes"])) * (1 + math.log(t["count"])) * (0.25 + t["recency"]) * (1.5 if t["alias"] else 1)
+        if t["score"] < MIN_SCORE:
+            continue
         ranked.append(t)
     ranked.sort(key=lambda t: -t["score"])
     return merge_variants(ranked)
@@ -462,7 +466,8 @@ def main():
     ap.add_argument("--vault")
     ap.add_argument("--out", default=vocab.DEFAULT_PATH)
     ap.add_argument("--cache", default=CACHE)
-    ap.add_argument("--limit", type=int, default=500, help="most terms written to the vocabulary")
+    ap.add_argument("--limit", type=int, default=120, help="most vault terms in the vocabulary")
+    ap.add_argument("--max-new", type=int, default=25, help="most terms one run adds (the rest come in later runs)")
     ap.add_argument("--no-llm", action="store_true", help="rules only")
     ap.add_argument("--model", default=None, help="MLX model (default: the polish model)")
     args = ap.parse_args()
@@ -506,14 +511,22 @@ def main():
     notes = read_vault(vault, cache, model, load_llm)
     current = vocab.load(args.out)
     mine = {t.text.lower() for t in current.terms if t.source == "manual"} | {i.lower() for i in current.ignore}
-    kept = [t for t in rank(notes) if t["term"].lower() not in mine][: args.limit]
+    before = {t.text.lower() for t in current.terms if t.source == "vault"}
+    kept, new = [], 0
+    for t in rank(notes):  # best first: terms already in the file keep their place, new ones are capped
+        if t["term"].lower() in mine or len(kept) >= args.limit:
+            continue
+        if t["term"].lower() not in before:
+            if new >= args.max_new:
+                continue
+            new += 1
+        kept.append(t)
     groups = {c: [] for c in CATEGORIES}
     for t in kept:
         groups[t["category"]].append(t["term"])
     domain = ""
     if not current.domain and model and load_llm():
         domain = describe_domain(llm, groups, notes)
-    before = {t.text.lower() for t in current.terms if t.source == "vault"}
     after = {t["term"].lower() for t in kept}
     name = os.path.basename(vault.rstrip("/")) or vault
     vocab.write_vault_block(args.out, groups, f"From vault: {name} ({date.today().isoformat()})", domain)

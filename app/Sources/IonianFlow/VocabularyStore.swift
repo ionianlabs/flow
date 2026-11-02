@@ -127,6 +127,9 @@ final class VocabularyStore: ObservableObject {
         objectWillChange.send()
     }
 
+    /// Reject all: every one of these goes to Ignore, so the next scan doesn't bring them back.
+    func ignoreAll(_ rejected: [Entry]) { finishReview(of: rejected, removing: Set(rejected.map(\.id))) }
+
     private static var reviewed: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: reviewedKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue), forKey: reviewedKey) }

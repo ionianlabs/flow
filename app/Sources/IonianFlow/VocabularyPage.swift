@@ -19,6 +19,7 @@ struct VocabularyPage: View {
     @State private var query = ""
     @State private var domain = ""
     @State private var reviewing = false
+    @State private var rejecting = false
     @State private var useVocabulary = Settings.useVocabulary
 
     var body: some View {
@@ -45,6 +46,11 @@ struct VocabularyPage: View {
         .sheet(isPresented: $reviewing) {
             ReviewSheet(store: store, entries: store.unreviewed) { reviewing = false }
         }
+        .confirmationDialog("Reject all \(store.unreviewed.count) new terms?", isPresented: $rejecting) {
+            Button("Reject all", role: .destructive) { store.ignoreAll(store.unreviewed) }
+        } message: {
+            Text("They go to Ignore, so the next scan won't bring them back.")
+        }
     }
 
     private var reviewBanner: some View {
@@ -56,6 +62,7 @@ struct VocabularyPage: View {
                     .ionianText(IonianType.small).foregroundStyle(Color.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: Space.s2)
+                Button("Reject all ›") { rejecting = true }.buttonStyle(.monoLink)
                 Button("Review ›") { reviewing = true }.buttonStyle(.monoLink)
             }
             .padding(.vertical, Space.s3)
@@ -310,6 +317,7 @@ struct ReviewSheet: View {
     let entries: [VocabularyStore.Entry]
     var onDone: () -> Void
     @State private var removing: Set<String> = []
+    @State private var rejecting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
@@ -349,6 +357,7 @@ struct ReviewSheet: View {
             HStack(spacing: Space.s4) {
                 MonoLabel(removing.isEmpty ? "Keeping all \(entries.count)" : "Removing \(removing.count) of \(entries.count)")
                 Spacer()
+                Button("Reject all ›") { rejecting = true }.buttonStyle(.monoLink)
                 Button("Later ›", action: onDone).keyboardShortcut(.cancelAction).buttonStyle(.monoLink)
                 Button("Done") {
                     store.finishReview(of: entries, removing: removing)
@@ -362,5 +371,13 @@ struct ReviewSheet: View {
         .frame(width: WindowLayout.review.width, height: WindowLayout.review.height)
         .background(Color.bg)
         .tint(Color.btnBg)
+        .confirmationDialog("Reject all \(entries.count) new terms?", isPresented: $rejecting) {
+            Button("Reject all", role: .destructive) {
+                store.ignoreAll(entries)
+                onDone()
+            }
+        } message: {
+            Text("They go to Ignore, so the next scan won't bring them back.")
+        }
     }
 }

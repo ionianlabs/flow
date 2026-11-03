@@ -1,9 +1,9 @@
 import Foundation
 
-/// Learns the vocabulary from a vault by running asr/sweep.py: right after a vault is connected,
+/// Learns the vocabulary from a vault with VaultSweep (Swift, Gemma through ModelHub): right after a vault is connected,
 /// then whenever notes changed (checked at most every 30 min, and only while Ionian Flow is idle).
-/// The scan is paused (SIGSTOP) while you dictate or transcribe, so it never competes with live
-/// recognition for the GPU, and it runs at background priority. The vault is only read.
+/// The scan is paused (SweepControl) while you dictate or transcribe, so it never competes with live
+/// recognition for the GPU, and it runs at background task priority. The vault is only read.
 final class VaultSweeper: ObservableObject {
     struct Vault: Hashable {
         let name: String
@@ -31,17 +31,18 @@ final class VaultSweeper: ObservableObject {
     var onFinished: (Result) -> Void = { _ in }
 
     let logPath = NSHomeDirectory() + "/Library/Logs/Ionian Flow/sweep.log"
-    private let asrDir: String
-    private var process: Process?
+    private var task: Task<Void, Never>?
+    private var taskID: UUID?
+    private var control: SweepControl?
     private var paused = false
-    private var buffer = Data()
-    private var counts = (added: 0, removed: 0, total: 0)
     private var timer: Timer?
     private static let interval: TimeInterval = 30 * 60
 
-    init(asrDir: String) {
-        self.asrDir = asrDir
-    }
+    init() {}
+
+    /// The Python sweep is gone; the argument is ignored. Kept so callers compile until Phase 5 removes it.
+    @available(*, deprecated, message: "VaultSweeper no longer needs the ASR folder; use init()")
+    convenience init(asrDir: String) { self.init() }
 
     /// The vaults Obsidian knows, most recently opened first.
     static func knownVaults() -> [Vault] {
@@ -64,7 +65,7 @@ final class VaultSweeper: ObservableObject {
 
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.maybeScan(force: false) }
-        // Once at launch, after the ASR server had a head start on the GPU.
+        // Once at launch, after the app has settled.
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in self?.maybeScan(force: true) }
     }
 
@@ -84,7 +85,7 @@ final class VaultSweeper: ObservableObject {
 
     /// `force`: skip the 30-minute spacing (launch), still only when something changed.
     private func maybeScan(force: Bool) {
-        guard process == nil, let vault = Settings.vault, !isBusy() else { return }
+        guard task == nil, let vault = Settings.vault, !isBusy() else { return }
         if let last = Settings.lastVaultScan {
             guard force || Date().timeIntervalSince(last) >= Self.interval, Self.changed(vault, since: last) else { return }
         }
@@ -105,115 +106,84 @@ final class VaultSweeper: ObservableObject {
     /// `requested`: you're waiting for it, so it runs at normal priority. A background resync runs
     /// at background priority (slower, but you won't notice it).
     func scan(requested: Bool) {
-        guard process == nil, let vault = Settings.vault else { return }
-        let python = asrDir + "/.venv/bin/python"  // not `uv run`: its child wouldn't get SIGSTOP
-        guard FileManager.default.isExecutableFile(atPath: python) else {
-            NSLog("Ionian Flow: no Python environment in %@ (run uv sync)", asrDir)
-            failed = true
-            return
-        }
-        let p = Process()
-        let sweep = [python, "sweep.py", "--vault", vault.path, "--out", Settings.vocabularyFile.path]
-        if requested {
-            p.executableURL = URL(fileURLWithPath: python)
-            p.arguments = Array(sweep.dropFirst())
-        } else {
-            p.executableURL = URL(fileURLWithPath: "/usr/sbin/taskpolicy")  // background priority; execs in place
-            p.arguments = ["-b"] + sweep
-        }
-        p.currentDirectoryURL = URL(fileURLWithPath: asrDir)
-        var env = ProcessInfo.processInfo.environment
-        env["HF_HUB_OFFLINE"] = env["HF_HUB_OFFLINE"] ?? "1"
-        env["PYTHONUNBUFFERED"] = "1"
-        p.environment = env
+        guard task == nil, let vault = Settings.vault else { return }
+        var o = VaultSweep.Options(vault: vault, out: Settings.vocabularyFile)
+        // The model is used when it is on disk; otherwise rules pick the terms.
+        if ModelHub.shared.gemmaAvailable() { o.model = VaultSweep.modelID }
+        let control = SweepControl()
+        self.control = control
+        let first = Settings.lastVaultScan == nil
         try? FileManager.default.createDirectory(atPath: (logPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: logPath, contents: nil)
-        p.standardError = FileHandle(forWritingAtPath: logPath)
-        let out = Pipe()
-        p.standardOutput = out
-        buffer = Data()
-        counts = (0, 0, 0)
-        out.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            DispatchQueue.main.async { self?.received(data) }
-        }
-        let first = Settings.lastVaultScan == nil
-        p.terminationHandler = { [weak self] proc in
-            out.fileHandleForReading.readabilityHandler = nil
-            DispatchQueue.main.async { self?.finished(proc, first: first, requested: requested) }
-        }
-        do {
-            try p.run()
-            process = p
-            running = true
-            phase = .reading(done: 0, of: 0)
-            failed = false
-        } catch {
-            NSLog("Ionian Flow: vault scan failed to start: %@", error.localizedDescription)
-            failed = true
-        }
+        running = true
+        phase = .reading(done: 0, of: 0)
+        failed = false
+        paused = false
         if isBusy() { pause() }
-    }
-
-    private func received(_ data: Data) {
-        buffer.append(data)
-        while let nl = buffer.firstIndex(of: 0x0A) {
-            let line = String(decoding: buffer[..<nl], as: UTF8.self)
-            buffer.removeSubrange(...nl)
-            let parts = line.split(separator: " ").map(String.init)
-            switch parts.first {
-            case "progress" where parts.count == 3:
-                phase = .reading(done: Int(parts[1]) ?? 0, of: Int(parts[2]) ?? 0)
-            case "llm" where parts.count == 3:
-                phase = .learning(done: Int(parts[1]) ?? 0, of: Int(parts[2]) ?? 0)
-            case "done":
-                let fields = Dictionary(parts.dropFirst().compactMap { kv -> (String, String)? in
-                    let p = kv.split(separator: "=", maxSplits: 1).map(String.init)
-                    return p.count == 2 ? (p[0], p[1]) : nil
-                }, uniquingKeysWith: { $1 })
-                counts = (Int(fields["added"] ?? "") ?? 0, Int(fields["removed"] ?? "") ?? 0, Int(fields["total"] ?? "") ?? 0)
-            default:
-                break
+        let id = UUID()
+        taskID = id
+        task = Task.detached(priority: requested ? .utility : .background) { [weak self, o] in
+            do {
+                let r = try await VaultSweep.run(o, makeLLM: { GemmaVaultLLM(control: control) }, control: control) { p in
+                    DispatchQueue.main.async {
+                        guard let self, self.taskID == id else { return }
+                        switch p {
+                        case .reading(let d, let n): self.phase = .reading(done: d, of: n)
+                        case .learning(let d, let n): self.phase = .learning(done: d, of: n)
+                        }
+                    }
+                }
+                await MainActor.run { self?.finished(id, .success(r), first: first, requested: requested) }
+            } catch {
+                await MainActor.run { self?.finished(id, .failure(error), first: first, requested: requested) }
             }
         }
     }
 
-    private func finished(_ proc: Process, first: Bool, requested: Bool) {
-        guard process === proc else { return }
-        process = nil
+    private func finished(_ id: UUID, _ outcome: Swift.Result<VaultSweep.Result, Error>, first: Bool, requested: Bool) {
+        guard taskID == id else { return }
+        task = nil
+        control = nil
+        taskID = nil
         running = false
         paused = false
         phase = .idle
-        if proc.terminationReason == .exit && proc.terminationStatus == 0 {
+        switch outcome {
+        case .success(let r):
             Settings.lastVaultScan = Date()
             lastScan = Settings.lastVaultScan
             failed = false
-            onFinished(Result(added: counts.added, removed: counts.removed, total: counts.total, first: first, requested: requested))
-        } else if proc.terminationReason == .exit {
-            NSLog("Ionian Flow: vault scan exited with %d, see %@", proc.terminationStatus, logPath)
+            onFinished(Result(added: r.added, removed: r.removed, total: r.total, first: first, requested: requested))
+        case .failure(let error):
+            if error is CancellationError { return }
+            NSLog("Ionian Flow: vault scan failed: %@", "\(error)")
+            try? "\(error)\n".write(toFile: logPath, atomically: true, encoding: .utf8)
             failed = true
         }
     }
 
-    /// While you dictate or transcribe. A paused scan keeps its memory and picks up where it was.
+    /// While you dictate or transcribe. A paused scan keeps its place; the model gives its lane back within a token.
     func pause() {
-        guard let p = process, !paused else { return }
-        kill(p.processIdentifier, SIGSTOP)
+        guard task != nil, !paused else { return }
+        control?.pause()
         paused = true
     }
 
     func resume() {
-        guard let p = process, paused else { return }
-        kill(p.processIdentifier, SIGCONT)
+        guard task != nil, paused else { return }
+        control?.resume()
         paused = false
     }
 
     func cancel() {
-        guard let p = process else { return }
-        resume()
-        process = nil
+        guard let t = task else { return }
+        taskID = nil
+        task = nil
+        t.cancel()
+        control?.resume()
+        control = nil
         running = false
-        p.terminate()
+        paused = false
         phase = .idle
     }
 }

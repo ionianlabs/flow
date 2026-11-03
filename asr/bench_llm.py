@@ -8,7 +8,8 @@ Two tasks, per model:
   (recall) and how much of the output is a real name (precision). Needs --vault and --gold.
 
 Models: "mlx:<hf id>" runs in-process like production; "ollama:<tag>" goes through a running
-Ollama server (localhost:11434); "swift:<binary>[ <model dir>]" drives scripts/llm-bench (mlx-swift-lm)
+Ollama server (localhost:11434); "app:<IonianFlow binary>" runs the app's own Polisher (`--enginetest-polish`, raw inputs in, finished
+text out); "swift:<binary>[ <model dir>]" drives scripts/llm-bench (mlx-swift-lm)
 over JSON lines on stdin/stdout with the same messages, token limit and greedy decoding (the model dir
 defaults to the cached HF snapshot of the production model).
 
@@ -154,8 +155,30 @@ class Swift:
             pass
 
 
+class App(Swift):
+    """The IonianFlow binary's `--enginetest-polish` mode: it gets the raw inputs (text, previous segment,
+    glossary) and builds the prompt and applies finish() itself, so the Swift Polisher is tested whole."""
+
+    def __init__(self, binary: str):
+        self.name = "app:" + binary
+        t = time.perf_counter()
+        self.proc = subprocess.Popen([binary, "--enginetest-polish"], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, text=True, bufsize=1)
+        self.stats()  # returns once the model is loaded and warm
+        self.load_s = time.perf_counter() - t
+
+    def polish(self, text: str, before: str, vocabulary) -> str:
+        req = {"text": text, "before": before}
+        if vocabulary is not None:
+            req |= {"domain": vocabulary.domain,
+                    "terms": [{"text": t.text, "aliases": list(t.aliases)} for t in vocabulary.terms]}
+        return self._call(req)["text"]
+
+
 def backend(spec: str):
     kind, _, name = spec.partition(":")
+    if kind == "app":
+        return App(name)
     if kind == "swift":
         return Swift(name)
     return MLX(name) if kind == "mlx" else Ollama(name)
@@ -167,14 +190,18 @@ def has(text: str, needle: str) -> bool:
 
 def bench_polish(llm, show: bool, dump: list | None = None) -> dict:
     p = polish.Polisher.__new__(polish.Polisher)  # only for context(); no model, no thread
-    llm.ask(polish.messages("warm up"), max_tokens=5, one_line=True)
+    if not hasattr(llm, "polish"):  # an app: backend warms itself up and builds its own prompts
+        llm.ask(polish.messages("warm up"), max_tokens=5, one_line=True)
     passed, times, fails = 0, [], []
     for text, must, must_not, glossary in POLISH_CASES:
         p.vocab = GLOSSARY if glossary else None
         t = time.perf_counter()
-        context = p.context(text)
-        out = polish.finish(text, llm.ask(polish.messages(text, context), max_tokens=polish.max_tokens(text),
-                                          one_line=True), context)
+        if hasattr(llm, "polish"):
+            out = llm.polish(text, "", p.vocab)
+        else:
+            context = p.context(text)
+            out = polish.finish(text, llm.ask(polish.messages(text, context), max_tokens=polish.max_tokens(text),
+                                              one_line=True), context)
         times.append(time.perf_counter() - t)
         if dump is not None:
             dump.append({"text": text, "out": out})

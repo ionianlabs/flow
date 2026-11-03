@@ -33,6 +33,7 @@ struct AppActions {
     var setKeepMicWarm: (Bool) -> Void
     var applyShortcuts: () -> Void
     var showSetupGuide: () -> Void
+    var models: ModelSetupModel
     var vocabulary: VocabularyActions
 }
 
@@ -253,11 +254,11 @@ private struct GeneralPage: View {
                     }
                     .buttonStyle(.monoLink)
                 }
-                SettingRow("Cleanup", model.cleanupAvailable
-                           ? "A small local model tidies finished transcript segments and writes the summary."
-                           : "Off. The cleanup model isn't downloaded, so transcript segments stay as heard and there is no summary.") {
-                    StatusDot(state: model.cleanupAvailable ? .ready : .off, word: model.cleanupAvailable ? "On" : "Off", wordColor: Color.muted)
-                }
+            }
+            SettingsSection("Models", note: "Models live in Application Support and work offline. Removing the cleanup model turns cleanup, summaries and LLM extraction off.") {
+                SpeechModelRow(models: actions.models)
+                CleanupModelRow(models: actions.models)
+                if ThirdPartyNoticesRow.url != nil { ThirdPartyNoticesRow() }
             }
             SettingsSection("App") {
                 SettingRow("Setup guide", "Permissions, your dictation key and a field to try it.") {
@@ -503,6 +504,7 @@ private struct TranscriptionPage: View {
     let actions = AppActions(
         toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
+        models: ModelSetupModel(store: FakeModelStore(installed: [.speech])),
         vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }))
     return MainView(model: model, store: store, sweeper: sweeper, actions: actions, query: query, category: category)
 }

@@ -135,10 +135,11 @@ private struct HubTest {
         // Concurrent first calls: each model requested 3x at once, must load once.
         let t0 = Date()
         async let p1 = hub.parakeet(), p2 = hub.parakeet(), p3 = hub.parakeet()
-        async let g1 = hub.gemma(), g2 = hub.gemma()
+        async let g1: Void = { _ = try await hub.gemma() }(), g2: Void = { _ = try await hub.gemma() }()
         async let m1 = hub.nemotron(.mic), m2 = hub.nemotron(.mic), s1 = hub.nemotron(.system)
         let mic: StreamingNemotronMultilingualAsrManager, sys: StreamingNemotronMultilingualAsrManager
-        let pk: ParakeetModels, gem: ModelContainer
+        let pk: ParakeetModels
+        var gem: ModelContainer?
         do {
             let (a, b, c) = try await (p1, p2, p3)
             _ = try await (g1, g2)
@@ -162,7 +163,7 @@ private struct HubTest {
             var st = TdtDecoderState.make()
             let r = try await hub.serial { try await pk.asr.transcribe(samples0, decoderState: &st) }
             check(!r.text.isEmpty, "first Parakeet call returns text")
-            let g = try await hub.serial { try await Self.polish("so um the build is uh twenty percent faster now", gem) }
+            let g = try await hub.serial { try await Self.polish("so um the build is uh twenty percent faster now", gem!) }
             check(!g.isEmpty, "first Gemma call returns text")
             _ = try await mic.process(samples: Array(samples0.prefix(16000)))
             _ = try await mic.finish(); await mic.reset()
@@ -189,7 +190,9 @@ private struct HubTest {
         say(String(format: "peak footprint %.0f MB (limit %.0f MB)", peak.mb, limit))
         check(peak.mb <= limit, "footprint under Phase 0 peak + 10 %")
 
-        // Unload and reload one model.
+        // Unload and reload one model. The test lets go of its container first, as the app does: unload only
+        // drops the hub's reference, so a held container would keep the old weights next to the new ones.
+        gem = nil
         await hub.unload(.gemma)
         let unloaded = await !hub.isLoaded(.gemma)
         check(unloaded, "unload(.gemma) marks it unloaded")

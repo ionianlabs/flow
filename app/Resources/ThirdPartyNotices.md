@@ -23,9 +23,10 @@ Attribution: NVIDIA Parakeet and Nemotron speech models, with Core ML conversion
 Gemma is provided under and subject to the Gemma Terms of Use. Ionian Flow uses it only locally, to tidy dictated
 text on this Mac.
 
-## MLX (optional download, with the cleanup model)
+## MLX (compiled into the app)
 
-MLX and its Metal kernels (`mlx.metallib`) are by Apple (ml-explore/mlx), MIT licence. The Swift bindings (mlx-swift,
+MLX and its Metal kernels are by Apple (ml-explore/mlx), MIT licence. The kernels are compiled from the mlx-swift
+sources at build time into `mlx.metallib` inside the app; nothing is downloaded. The Swift bindings (mlx-swift,
 mlx-swift-lm) are MIT as well.
 
 ## Libraries compiled into the app

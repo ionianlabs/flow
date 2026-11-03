@@ -4,7 +4,9 @@ The [README](../README.md) is for people using Ionian Flow. This page is for bui
 understanding it. Flow is a Swift package (`app/`); there is no other runtime.
 
 ## Build from source
-You need a Mac with Apple Silicon, macOS 15 or later and the Xcode command line tools.
+You need a Mac with Apple Silicon, macOS 15 or later, Xcode and its Metal Toolchain (once:
+`xcodebuild -downloadComponent MetalToolchain`). `swift build` and the tests work with the command line tools alone;
+`build-app.sh` needs the Metal compiler. People who run the built app need nothing.
 ```bash
 swift build --package-path app        # debug build, enough for the tests
 scripts/make-cert.sh                  # once: stable code signature (see below)
@@ -12,7 +14,13 @@ scripts/build-app.sh && open "build/Ionian Flow.app"   # release build, signed .
 ```
 `scripts/install.sh` runs `make-cert.sh`, `build-app.sh` and `open` for you.
 
-**Models.** Nothing is bundled. On first launch the setup guide downloads the models into
+**GPU kernels.** `scripts/build-metallib.sh` compiles the Metal sources of the pinned mlx-swift checkout into
+`app/.build/mlx.metallib` (same flags as MLX's own CMake build; cached per mlx-swift revision) and `build-app.sh` ships
+it as `Contents/Resources/mlx.metallib`. At run time `ModelStore.metallibLocation` picks the bundle's file, else an
+`mlx.metallib` next to the binary or in a parent folder (so a bare `.build` binary finds `app/.build/mlx.metallib`);
+`IONIAN_FLOW_METALLIB=/path/mlx.metallib` overrides both. Nothing is downloaded.
+
+**Models.** No models are bundled. On first launch the setup guide downloads the models into
 `~/Library/Application Support/Ionian Flow/Models` (`ModelStore`, `ModelHub`): the speech models are
 required, the cleanup model (Gemma 4 E2B) is optional. After that the app runs offline.
 

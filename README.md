@@ -24,7 +24,7 @@ Ionian Flow is dictation and meeting transcripts for the Mac, in German and Engl
 - **Free.** MIT licensed, no account, no subscription.
 
 ## Install it.
-You need a Mac with Apple Silicon, macOS 15 or later, about 8 GB of free disk space and the Xcode command line tools (`xcode-select --install`). Flow is written in Swift. There is nothing else to install.
+You need a Mac with Apple Silicon, macOS 15 or later, about 8 GB of free disk space. Building from source also needs Xcode and its Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`), because the app compiles MLX's GPU kernels itself. Flow is written in Swift. Someone running a built app needs nothing else.
 
 ```bash
 git clone https://github.com/ionianlabs/flow.git

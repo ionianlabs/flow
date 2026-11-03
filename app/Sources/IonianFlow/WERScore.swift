@@ -1,7 +1,7 @@
 import Foundation
 
 // Word error rate scoring, a port of what the Python bench scripts did (asr/bench_wer.normalize, jiwer's
-// corpus WER, scripts/ne-int/score_dictation.py and compare_transcribe.py). CLI flags: --score-dictation,
+// corpus WER, the former Python scorers). CLI flags: --score-dictation,
 // --compare-transcribe, --make-two-speaker. The Python files are gone; the selftest below pins the numbers.
 
 enum WERScore {

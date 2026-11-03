@@ -253,7 +253,7 @@ final class Polisher: @unchecked Sendable {
 }
 
 enum PolisherCLI {
-    /// `--enginetest-polish`: JSON lines on stdin/stdout, driven by the former Python bench_llm.py's `app:` backend.
+    /// `--enginetest-polish`: JSON lines on stdin/stdout.
     ///   {"text":..., "before":..., "domain":..., "terms":[{"text":..,"aliases":[..]}]} -> {"text":..., "ms":...}
     ///   {"cmd":"stats"} -> {"load_s":..., "peak_rss_mb":...}
     /// The model is loaded before the first line is read. Returns the process exit code.

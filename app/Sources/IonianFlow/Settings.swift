@@ -76,7 +76,7 @@ enum Settings {
         set { d.set(newValue.path, forKey: "transcriptsFolder") }
     }
 
-    /// Names, acronyms and jargon the recognizer should get right (format: the former Python vocab.py).
+    /// Names, acronyms and jargon the recognizer should get right (format: see VocabularyParser.swift).
     static let vocabularyFile = testDir?.appendingPathComponent("Vocabulary.md")
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Ionian Flow/Vocabulary.md")
 

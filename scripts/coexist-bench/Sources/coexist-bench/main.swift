@@ -168,14 +168,14 @@ actor Serial {
         return (text, Date().timeIntervalSince(t) * 1000)
     }
 
-    /// One Gemma polish call (greedy, thinking off, n-1 prefill rule from llm-bench).
+    /// One Gemma polish call (greedy, thinking off, n-1 prefill rule from Polisher).
     func polish(_ text: String) async throws -> (String, Double) {
         let t = Date()
         let input = try await llm.prepare(input: UserInput(
             chat: [.system(polishSystem), .user("Segment: \(text)\nOutput:")],
             additionalContext: ["enable_thinking": false]))
         var params = GenerateParameters(maxTokens: 160, temperature: 0)
-        // Prefill all but the last prompt token without logits (llm-bench: otherwise ~2x slower prefill).
+        // Prefill all but the last prompt token without logits (otherwise ~2x slower prefill).
         params.prefill.stepSize = max(1, input.text.tokens.size - 1)
         let stream = try await llm.generate(input: input, parameters: params)
         var out = ""

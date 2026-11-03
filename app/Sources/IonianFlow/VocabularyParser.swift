@@ -1,7 +1,7 @@
 import Foundation
 
-/// One line of the vocabulary file, parsed. The format and the Python parser are in the former Python vocab.py;
-/// keep the two in step (VocabNormalizer's selftest compares them on the same inputs).
+/// One line of the vocabulary file, parsed. Its format is the one VocabularyStore reads and writes; keep the two
+/// in step (the self test compares them on the same inputs).
 struct VocabTerm: Equatable {
     let text: String
     let category: String

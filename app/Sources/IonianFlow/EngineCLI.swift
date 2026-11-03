@@ -13,6 +13,7 @@ enum EngineCLI {
             ("--enginetest-polish", PolisherCLI.cli),         // E
             ("--enginetest-summary", SummarizerCLI.cli),      // F
             ("--enginetest-sweep", VaultSweep.cli),           // F
+            ("--enginetest-store", ModelStoreTests.cli),      // G
             ("--e2e-engine", E2E.cli),                        // integration
         ]
         for (flag, handler) in routes {
@@ -32,6 +33,7 @@ enum EngineSelfTests {
             PolisherSelfTest.run(),      // E
             SummarizerCLI.selfTest(),    // F
             VaultSweep.selfTest(),       // F
+            ModelStoreTests.selfTest(),  // G
         ]
         return !results.contains(false)
     }

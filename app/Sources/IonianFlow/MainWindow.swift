@@ -150,7 +150,7 @@ extension AppModel {
         if recognizerReady { return StatusDot(state: .ready, word: "Ready") }
         let text = status.replacingOccurrences(of: "ASR: ", with: "").replacingOccurrences(of: "ASR ", with: "Speech model ")
             .replacingOccurrences(of: "…", with: "").replacingOccurrences(of: "...", with: "")
-        return StatusDot(state: status.hasPrefix("Grant") || recognizerFailed ? .off : .working, word: text.capitalizingFirst)
+        return StatusDot(state: status.hasPrefix("Grant") || status.contains("not downloaded") || recognizerFailed ? .off : .working, word: text.capitalizingFirst)
     }
 }
 

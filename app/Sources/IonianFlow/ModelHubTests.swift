@@ -39,7 +39,26 @@ enum ModelHubTests {
             done.signal()
         }
         guard done.wait(timeout: .now() + 10) == .success else { return false }
-        return st.order == Array(0..<8) && !st.overlap && hub.footprintMB() > 0
+        return st.order == Array(0..<8) && !st.overlap && hub.footprintMB() > 0 && prioritySelfTest()
+    }
+
+    /// A `.low` job that queued first runs after a `.high` job that queued later; same-priority order stays FIFO.
+    private static func prioritySelfTest() -> Bool {
+        final class Order: @unchecked Sendable { let lock = NSLock(); var v: [String] = [] }
+        let hub = ModelHub(), o = Order(), done = DispatchSemaphore(value: 0)
+        Task {
+            let holder = Task { await hub.serial { try? await Task.sleep(nanoseconds: 80_000_000) } }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            var jobs: [Task<Void, Never>] = []
+            for (name, p) in [("low1", LanePriority.low), ("low2", .low), ("high1", .high), ("high2", .high)] {
+                jobs.append(Task { await hub.serial(p) { o.lock.withLock { o.v.append(name) } } })
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+            await holder.value
+            for j in jobs { await j.value }
+            done.signal()
+        }
+        return done.wait(timeout: .now() + 10) == .success && o.v == ["high1", "high2", "low1", "low2"]
     }
 
     /// `--enginetest-hub ...`. Return the process exit code.
@@ -116,10 +135,11 @@ private struct HubTest {
         // Concurrent first calls: each model requested 3x at once, must load once.
         let t0 = Date()
         async let p1 = hub.parakeet(), p2 = hub.parakeet(), p3 = hub.parakeet()
-        async let g1 = hub.gemma(), g2 = hub.gemma()
+        async let g1: Void = { _ = try await hub.gemma() }(), g2: Void = { _ = try await hub.gemma() }()
         async let m1 = hub.nemotron(.mic), m2 = hub.nemotron(.mic), s1 = hub.nemotron(.system)
         let mic: StreamingNemotronMultilingualAsrManager, sys: StreamingNemotronMultilingualAsrManager
-        let pk: ParakeetModels, gem: ModelContainer
+        let pk: ParakeetModels
+        var gem: ModelContainer?
         do {
             let (a, b, c) = try await (p1, p2, p3)
             _ = try await (g1, g2)
@@ -143,7 +163,7 @@ private struct HubTest {
             var st = TdtDecoderState.make()
             let r = try await hub.serial { try await pk.asr.transcribe(samples0, decoderState: &st) }
             check(!r.text.isEmpty, "first Parakeet call returns text")
-            let g = try await hub.serial { try await Self.polish("so um the build is uh twenty percent faster now", gem) }
+            let g = try await hub.serial { try await Self.polish("so um the build is uh twenty percent faster now", gem!) }
             check(!g.isEmpty, "first Gemma call returns text")
             _ = try await mic.process(samples: Array(samples0.prefix(16000)))
             _ = try await mic.finish(); await mic.reset()
@@ -170,11 +190,13 @@ private struct HubTest {
         say(String(format: "peak footprint %.0f MB (limit %.0f MB)", peak.mb, limit))
         check(peak.mb <= limit, "footprint under Phase 0 peak + 10 %")
 
-        // Unload and reload one model.
+        // Unload and reload one model. The test lets go of its container first, as the app does: unload only
+        // drops the hub's reference, so a held container would keep the old weights next to the new ones.
+        gem = nil
         await hub.unload(.gemma)
         let unloaded = await !hub.isLoaded(.gemma)
         check(unloaded, "unload(.gemma) marks it unloaded")
-        if let g = try? await hub.gemma(), let out = try? await hub.serial({ try await Self.polish("hello there this is a test", g) }) {
+        if let g = try? await hub.gemma(), let out = try? await hub.serial { try await Self.polish("hello there this is a test", g) } {
             let n = await hub.loadCounts[.gemma] ?? 0
             check(n == 2 && !out.isEmpty, "gemma reloads after unload and works")
         } else { check(false, "gemma reload") }

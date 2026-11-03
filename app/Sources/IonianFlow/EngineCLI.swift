@@ -32,6 +32,7 @@ enum EngineSelfTests {
             PolisherSelfTest.run(),      // E
             SummarizerCLI.selfTest(),    // F
             VaultSweep.selfTest(),       // F
+            ModelSetupModel.selfTest(),  // H
         ]
         return !results.contains(false)
     }

@@ -9,7 +9,7 @@ final class OnboardingWindow {
     private let window: NSWindow
     private var closeObserver: NSObjectProtocol?
 
-    init(model: AppModel, step: Int = 0, applyShortcuts: @escaping () -> Void,
+    init(model: AppModel, models: ModelSetupModel = .shared, step: Int = 0, applyShortcuts: @escaping () -> Void,
          connectVault: @escaping (URL) -> Void, pickVaultFolder: @escaping () -> URL?) {
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.size.width, height: Self.size.height),
@@ -23,7 +23,7 @@ final class OnboardingWindow {
         window.backgroundColor = IonianColor.bg
         window.isReleasedWhenClosed = false
         let host = NSHostingView(rootView: OnboardingView(
-            model: model, step: step, applyShortcuts: applyShortcuts, connectVault: connectVault,
+            model: model, models: models, step: step, applyShortcuts: applyShortcuts, connectVault: connectVault,
             pickVaultFolder: pickVaultFolder, onDone: { [weak self] in self?.window.close() }
         ))
         host.sizingOptions = []
@@ -51,6 +51,7 @@ final class OnboardingWindow {
 
 struct OnboardingView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var models: ModelSetupModel
     var applyShortcuts: () -> Void
     var connectVault: (URL) -> Void
     var pickVaultFolder: () -> URL?
@@ -59,10 +60,11 @@ struct OnboardingView: View {
     @State private var step: Int
     @State private var vault: URL?
 
-    init(model: AppModel, step: Int, applyShortcuts: @escaping () -> Void, connectVault: @escaping (URL) -> Void,
+    init(model: AppModel, models: ModelSetupModel = .shared, step: Int, applyShortcuts: @escaping () -> Void, connectVault: @escaping (URL) -> Void,
          pickVaultFolder: @escaping () -> URL?, onDone: @escaping () -> Void,
          knownVaults: [VaultSweeper.Vault] = VaultSweeper.knownVaults(), vault: URL? = Settings.vault) {
         self.model = model
+        self.models = models
         self.applyShortcuts = applyShortcuts
         self.connectVault = connectVault
         self.pickVaultFolder = pickVaultFolder
@@ -71,7 +73,11 @@ struct OnboardingView: View {
         _step = State(initialValue: step)
         _vault = State(initialValue: vault)
     }
-    private let steps = ["Welcome", "Permissions", "Shortcut", "Your words", "Try it"]
+    static let modelsStep = 4
+    /// The models step is skipped when everything is on disk already (existing users).
+    private func next(_ s: Int) -> Int { s + 1 == Self.modelsStep && models.allInstalled ? s + 2 : s + 1 }
+    private func previous(_ s: Int) -> Int { s - 1 == Self.modelsStep && models.allInstalled ? s - 2 : s - 1 }
+    private let steps = ["Welcome", "Permissions", "Shortcut", "Your words", "Models", "Try it"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,7 +87,8 @@ struct OnboardingView: View {
                 case 1: PermissionsStep(model: model)
                 case 2: ShortcutStep(applyShortcuts: applyShortcuts)
                 case 3: VaultStep(connected: $vault, known: knownVaults, connectVault: connectVault, pickVaultFolder: pickVaultFolder)
-                default: TryStep(model: model, back: { step -= 1 })
+                case 4: ModelsStep(models: models)
+                default: TryStep(model: model, back: { step = previous(step) })
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -89,11 +96,12 @@ struct OnboardingView: View {
             HStack(spacing: Space.s3) {
                 MonoLabel("\(step + 1) / \(steps.count) · \(steps[step])")
                 Spacer()
-                if step > 0 { Button("‹ Back") { step -= 1 }.buttonStyle(.monoLink) }
+                if step > 0 { Button("‹ Back") { step = previous(step) }.buttonStyle(.monoLink) }
                 Button(step == steps.count - 1 ? "Done" : step == 0 ? "Start setup" : step == 3 && vault == nil ? "Skip" : "Continue") {
-                    if step == steps.count - 1 { onDone() } else { step += 1 }
+                    if step == steps.count - 1 { onDone() } else { step = next(step) }
                 }
                 .keyboardShortcut(.defaultAction)
+                .disabled(step == Self.modelsStep && !models.canContinue)
                 .buttonStyle(.primary)
                 .padding(.leading, Space.s2)
             }
@@ -108,7 +116,7 @@ struct OnboardingView: View {
 }
 
 /// Where every step's content sits: the window's margins and a headline in `type.section`.
-private struct StepPage<Content: View>: View {
+struct StepPage<Content: View>: View {
     let title: Text
     var lead: String?
     @ViewBuilder var content: Content

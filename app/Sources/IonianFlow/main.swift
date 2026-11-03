@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         },
         applyShortcuts: { [weak self] in self?.applyShortcuts() },
         showSetupGuide: { [weak self] in self?.onboarding.show() },
+        models: ModelSetupModel.shared,
         vocabulary: VocabularyActions(
             connect: { [weak self] in self?.connectVault($0) },
             chooseFolder: { [weak self] in self?.chooseVaultFolder() },
@@ -64,8 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         )
     ))
     private var scanWatch: AnyCancellable?
+    private var onboardingStep = 0
     private lazy var onboarding = OnboardingWindow(
         model: appModel,
+        models: ModelSetupModel.shared,
+        step: onboardingStep,
         applyShortcuts: { [weak self] in self?.applyShortcuts() },
         connectVault: { [weak self] in self?.startVault($0) },
         pickVaultFolder: { [weak self] in self?.pickVaultFolder() }
@@ -97,15 +101,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         Settings.registerDefaults()
         setUpMenu()
         setUpEngine()
+        ModelSetupModel.shared.onWillRemove = { item in if item == .cleanup { await ModelHub.shared.unload(.gemma) } }
+        ModelSetupModel.shared.onChange = { [weak self] in self?.modelsChanged($0) }
+        let speechMissing = !ModelSetupModel.shared.canContinue
         if Settings.onboarded {
             AudioCapture.requestPermission { ok in if !ok { NSLog("Ionian Flow: microphone permission denied") } }
             _ = TextInserter.hasAccessibility(prompt: true)
+            if speechMissing {  // models were removed or never finished: ask for them instead of failing to start
+                onboardingStep = OnboardingView.modelsStep
+                onboarding.show()
+            }
         } else {
             onboarding.show()  // asks for each permission in turn, with the reason
         }
         startHotkey()
 
-        engine.start()
+        if speechMissing {
+            setStatus("ASR: models not downloaded")  // the engine starts when the download finishes (modelsChanged)
+        } else {
+            engine.start()
+        }
         appModel.cleanupAvailable = engine.capabilities.contains(.polish)
         if FinalPass.downloaded {  // ~80 MB once compiled: transcription can start with it right away
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self.transcriber.finalPass.prepare() }
@@ -535,6 +550,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     /// Unloads and loads the speech models again.
+    /// A download finished or the cleanup model was removed: capabilities are derived from what is on disk
+    /// (NativeEngine.capabilities asks ModelHub.gemmaAvailable), so refreshing is re-reading them. Speech: start the engine.
+    private func modelsChanged(_ item: ModelItem) {
+        switch item {
+        case .speech:
+            if ModelSetupModel.shared.canContinue { reloadEngine() }  // emits .ready, which refreshes cleanupAvailable
+        case .cleanup:
+            appModel.cleanupAvailable = engine.capabilities.contains(.polish)
+            if appModel.cleanupAvailable { engine.polish(id: 0, text: "", before: "") }  // preload the model
+        }
+    }
+
     private func reloadEngine() {
         setStatus("ASR: loading models")
         engine.stop()

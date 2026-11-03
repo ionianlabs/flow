@@ -36,6 +36,7 @@ enum EngineSelfTests {
             SummarizerCLI.selfTest(),    // F
             VaultSweep.selfTest(),       // F
             WERScore.selfTest(),         // WER scoring
+            ModelSetupModel.selfTest(),  // H
         ]
         return !results.contains(false)
     }

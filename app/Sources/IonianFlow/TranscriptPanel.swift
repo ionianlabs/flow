@@ -258,6 +258,9 @@ private struct TranscriptView: View {
             if let notice = model.notice {
                 Text(notice).ionianText(IonianType.small).foregroundStyle(Color.ink)
             }
+            if model.cleanupOff && model.ended == nil {
+                Text("Cleanup is off. Segments stay as heard.").ionianText(IonianType.small).foregroundStyle(Color.muted)
+            }
             if model.cancellingEcho && model.ended == nil {
                 Text("Removing the speakers' audio from your mic.").ionianText(IonianType.small).foregroundStyle(Color.muted)
             }

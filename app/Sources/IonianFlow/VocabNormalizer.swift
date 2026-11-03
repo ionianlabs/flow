@@ -289,7 +289,7 @@ extension VocabNormalizer {
         func check<T: Equatable>(_ got: T, _ want: T, _ what: String) {
             if got != want { ok = false; print("FAIL normalizer: \(what): got \(got), want \(want)") }
         }
-        if WordFrequencyTable.shared.isEmpty { print("FAIL normalizer: wordfreq.tsv missing (scripts/make-wordfreq.py)"); return false }
+        if WordFrequencyTable.shared.isEmpty { print("FAIL normalizer: wordfreq.tsv missing (app/Resources)"); return false }
 
         let start = VocabularyParser.start, end = VocabularyParser.end
         var sample = VocabularyFile.template.replacingOccurrences(of: "## Terms\n", with: "## Terms\n- ACME\n- pull request (heard as: pool request, pul request)\n")

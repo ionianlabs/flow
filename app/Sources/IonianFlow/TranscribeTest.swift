@@ -1,23 +1,18 @@
 import Foundation
 
-/// --transcribetest SOCKET YOU.wav [THEM.wav] [--no-parakeet]: transcription mode on WAV files
-/// (16 kHz mono Int16) instead of the mic and the system audio, against a running server
-/// (`uv run server.py --socket SOCKET`), at 4x real time. Prints the segments and the Markdown.
+/// --transcribetest YOU.wav [THEM.wav] [--no-parakeet]: transcription mode on WAV files
+/// (16 kHz mono Int16) instead of the mic and the system audio, on the native engine,
+/// at 4x real time. Prints the segments and the Markdown.
 func runTranscribeTest(_ args: [String]) {
     Settings.registerDefaults()
-    let files = args.dropFirst().filter { !$0.hasPrefix("--") }
-    guard let socket = args.first, let youFile = files.first, let you = loadWAV(youFile) else {
-        print("usage: --transcribetest SOCKET YOU.wav [THEM.wav] [--no-parakeet]")
+    let files = args.filter { !$0.hasPrefix("--") }
+    guard let youFile = files.first, let you = loadWAV(youFile) else {
+        print("usage: --transcribetest YOU.wav [THEM.wav] [--no-parakeet]")
         exit(2)
     }
     let them = files.dropFirst().first.flatMap(loadWAV)
-    let client = ASRClient(socketPath: socket)
-    guard client.connect() else {
-        print("no server on \(socket)")
-        exit(1)
-    }
-    let t = Transcriber(client: client, socketPath: socket, mic: AudioCapture())
-    client.onEvent = { _ = t.handleMain($0) }
+    let engine = NativeEngine(finalizer: ParakeetFinalizer())
+    let t = Transcriber(engine: engine, mic: AudioCapture())
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("ionian-flow-transcribetest.md")
     let started = Date()
     t.onFinished = {
@@ -26,7 +21,7 @@ func runTranscribeTest(_ args: [String]) {
     }
     let go = {
         t.startForFiles(them: them != nil, file: file)
-        print("finals from \(t.liveOnly ? "Parakeet" : "the server's final decoder")")
+        print("finals from \(t.finalPass.isReady ? "Parakeet" : "the engine's live final"), cleanup \(t.cleanupAvailable ? "on" : "off")")
         print("vault \(VaultTags.root()?.path ?? "none"), its tags: \(VaultTags.common().joined(separator: ", "))")
         Thread {
             let tail = [Int16](repeating: 0, count: 32_000)  // 2 s of silence closes the last segment
@@ -40,7 +35,16 @@ func runTranscribeTest(_ args: [String]) {
             DispatchQueue.main.async { t.stop() }
         }.start()
     }
-    if args.contains("--no-parakeet") { go() } else { t.finalPass.prepare { _ in go() } }
+    var launched = false
+    engine.onEvent = { event in
+        if case .ready = event, !launched {
+            launched = true
+            if args.contains("--no-parakeet") { go() } else { t.finalPass.prepare { _ in go() } }
+        } else {
+            _ = t.handleMain(event)
+        }
+    }
+    engine.start()
     dispatchMain()
 }
 

@@ -10,7 +10,9 @@ final class AppModel: ObservableObject {
     }
 
     @Published var page = Page.general
-    @Published var status = "ASR: starting"
+    @Published var status = "ASR: loading models"
+    /// The cleanup model is downloaded (polish and summaries are on).
+    @Published var cleanupAvailable = true
     @Published var transcribing = false
     @Published var transcriptsFolder = Settings.transcriptsFolder
     /// The event tap is running (Input Monitoring granted and taking effect).
@@ -24,8 +26,7 @@ final class AppModel: ObservableObject {
 /// What the window's pages can ask the app to do (settings with side effects go through here).
 struct AppActions {
     var toggleTranscription: () -> Void
-    var restartASR: () -> Void
-    var openLog: () -> Void
+    var reloadEngine: () -> Void
     var chooseTranscriptsFolder: () -> Void
     var openTranscripts: () -> Void
     var setMicrophone: (String) -> Void
@@ -141,13 +142,14 @@ extension AppModel.Page {
 
 extension AppModel {
     var recognizerReady: Bool { status.hasSuffix("ready") && !status.contains("not") }
+    var recognizerFailed: Bool { status.hasSuffix("error") }
 
     /// The speech model's state as a dot with its word (MAC-09).
     var recognizerStatus: StatusDot {
         if recognizerReady { return StatusDot(state: .ready, word: "Ready") }
         let text = status.replacingOccurrences(of: "ASR: ", with: "").replacingOccurrences(of: "ASR ", with: "Speech model ")
             .replacingOccurrences(of: "…", with: "").replacingOccurrences(of: "...", with: "")
-        return StatusDot(state: status.hasPrefix("Grant") ? .off : .working, word: text.capitalizingFirst)
+        return StatusDot(state: status.hasPrefix("Grant") || recognizerFailed ? .off : .working, word: text.capitalizingFirst)
     }
 }
 
@@ -247,10 +249,14 @@ private struct GeneralPage: View {
                 SettingRow("Recognizer", "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.") {
                     HStack(spacing: Space.s4) {
                         StatusDot(state: model.recognizerStatus.state, word: model.recognizerStatus.word, wordColor: Color.muted)
-                        Button("Restart ›", action: actions.restartASR)
-                        Button("Open log ↗", action: actions.openLog)
+                        Button("Reload ›", action: actions.reloadEngine)
                     }
                     .buttonStyle(.monoLink)
+                }
+                SettingRow("Cleanup", model.cleanupAvailable
+                           ? "A small local model tidies finished transcript segments and writes the summary."
+                           : "Off. The cleanup model isn't downloaded, so transcript segments stay as heard and there is no summary.") {
+                    StatusDot(state: model.cleanupAvailable ? .ready : .off, word: model.cleanupAvailable ? "On" : "Off", wordColor: Color.muted)
                 }
             }
             SettingsSection("App") {
@@ -495,7 +501,7 @@ private struct TranscriptionPage: View {
     let sweeper = VaultSweeper(asrDir: "")
     let store = VocabularyStore(url: file ?? URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ionian-flow-render.md"), watch: false)
     let actions = AppActions(
-        toggleTranscription: {}, restartASR: {}, openLog: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
+        toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
         vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }))
     return MainView(model: model, store: store, sweeper: sweeper, actions: actions, query: query, category: category)

@@ -58,7 +58,7 @@ enum Settings {
     static var parakeetFinals: Bool { d.bool(forKey: "parakeetFinals") }
 
     /// Frontmatter (description, tags, keywords) and a summary for every finished transcript, by the
-    /// polish LLM. No UI: `defaults write dev.ionian.flow summarizeTranscripts -bool false`.
+    /// cleanup model (needs it downloaded). No UI: `defaults write dev.ionian.flow summarizeTranscripts -bool false`.
     static var summarizeTranscripts: Bool { d.bool(forKey: "summarizeTranscripts") }
 
     static let defaultTranscriptsFolder = FileManager.default.homeDirectoryForCurrentUser

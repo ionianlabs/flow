@@ -104,7 +104,8 @@ func runVocabularyDemo(file: String?) {
     model.hotkeyActive = true
     let window = MainWindow(model: model, store: store, sweeper: sweeper, actions: AppActions(
         toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
-        setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {}, vocabulary: vocabulary
+        setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
+        models: ModelSetupModel(store: FakeModelStore(installed: [.speech])), vocabulary: vocabulary
     ))
     retainedVocabularyDemo = (store, sweeper, window)
     let page = ProcessInfo.processInfo.environment["IONIAN_FLOW_DEMO_PAGE"].flatMap(AppModel.Page.init(rawValue:))
@@ -113,12 +114,12 @@ func runVocabularyDemo(file: String?) {
 
 private var retainedOnboardingDemo: OnboardingWindow?
 
-/// The first-run guide, starting at `step` (0 to 4); permissions show this binary's real state.
+/// The first-run guide, starting at `step` (0 to 5; 4 is the models step, with a fake store); permissions show this binary's real state.
 func runOnboardingDemo(step: Int) {
     Settings.registerDefaults()
     let model = AppModel()
     model.status = "ASR: ready"
-    let window = OnboardingWindow(model: model, step: step, applyShortcuts: {}, connectVault: { _ in },
+    let window = OnboardingWindow(model: model, models: ModelSetupModel(store: FakeModelStore()), step: step, applyShortcuts: {}, connectVault: { _ in },
                                   pickVaultFolder: { nil })
     retainedOnboardingDemo = window
     window.show()

@@ -39,7 +39,26 @@ enum ModelHubTests {
             done.signal()
         }
         guard done.wait(timeout: .now() + 10) == .success else { return false }
-        return st.order == Array(0..<8) && !st.overlap && hub.footprintMB() > 0
+        return st.order == Array(0..<8) && !st.overlap && hub.footprintMB() > 0 && prioritySelfTest()
+    }
+
+    /// A `.low` job that queued first runs after a `.high` job that queued later; same-priority order stays FIFO.
+    private static func prioritySelfTest() -> Bool {
+        final class Order: @unchecked Sendable { let lock = NSLock(); var v: [String] = [] }
+        let hub = ModelHub(), o = Order(), done = DispatchSemaphore(value: 0)
+        Task {
+            let holder = Task { await hub.serial { try? await Task.sleep(nanoseconds: 80_000_000) } }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            var jobs: [Task<Void, Never>] = []
+            for (name, p) in [("low1", LanePriority.low), ("low2", .low), ("high1", .high), ("high2", .high)] {
+                jobs.append(Task { await hub.serial(p) { o.lock.withLock { o.v.append(name) } } })
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+            await holder.value
+            for j in jobs { await j.value }
+            done.signal()
+        }
+        return done.wait(timeout: .now() + 10) == .success && o.v == ["high1", "high2", "low1", "low2"]
     }
 
     /// `--enginetest-hub ...`. Return the process exit code.
@@ -174,7 +193,7 @@ private struct HubTest {
         await hub.unload(.gemma)
         let unloaded = await !hub.isLoaded(.gemma)
         check(unloaded, "unload(.gemma) marks it unloaded")
-        if let g = try? await hub.gemma(), let out = try? await hub.serial({ try await Self.polish("hello there this is a test", g) }) {
+        if let g = try? await hub.gemma(), let out = try? await hub.serial { try await Self.polish("hello there this is a test", g) } {
             let n = await hub.loadCounts[.gemma] ?? 0
             check(n == 2 && !out.isEmpty, "gemma reloads after unload and works")
         } else { check(false, "gemma reload") }

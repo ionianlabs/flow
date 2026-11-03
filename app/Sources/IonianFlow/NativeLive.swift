@@ -148,7 +148,7 @@ func nativeLanguageCode(_ language: String) -> String {
 /// One session on one channel. Commands are queued as they arrive (audio-thread safe); one task feeds them to
 /// the channel's manager once the lane is free and the model is loaded.
 final class LiveStream: @unchecked Sendable {
-    enum Command { case audio(Data), cut(Int), end, cancel }
+    enum Command { case audio(Data, queued: Date), cut(Int), end, cancel }
 
     struct Dependencies: @unchecked Sendable {
         /// The channel's warmed manager (ModelHub.nemotron).
@@ -187,7 +187,7 @@ final class LiveStream: @unchecked Sendable {
     /// end() or cancel() was called: no more audio is accepted.
     var isEnded: Bool { lock.lock(); defer { lock.unlock() }; return _ended }
 
-    func push(_ pcm: Data) { if !isEnded { continuation.yield(.audio(pcm)) } }
+    func push(_ pcm: Data) { if !isEnded { continuation.yield(.audio(pcm, queued: Date())) } }
     func cut(at sample: Int) { if !isEnded { continuation.yield(.cut(sample)) } }
     func end() {
         lock.lock(); let was = _ended; _ended = true; lock.unlock()
@@ -260,8 +260,10 @@ final class LiveStream: @unchecked Sendable {
 
             loop: for await command in commands {
                 switch command {
-                case .audio(let data):
+                case .audio(let data, let queued):
                     if failed || isCancelled { continue }
+                    let started = Date()
+                    defer { LaneLog.record("live-\(id.channel)", .high, queued: queued, started: started, depth: 0) }
                     let samples = Self.floats(data)
                     if dictation { utterance += samples }
                     do {

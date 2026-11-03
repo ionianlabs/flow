@@ -45,7 +45,7 @@ final class ParakeetFinalizer: UtteranceFinalizer, @unchecked Sendable {
         var samples = pcm
         if samples.count < 16_000 { samples += [Float](repeating: 0, count: 16_000 - samples.count) }  // Parakeet wants >= 1 s
         do {
-            return try await hub.serial { try await self.run(samples) }
+            return try await hub.serial(label: "dictation") { try await self.run(samples) }
         } catch {
             NSLog("Ionian Flow: dictation final failed: %@", error.localizedDescription)
             return ""

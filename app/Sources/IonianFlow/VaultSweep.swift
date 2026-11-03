@@ -11,7 +11,8 @@ enum VaultSweep {
     /// Not the Python sweep's file (sweep-cache.json): its notes are read again once after the switch.
     static let cacheVersion = 1
     static var defaultCache: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Ionian Flow/vault-sweep.json")
+        Settings.testDir?.appendingPathComponent("vault-sweep.json")
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Ionian Flow/vault-sweep.json")
     }
 
     static let domainPrompt = #"""

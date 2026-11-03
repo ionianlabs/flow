@@ -104,8 +104,8 @@ final class NativeEngine: SpeechEngine, @unchecked Sendable {
 
     // MARK: Lifecycle
 
-    /// Loads the microphone model in the background and announces .ready. The system-audio model loads at its
-    /// first session.
+    /// Loads the microphone model in the background and announces .ready, then Parakeet (the dictation final).
+    /// The app calls this at launch, so the first dictation doesn't wait. The system-audio model loads at its first session.
     func start() {
         lock.lock(); stopped = false; lock.unlock()
         Task.detached(priority: .userInitiated) { [self] in
@@ -114,6 +114,9 @@ final class NativeEngine: SpeechEngine, @unchecked Sendable {
                 await prepare(manager, channel: .mic)
                 lock.withLock { _ready = true }
                 emit(.ready)
+                // The first dictation's final needs Parakeet: load it now, in the background, so it doesn't wait for
+                // a cold Core ML compile (about 20 s the first time after an update; 0.3 s from the cache).
+                if finalizer != nil { _ = try? await hub.parakeet() }
             } catch {
                 emit(.error(error as? EngineError ?? .failed("\(error)")))
             }

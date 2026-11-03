@@ -1,7 +1,7 @@
 // swift-tools-version: 6.2
 // Phase 0 coexistence test: every model of the native engine in ONE process for 30 minutes
 // (two Nemotron streams, Parakeet Ultra + CTC vocabulary model, Gemma 4 E2B). See main.swift.
-// Pins are exact on purpose (FluidAudio like engine-bench, MLX like llm-bench); update deliberately.
+// Pins are exact on purpose (FluidAudio like engine-bench, MLX like app/Package.swift); update deliberately.
 import PackageDescription
 
 let package = Package(

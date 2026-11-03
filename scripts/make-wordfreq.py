@@ -2,7 +2,7 @@
 """Writes app/Resources/wordfreq.tsv: the German and English word-frequency table behind
 VocabNormalizer's common-word guard (Zipf scale, like wordfreq).
 
-    asr/.venv/bin/python scripts/make-wordfreq.py [out.tsv]
+    python3 scripts/make-wordfreq.py [out.tsv]
 
 One line per word: `word<TAB>de<TAB>en`, Zipf frequency times 100 (an integer), empty where the
 word is below 3.0 in that language. 3.0 is the lowest threshold vocab.py ever asks for.

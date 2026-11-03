@@ -23,7 +23,9 @@ import SwiftUI
         "settings-dictation": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .dictation)) }),
         "settings-transcription": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .transcription)) }),
         "onboarding-0": onboarding(0), "onboarding-1": onboarding(1), "onboarding-2": onboarding(2),
-        "onboarding-3": onboarding(3), "onboarding-4": onboarding(4),
+        "onboarding-3": onboarding(3), "onboarding-4": onboarding(4, models: .idle), "onboarding-5": onboarding(5),
+        "models-downloading": onboarding(4, models: .downloading), "models-error": onboarding(4, models: .error),
+        "models-skipped": onboarding(4, models: .skipped), "models-done": onboarding(4, models: .done),
         "vocabulary": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularySample())) }),
         "vocabulary-large": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge())) }),
         "vocabulary-large-category": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), category: "People")) }),
@@ -64,7 +66,9 @@ import SwiftUI
         })
     }
 
-    private static func onboarding(_ step: Int) -> Surface {
+    enum ModelsState { case idle, downloading, error, skipped, done }
+
+    private static func onboarding(_ step: Int, models state: ModelsState = .done) -> Surface {
         Surface(size: OnboardingWindow.size, make: {
             Settings.registerDefaults()
             let model = AppModel()
@@ -72,7 +76,17 @@ import SwiftUI
             let notes = URL(fileURLWithPath: "/tmp/Northwind Notes", isDirectory: true)
             let known = [VaultSweeper.Vault(name: "Northwind Notes", url: notes),
                          VaultSweeper.Vault(name: "Garden", url: URL(fileURLWithPath: "/tmp/Garden", isDirectory: true))]
-            return AnyView(OnboardingView(model: model, step: step, applyShortcuts: {}, connectVault: { _ in },
+            let fake = FakeModelStore(installed: state == .done ? [.speech] : [])
+            let models = ModelSetupModel(store: fake)
+            switch state {
+            case .downloading: fake.hold = true; models.start(.speech); models.start(.cleanup)
+            case .error: fake.failNext(.speech); models.start(.speech)
+            case .skipped: models.skipCleanup()
+            default: break
+            }
+            // Let the fake's first progress and error land before the frame is drawn.
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            return AnyView(OnboardingView(model: model, models: models, step: step, applyShortcuts: {}, connectVault: { _ in },
                                           pickVaultFolder: { nil }, onDone: {}, knownVaults: known, vault: step == 3 ? notes : nil))
         })
     }

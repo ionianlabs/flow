@@ -3,7 +3,7 @@ import Foundation
 
 // Unit C (dictation final). Whole-utterance final for dictation: Parakeet Ultra re-reads the buffered utterance,
 // CTC vocabulary rescoring (library defaults, "ctc-default" in scripts/parakeet-bench), the common-word guard
-// (zipf 4.0, port of asr/pk_post.py guard()), then VocabNormalizer. Models come from ModelHub.parakeet();
+// (zipf 4.0, port of the former Python pk_post.py guard()), then VocabNormalizer. Models come from ModelHub.parakeet();
 // FinalPass (transcription mode) shares the same instance.
 
 protocol UtteranceFinalizer {
@@ -97,7 +97,7 @@ final class ParakeetFinalizer: UtteranceFinalizer, @unchecked Sendable {
 }
 
 enum DictationFinal {
-    /// Port of guard() in asr/pk_post.py: word-diff the plain text against the CTC-rescored one and revert a change
+    /// Port of guard() in the former Python pk_post.py: word-diff the plain text against the CTC-rescored one and revert a change
     /// whose original words are all common (ordinary German or English at `zipf`). Inserts are kept. The diff is
     /// used rather than RescoreOutput.replacements because that list has no word positions, so a multi-word span
     /// can't be mapped back exactly; the diff is also what the Phase 0 numbers were measured with.

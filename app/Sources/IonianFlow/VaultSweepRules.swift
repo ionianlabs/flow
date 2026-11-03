@@ -1,6 +1,6 @@
 import Foundation
 
-// Unit F: the rule pipeline of asr/sweep.py (candidates, keep_candidate, plausible, fix_category, extract).
+// Unit F: the rule pipeline of the former Python sweep.py (candidates, keep_candidate, plausible, fix_category, extract).
 // Same regexes, same order of decisions; comments name the Python function each piece comes from.
 
 struct SweepTerm: Codable, Equatable {

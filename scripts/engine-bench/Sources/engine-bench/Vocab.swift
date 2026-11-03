@@ -16,7 +16,7 @@ func vocabularyTerms(_ url: URL) throws -> [String] {
 /// vocab DIR: every clip with the bias off and with NemotronVocabularyBias at several per-token boosts.
 /// The Python booster has two knobs (start 1.0 on a term's first characters, strength 3.0 once under way);
 /// FluidAudio has one flat per-token bonus (its default 4.5, ceiling 6.0), so the settings below are flat
-/// bonuses around the Python numbers. Score with: cd asr && uv run bench_vocab.py --score DIR
+/// bonuses around the Python numbers.
 func runVocab(_ args: Args) async throws {
     guard let dirPath = args.positional.first else { fail("usage: engine-bench vocab DIR [--chunk 560]") }
     let dir = URL(fileURLWithPath: dirPath)

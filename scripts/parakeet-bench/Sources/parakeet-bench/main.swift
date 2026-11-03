@@ -3,7 +3,7 @@
 //   parakeet-bench vocab DIR            DIR = native-bench/vocab, writes hyp-parakeet-<label>.jsonl
 //   parakeet-bench dict MANIFEST OUT VOCAB.md [datasets,comma]   bench/data set, rescoring on
 //   parakeet-bench latency MANIFEST VOCAB.md [N]                 per-call time + peak RSS
-// Reads DIR/manifest.jsonl (asr/bench_wer.py prepare), appends DIR/hyp-parakeet-<version>.jsonl.
+// Reads DIR/manifest.jsonl (the former Python bench_wer.py prepare), appends DIR/hyp-parakeet-<version>.jsonl.
 // "ms" is the transcribe call on a warm model: what a final pass would add after a segment ends.
 import FluidAudio
 import Foundation

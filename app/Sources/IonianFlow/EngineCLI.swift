@@ -13,6 +13,7 @@ enum EngineCLI {
             ("--enginetest-polish", PolisherCLI.cli),         // E
             ("--enginetest-summary", SummarizerCLI.cli),      // F
             ("--enginetest-sweep", VaultSweep.cli),           // F
+            ("--enginetest-store", ModelStoreTests.cli),      // G
             ("--e2e-engine", E2E.cli),                        // integration
             ("--score-dictation", WERScore.scoreDictationCLI),
             ("--compare-transcribe", WERScore.compareTranscribeCLI),
@@ -35,6 +36,7 @@ enum EngineSelfTests {
             PolisherSelfTest.run(),      // E
             SummarizerCLI.selfTest(),    // F
             VaultSweep.selfTest(),       // F
+            ModelStoreTests.selfTest(),  // G
             WERScore.selfTest(),         // WER scoring
             ModelSetupModel.selfTest(),  // H
         ]

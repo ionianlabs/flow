@@ -15,6 +15,7 @@ cp "$ROOT/app/.build/release/IonianFlow" "$APP/Contents/MacOS/IonianFlow"
 cp "$ROOT/app/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp -R "$ROOT/app/Resources/Fonts" "$APP/Contents/Resources/Fonts"
 cp -R "$ROOT/app/Resources/Chrome" "$APP/Contents/Resources/Chrome"
+cp "$ROOT/app/Resources/ThirdPartyNotices.md" "$APP/Contents/Resources/ThirdPartyNotices.md"
 # MLX's Metal kernels: SwiftPM cannot compile them without Xcode, so mlx.metallib is borrowed from the Python
 # mlx wheel (mlx is a namespace package, hence mlx.__path__[0]) and put next to the binary, where MLX looks first.
 # TEMPORARY: Phase 4/5 replaces this source (a metallib built in-tree and shipped with the app).

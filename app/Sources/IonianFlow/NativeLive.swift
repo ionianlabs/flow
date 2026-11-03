@@ -204,6 +204,9 @@ final class LiveStream: @unchecked Sendable {
         var finals: [(segment: Int, text: String, start: Double?, end: Double?)] = []
         var lang: String?
         var utterance: [Float] = []
+        // Dictation: the finalizer starts at the release, in parallel with the live decoder's flush (its text is
+        // only the fallback), so the key-release to text time is the longer of the two, not their sum.
+        var pendingFinal: Task<String, Never>?
 
         await deps.lane.acquire()
         var laneHeld = true
@@ -279,6 +282,13 @@ final class LiveStream: @unchecked Sendable {
                     await manager.reset()
                     return
                 case .end:
+                    if dictation, let finalize = deps.finalize, !utterance.isEmpty {
+                        let code = options.language.split(separator: "-").first.map(String.init) ?? ""
+                        let heard = utterance
+                        pendingFinal = Task.detached(priority: .userInitiated) {
+                            await finalize(heard, code.isEmpty || code == "auto" ? nil : code)
+                        }
+                    }
                     var tokens: [LiveToken] = []
                     if !failed {
                         do {
@@ -305,7 +315,10 @@ final class LiveStream: @unchecked Sendable {
         // Dictation: the whole utterance through the finalizer; the live text is the fallback.
         let live = finals.first
         var text = live?.text ?? ""
-        if let finalize = deps.finalize, !utterance.isEmpty {
+        if let pendingFinal {
+            let better = await pendingFinal.value
+            if !better.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = better }
+        } else if let finalize = deps.finalize, !utterance.isEmpty {  // the stream ended without an .end command
             let code = options.language.split(separator: "-").first.map(String.init) ?? ""
             let better = await finalize(utterance, code.isEmpty || code == "auto" ? nil : code)
             if !better.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = better }

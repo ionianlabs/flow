@@ -156,5 +156,5 @@ final class WordFrequencyTable: WordFrequency {
 }
 
 private extension Double {
-    func rounded(toPlaces n: Int) -> Double { let m = pow(10, Double(n)); return (self * m).rounded() / m }
+    func rounded(toPlaces n: Int) -> Double { let m = Foundation.pow(10, Double(n)); return (self * m).rounded() / m }
 }

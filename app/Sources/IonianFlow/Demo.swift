@@ -103,7 +103,7 @@ func runVocabularyDemo(file: String?) {
     model.status = "ASR: ready"  // the look of a running app, for design work and screenshots
     model.hotkeyActive = true
     let window = MainWindow(model: model, store: store, sweeper: sweeper, actions: AppActions(
-        toggleTranscription: {}, restartASR: {}, openLog: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
+        toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {}, vocabulary: vocabulary
     ))
     retainedVocabularyDemo = (store, sweeper, window)

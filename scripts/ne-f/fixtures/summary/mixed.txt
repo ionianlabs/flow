@@ -1,0 +1,9 @@
+**You** (00:00:05): Hi Jonas, lass uns kurz den Stand zum Atlas Dashboard durchgehen, the demo is on Monday.
+**Them** (00:00:14): Klar. The login flow is done, aber die Export-Funktion für die PDFs ist noch nicht fertig.
+**You** (00:00:27): Okay. Do we need the PDF export for the demo, oder reicht ein CSV?
+**Them** (00:00:38): CSV reicht völlig, ich würde den PDF Export auf nach der Demo verschieben.
+**You** (00:00:50): Dann machen wir das so. We ship CSV first and the PDF export comes in the next sprint.
+**Them** (00:01:02): Einverstanden. Ich schicke dir heute noch die Testdaten, damit du die Slides vorbereiten kannst.
+**You** (00:01:15): Super. I will ask Priya from the design team for the final screenshots.
+**Them** (00:01:26): Und vergiss nicht, den Termin mit dem Kunden zu bestätigen. They want to see the roadmap too.
+**You** (00:01:37): Mache ich, I will confirm tomorrow.

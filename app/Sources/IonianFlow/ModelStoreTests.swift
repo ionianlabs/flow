@@ -191,6 +191,10 @@ enum ModelStoreTests {
                 try fm.copyItem(at: snap.appendingPathComponent(f.name).resolvingSymlinksInPath(), to: ModelStore.gemmaDirectory.appendingPathComponent(f.name))
             }
         } catch { print("FAIL copy: \(error)"); return 1 }
+        if let m = ProcessInfo.processInfo.environment["IONIAN_FLOW_TEST_METALLIB"] {  // a metallib to place in the temp root
+            try? fm.createDirectory(at: ModelStore.metallibURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.copyItem(at: URL(fileURLWithPath: m), to: ModelStore.metallibURL)
+        }
         print("temp root: \(tmp.path)")
         print(ModelStore.shared.isInstalled(.cleanup) ? "ok   cleanup installed in temp root" : "FAIL cleanup not installed")
         print("metallib in root: \(fm.fileExists(atPath: ModelStore.metallibURL.path))")

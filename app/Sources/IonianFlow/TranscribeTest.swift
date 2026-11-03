@@ -27,16 +27,22 @@ func runTranscribeTest(_ args: [String]) {
             let tail = [Int16](repeating: 0, count: 32_000)  // 2 s of silence closes the last segment
             let a = you + tail, b = (them ?? []) + tail
             let step = 1_600
+            let t0 = Date()
+            let speed = Double(ProcessInfo.processInfo.environment["IONIAN_GATE_SPEED"] ?? "") ?? 4
             for i in stride(from: 0, to: max(a.count, b.count), by: step) {
                 t.feedFile(.you, chunk(a, i, step))
                 if them != nil { t.feedFile(.them, chunk(b, i, step)) }
-                Thread.sleep(forTimeInterval: 0.1 / 4)
+                // Against the clock, not a sleep per chunk: the feed work itself would add up to a growing lag.
+                let due = t0.addingTimeInterval(Double(i + step) / 16_000 / speed)
+                Thread.sleep(forTimeInterval: max(0, due.timeIntervalSinceNow))
             }
             DispatchQueue.main.async { t.stop() }
         }.start()
     }
     var launched = false
+    let log = EventLog(ProcessInfo.processInfo.environment["IONIAN_GATE_LOG"])
     engine.onEvent = { event in
+        log.record(event, since: started)
         if case .ready = event, !launched {
             launched = true
             if args.contains("--no-parakeet") { go() } else { t.finalPass.prepare { _ in go() } }
@@ -46,6 +52,29 @@ func runTranscribeTest(_ args: [String]) {
     }
     engine.start()
     dispatchMain()
+}
+
+/// IONIAN_GATE_LOG=<dir>: events.csv with the wall time of every final and polished event next to the
+/// audio times of its segment, to read the lag between a segment's end and its text.
+private final class EventLog {
+    private let handle: FileHandle?
+    init(_ dir: String?) {
+        guard let dir else { handle = nil; return }
+        let path = dir + "/events.csv"
+        FileManager.default.createFile(atPath: path, contents: Data("t,kind,channel,segment,start,end\n".utf8))
+        handle = FileHandle(forWritingAtPath: path)
+    }
+    func record(_ event: EngineEvent, since t0: Date) {
+        guard let handle else { return }
+        let t = String(format: "%.3f", Date().timeIntervalSince(t0))
+        var line: String?
+        switch event {
+        case .final(let s, let segment, _, _, let a, let b): line = "\(t),final,\(s.channel),\(segment),\(a ?? -1),\(b ?? -1)"
+        case .polished(let id, _): line = "\(t),polished,,\(id),,"
+        default: break
+        }
+        if let line { handle.seekToEndOfFile(); handle.write(Data((line + "\n").utf8)) }
+    }
 }
 
 /// Prints the segments and the file once the summary is in (or failed).

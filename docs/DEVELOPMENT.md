@@ -203,7 +203,7 @@ Images in this repo come only from the app's offscreen renderer or from headless
 | `... --enginetest-hub`, `--enginetest-polish`, `--enginetest-summary`, `--enginetest-sweep --vault DIR --out FILE [--no-llm]` | Model hub, cleanup (JSON lines on stdin), summaries on fixtures, vocabulary sweep |
 | `... --e2e-engine load\|reload\|unload\|dictation MANIFEST OUTDIR [perGroup]` | Whole-app engine run: model load and unload, dictation end to end |
 | `... --transcribetest you.wav [them.wav] [--no-parakeet]` | Transcription mode on WAV files (16 kHz mono) instead of mic and system audio, 4× real time |
-| `... --score-dictation`, `--compare-transcribe` | WER scoring of dictation and transcript output (Swift, in `EngineCLI.swift`) |
+| `... --score-dictation`, `--compare-transcribe`, `--make-two-speaker` | WER scoring of dictation hypotheses and of a transcribetest run against its references, and building a two-speaker test file (Swift, `WERScore.swift`) |
 | `open -n "build/Ionian Flow.app" --args --mictest` | Capture 1 s from each input device, write chunk counts and start latency to `/tmp/ionian-flow-mictest.txt` (runs with the app's mic permission) |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --demo` | Loop a fake dictation through the pill (design work, no mic) |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --transcript-demo` | Loop a fake meeting through the transcription panel |

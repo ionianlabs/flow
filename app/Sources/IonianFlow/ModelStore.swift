@@ -260,8 +260,8 @@ final class ModelStore: @unchecked Sendable {
     func download(_ item: ModelItem, progress: @escaping @Sendable (Double) -> Void) async throws {
         if isInstalled(item) { progress(1); return }
         let flag = CancelFlag()
-        lock.lock(); flags[item] = flag; lock.unlock()
-        defer { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
+        register(item, flag)
+        defer { unregister(item, flag) }
         do {
             switch item {
             case .speech: try await downloadSpeech(flag, progress)
@@ -274,6 +274,9 @@ final class ModelStore: @unchecked Sendable {
         }
         progress(1)
     }
+
+    private func register(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); flags[item] = flag; lock.unlock() }
+    private func unregister(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
 
     /// Stops a running download of the item; partial files stay for the next resume.
     func cancel(_ item: ModelItem) {

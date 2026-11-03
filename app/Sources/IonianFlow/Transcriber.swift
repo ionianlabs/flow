@@ -4,9 +4,10 @@ import SwiftUI
 /// Transcription mode: transcribes the mic ("You") and everything the Mac plays ("Them") into the
 /// side panel and a Markdown file. Each stream is one ASR session for the whole meeting, cut into
 /// segments at pauses: the recognizer keeps its context and language across cuts, only the text is
-/// split (at the exact audio frame, see asr/server.py). A segment shows the live decoder's text
-/// first, then the final text, then the local LLM's cleanup. The final text comes from Parakeet
-/// (FinalPass) once its model is loaded, otherwise from the server's slower, more accurate decoder.
+/// split (at the exact audio frame, see SpeechEngine.cut). A segment shows the live decoder's text
+/// first, then the final text, then the local LLM's cleanup (only when the engine has the cleanup
+/// model). The final text comes from Parakeet (FinalPass) once its model is loaded, otherwise from
+/// the engine's live final.
 enum Speaker: String {
     case you = "You", them = "Them"
 }
@@ -39,6 +40,8 @@ final class TranscriptModel: ObservableObject {
     @Published var summarizing = false
     /// The mic runs through macOS echo cancellation (speakers, not headphones).
     @Published var cancellingEcho = false
+    /// The engine has no cleanup model: segments stay as heard and no summary is written.
+    @Published var cleanupOff = false
 
     struct Block: Identifiable {
         let id: Int
@@ -114,19 +117,19 @@ private struct Segmenter {
     }
 }
 
-/// One audio source and its ASR connection.
+/// One audio source and its engine session.
 private final class Stream {
     let speaker: Speaker
-    let client: ASRClient
+    let channel: Channel
     var segmenter = Segmenter()        // audio thread
     var samples = 0                    // audio thread: sent in this session
     var segment = 0                    // audio thread: current segment index
-    var session = 0                    // main thread: this stream's ASR session
+    var session: SessionID?            // main thread: this stream's engine session, nil when none is open
     var started = Date()               // main thread: when the session's audio began
     var segments: [Int: Int] = [:]     // main thread: segment index -> segment id, until final
-    // Main thread, per segment index: the server's final (text, language, audio times), and
+    // Main thread, per segment index: the engine's final (text, language, audio times), and
     // Parakeet's text once it answered (nil inside: it failed). A segment is final with both.
-    var serverFinals: [Int: (text: String, lang: String?, start: Double?, end: Double?)] = [:]
+    var liveFinals: [Int: (text: String, lang: String?, start: Double?, end: Double?)] = [:]
     var parakeet: [Int: String?] = [:]
     var awaitingParakeet: Set<Int> = []
     // The current segment's audio for Parakeet: written on the audio thread, taken at cuts and at stop.
@@ -154,14 +157,14 @@ private final class Stream {
         pcm = []
         lock.unlock()
         segments = [:]
-        serverFinals = [:]
+        liveFinals = [:]
         parakeet = [:]
         awaitingParakeet = []
     }
 
-    init(speaker: Speaker, client: ASRClient) {
+    init(speaker: Speaker, channel: Channel) {
         self.speaker = speaker
-        self.client = client
+        self.channel = channel
     }
 }
 
@@ -173,22 +176,21 @@ final class Transcriber {
 
     private let mic: AudioCapture
     private let system = SystemAudioCapture()
-    private let you: Stream
-    private let them: Stream
+    private let engine: SpeechEngine
+    private let you = Stream(speaker: .you, channel: .mic)
+    private let them = Stream(speaker: .them, channel: .system)
     private var nextID = 1
     private var polishing: Set<Int> = []
     private var finishTimeout: DispatchWorkItem?
     let finalPass = FinalPass()
     private var summaryID = 0
     private var pendingSummaries: [Int: URL] = [:]  // summary request -> its transcript file
-    /// This transcription's server sessions run only the live decoder: Parakeet makes the finals.
-    private(set) var liveOnly = false
+    /// The cleanup model is downloaded: segments get polished, the transcript a summary.
+    var cleanupAvailable: Bool { engine.capabilities.contains(.polish) }
 
-    init(client: ASRClient, socketPath: String, mic: AudioCapture) {
+    init(engine: SpeechEngine, mic: AudioCapture) {
         self.mic = mic
-        you = Stream(speaker: .you, client: client)
-        them = Stream(speaker: .them, client: ASRClient(socketPath: socketPath, decoderSet: 1))
-        them.client.onEvent = { [weak self] event in self?.handle(event, from: self?.them) }
+        self.engine = engine
     }
 
     func start() throws {
@@ -198,9 +200,9 @@ final class Transcriber {
         polishing = []
         you.reset()
         them.reset()
-        you.client.polish(id: 0, text: "")  // load the LLM while the first segment is spoken
-        liveOnly = finalPass.isReady
-        if !liveOnly { finalPass.prepare() }  // takes over from the next segment once loaded
+        model.cleanupOff = !cleanupAvailable
+        if cleanupAvailable { engine.polish(id: 0, text: "", before: "") }  // load the LLM while the first segment is spoken
+        if !finalPass.isReady { finalPass.prepare() }  // takes over from the next segment once loaded
 
         mic.warmSeconds = 0
         mic.onLevel = { [model] level in
@@ -212,23 +214,18 @@ final class Transcriber {
         begin(you)
         mic.onAudio = { [weak self, you] pcm in self?.feed(you, pcm) }
 
-        if them.client.isConnected || them.client.connect() {
-            do {
-                begin(them)
-                system.onAudio = { [weak self, them, model] pcm in
-                    let level = Segmenter.rms(pcm)
-                    DispatchQueue.main.async { model.themLevel = 0.5 * model.themLevel + 0.5 * level }
-                    self?.feed(them, pcm)
-                }
-                try system.start()
-            } catch {
-                NSLog("Ionian Flow: system audio failed: %@", error.localizedDescription)
-                model.notice = "System audio is unavailable. Only your mic is transcribed."
-                them.client.cancel()
-                them.client.disconnect()
+        do {
+            begin(them)
+            system.onAudio = { [weak self, them, model] pcm in
+                let level = Segmenter.rms(pcm)
+                DispatchQueue.main.async { model.themLevel = 0.5 * model.themLevel + 0.5 * level }
+                self?.feed(them, pcm)
             }
-        } else {
+            try system.start()
+        } catch {
+            NSLog("Ionian Flow: system audio failed: %@", error.localizedDescription)
             model.notice = "System audio is unavailable. Only your mic is transcribed."
+            closeSession(them, cancel: true)
         }
         save()
     }
@@ -243,10 +240,10 @@ final class Transcriber {
         system.onAudio = { _ in }
         system.stop()
         finishSegment(you, index: you.segment, audio: you.take())
-        you.client.end()
-        if them.client.isConnected {
+        closeSession(you, cancel: false)
+        if them.session != nil {
             finishSegment(them, index: them.segment, audio: them.take())
-            them.client.end()
+            closeSession(them, cancel: false)
         }
         model.finishing = true
         model.level = 0
@@ -257,12 +254,12 @@ final class Transcriber {
         finishIfDone()
     }
 
-    /// Main-connection events: true if they belonged to transcription.
-    func handleMain(_ event: ASRClient.Event) -> Bool {
+    /// The engine's events: true if they belonged to transcription.
+    func handleMain(_ event: EngineEvent) -> Bool {
         switch event {
-        case .partial(let session, _, _, _), .final(let session, _, _, _, _, _):
-            guard session == you.session, session != 0 else { return false }
-            handle(event, from: you)
+        case .partial(let id, _, _, _), .final(let id, _, _, _, _, _):
+            guard let stream = [you, them].first(where: { $0.session == id }) else { return false }
+            handle(event, from: stream)
             return true
         case .polished:  // only transcription asks for polish
             handle(event, from: you)
@@ -270,15 +267,6 @@ final class Transcriber {
         case .summary(let id, let summary):
             addSummary(id: id, summary)
             return true
-        case .disconnected:
-            pendingSummaries = [:]
-            model.summarizing = false
-            if isActive || model.finishing {
-                model.notice = "Speech recognition restarted. The transcript so far is saved."
-                stop()
-                finish()
-            }
-            return false
         default:
             return false
         }
@@ -290,10 +278,11 @@ final class Transcriber {
         model.fileURL = file
         nextID = 1
         polishing = []
-        liveOnly = finalPass.isReady
+        model.cleanupOff = !cleanupAvailable
+        if cleanupAvailable { engine.polish(id: 0, text: "", before: "") }
         isActive = true
         begin(you)
-        if withThem, them.client.isConnected || them.client.connect() { begin(them) }
+        if withThem { begin(them) }
     }
 
     /// --transcribetest: one chunk of 16 kHz mono Int16, from the thread that stands in for the audio thread.
@@ -304,12 +293,13 @@ final class Transcriber {
     // MARK: - Audio thread
 
     private func feed(_ stream: Stream, _ pcm: Data) {
-        stream.client.sendAudio(pcm)
+        guard let session = stream.session else { return }
+        engine.push(session, pcm: pcm)
         stream.append(pcm)
         stream.samples += pcm.count / 2
         guard let back = stream.segmenter.feed(pcm) else { return }
         let at = stream.samples - back
-        stream.client.cut(at: at)
+        engine.cut(session, at: at)
         let audio = stream.take(keeping: back)
         stream.segment += 1
         let index = stream.segment
@@ -329,12 +319,23 @@ final class Transcriber {
         stream.reset()
         stream.started = Date()
         let language = Settings.language == "auto" ? "" : Settings.language
-        stream.session = stream.client.start(language: liveOnly ? language + ";live" : language)
+        stream.session = engine.beginSession(SessionOptions(language: language, channel: stream.channel, kind: .transcription))
         addSegment(stream, index: 0, at: 0)
     }
 
-    /// A segment's audio is complete: Parakeet transcribes it, if it's loaded (in a session that
-    /// started before it was, the server's final decoder still runs and covers the earlier segments).
+    /// Ends the stream's engine session (its last final still arrives) or drops it.
+    private func closeSession(_ stream: Stream, cancel: Bool) {
+        guard let session = stream.session else { return }
+        if cancel {
+            engine.cancel(session)
+            stream.session = nil
+        } else {
+            engine.end(session)
+        }
+    }
+
+    /// A segment's audio is complete: Parakeet transcribes it, if it's loaded (in a segment that
+    /// ended before it was, the engine's live final stands).
     private func finishSegment(_ stream: Stream, index: Int, audio: [Int16]) {
         guard finalPass.isReady, stream.segments[index] != nil, audio.count >= 3_200 else { return }
         stream.awaitingParakeet.insert(index)
@@ -354,8 +355,7 @@ final class Transcriber {
                                                 text: "", stage: .live))
     }
 
-    private func handle(_ event: ASRClient.Event, from stream: Stream?) {
-        guard let stream else { return }
+    private func handle(_ event: EngineEvent, from stream: Stream) {
         switch event {
         case .partial(let session, let segment, let text, let lang):
             guard session == stream.session, let id = stream.segments[segment] else { return }
@@ -364,7 +364,7 @@ final class Transcriber {
             update(id) { if $0.stage == .live { $0.text = clean } }
         case .final(let session, let segment, let text, let lang, let start, let end):
             guard session == stream.session, stream.segments[segment] != nil else { return }
-            stream.serverFinals[segment] = (text, lang, start, end)
+            stream.liveFinals[segment] = (text, lang, start, end)
             finalize(stream, index: segment)
         case .polished(let id, let text):
             guard id != 0 else { return }
@@ -373,31 +373,28 @@ final class Transcriber {
             removeEchoes()
             save()
             finishIfDone()
-        case .disconnected where stream === them:
-            if isActive {
-                system.stop()
-                model.notice = "System audio stopped."
-            }
         default:
             break
         }
     }
 
-    /// Once the server's final (audio times; text when Parakeet isn't used or failed) and Parakeet's
+    /// Once the engine's final (audio times; text when Parakeet isn't used or failed) and Parakeet's
     /// answer, if it was asked, are both in.
     private func finalize(_ stream: Stream, index: Int) {
-        guard let server = stream.serverFinals[index], !stream.awaitingParakeet.contains(index),
+        guard let live = stream.liveFinals[index], !stream.awaitingParakeet.contains(index),
               let id = stream.segments[index] else { return }
         stream.segments[index] = nil
-        stream.serverFinals[index] = nil
-        let text = (stream.parakeet.removeValue(forKey: index) ?? nil) ?? server.text
-        if let start = server.start, let end = server.end {
+        stream.liveFinals[index] = nil
+        let text = (stream.parakeet.removeValue(forKey: index) ?? nil) ?? live.text
+        if let start = live.start, let end = live.end {
             update(id) {
                 $0.start = stream.started.addingTimeInterval(start)
                 $0.end = stream.started.addingTimeInterval(end)
             }
         }
-        let heard = FillerFilter.clean(text, lang: server.lang)
+        // The spelling pass runs here for every final: the engine only delivers recognizer text.
+        // (Dictation gets it inside the engine's DictationFinal, so it is not applied twice there.)
+        let heard = FillerFilter.clean(SpellingPass.apply(text), lang: live.lang)
         let clean = withoutEcho(heard, segment: id)
         if clean.isEmpty {
             model.segments.removeAll { $0.id == id }
@@ -405,8 +402,10 @@ final class Transcriber {
             // The previous segment of the same speaker: a sentence split by a pause stays one.
             let before = model.segments.last { $0.speaker == stream.speaker && $0.id < id && $0.stage != .live }
             update(id) { $0.text = clean; $0.heard = heard; $0.stage = .final }
-            polishing.insert(id)
-            you.client.polish(id: id, text: clean, before: before?.text ?? "")
+            if cleanupAvailable {
+                polishing.insert(id)
+                engine.polish(id: id, text: clean, before: before?.text ?? "")
+            }
         }
         if stream === them { removeEchoes() }  // "You" may have finished first
         save()
@@ -516,13 +515,12 @@ final class Transcriber {
         for i in model.segments.indices where model.segments[i].stage == .live { model.segments[i].stage = .final }
         you.reset()
         them.reset()
-        you.session = 0
-        them.session = 0
+        you.session = nil
+        them.session = nil
         polishing = []
         model.finishing = false
         model.ended = Date()
         save()
-        them.client.disconnect()
         requestSummary()
         onFinished()
     }
@@ -530,7 +528,8 @@ final class Transcriber {
     /// The finished transcript goes to the LLM for its frontmatter and summary; the file gets them
     /// when they arrive (also if a new transcription has started meanwhile).
     private func requestSummary() {
-        guard Settings.summarizeTranscripts, !model.segments.isEmpty, let url = model.fileURL else { return }
+        guard Settings.summarizeTranscripts, engine.capabilities.contains(.summary),
+              !model.segments.isEmpty, let url = model.fileURL else { return }
         summaryID += 1
         let id = summaryID
         pendingSummaries[id] = url
@@ -538,7 +537,7 @@ final class Transcriber {
         let transcript = TranscriptStore.body(model)
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let tags = VaultTags.common()
-            DispatchQueue.main.async { self?.you.client.summarize(id: id, transcript: transcript, tags: tags) }
+            DispatchQueue.main.async { self?.engine.summarize(id: id, transcript: transcript, tags: tags) }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in self?.addSummary(id: id, nil) }
     }
@@ -638,5 +637,76 @@ enum TranscriptStore {
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = pattern
         return f.string(from: date)
+    }
+}
+
+/// The spelling pass (vocabulary aliases, spelling variants, near misses) for transcription finals.
+/// Follows the vocabulary file: rebuilt when it changes, and off with "Use vocabulary" switched off.
+enum SpellingPass {
+    private static var cached: (stamp: Date, normalizer: VocabNormalizer)?
+
+    static func apply(_ text: String, file: URL = Settings.vocabularyFile) -> String {
+        guard Settings.useVocabulary else { return text }
+        return normalizer(file)?.normalize(text) ?? text
+    }
+
+    private static func normalizer(_ file: URL) -> VocabNormalizer? {
+        guard let stamp = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
+        if let cached, cached.stamp == stamp { return cached.normalizer }
+        guard let md = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        let n = VocabNormalizer(markdown: md)
+        cached = (stamp, n)
+        return n
+    }
+}
+
+/// Dictation's engine side: one .dictation session per key press. The engine's final already went
+/// through DictationFinal (Parakeet, rescoring, spelling pass), so only the display cleanup is left.
+struct DictationFlow {
+    enum Update: Equatable {
+        case partial(String, lang: String?)
+        case final(String, lang: String?)
+    }
+
+    private(set) var session: SessionID?
+    /// The detected language of this dictation so far.
+    var lang: String?
+
+    mutating func begin(_ engine: SpeechEngine, language: String) -> SessionID {
+        let id = engine.beginSession(SessionOptions(language: language, channel: .mic, kind: .dictation))
+        session = id
+        lang = nil
+        return id
+    }
+
+    /// The release: the final is still to come.
+    func end(_ engine: SpeechEngine) {
+        if let session { engine.end(session) }
+    }
+
+    mutating func cancel(_ engine: SpeechEngine) {
+        if let session { engine.cancel(session) }
+        session = nil
+    }
+
+    /// Events of this session only; older sessions' and other kinds are ignored.
+    mutating func update(for event: EngineEvent) -> Update? {
+        switch event {
+        case .partial(let id, _, let text, let l):
+            guard id == session else { return nil }
+            if let l { lang = l }
+            return .partial(Self.clean(text, lang: l ?? lang), lang: l)
+        case .final(let id, _, let text, let l, _, _):
+            guard id == session else { return nil }
+            let language = l ?? lang
+            return .final(Self.clean(text, lang: language), lang: language)
+        default:
+            return nil
+        }
+    }
+
+    /// Same cleanup for the live HUD and the paste, so what you see is what gets inserted.
+    static func clean(_ text: String, lang: String?) -> String {
+        TextFormatter.format(FillerFilter.clean(text, lang: lang))
     }
 }

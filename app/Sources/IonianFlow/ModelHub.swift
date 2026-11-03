@@ -8,9 +8,9 @@ import Tokenizers
 
 // Unit D (ModelHub). The single owner of every model in the process (24 GB machine, one process):
 // lazy loads, one serial lane for Parakeet/CTC/Gemma work, unload policy, memory sampling.
-// Callers: B (nemotron), C (parakeet), E and F (gemma, serial). Loads from the existing caches for now;
-// downloads are Phase 4. Reference: scripts/coexist-bench main.swift (Serial actor, loaders) and
-// scripts/llm-bench (Gemma loading; the n-1 prefill rule lives with the caller, in Polisher).
+// Callers: B (nemotron), C (parakeet), E and F (gemma, serial). Models live in ModelStore.root
+// (downloaded by ModelStore; IONIAN_FLOW_DEV_HF_CACHE=1 reads the Python tools' caches instead). Reference:
+// scripts/coexist-bench main.swift (Serial actor, loaders); the n-1 prefill rule lives with the caller, in Polisher.
 //
 // Contract:
 //  - Every loader is idempotent and concurrency-safe: concurrent callers share one load.

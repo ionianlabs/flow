@@ -21,8 +21,9 @@ if CommandLine.arguments.contains("--selftest") {
     let echo = Transcriber.echoSelfTest()
     let vocabulary = VocabularyStore.selfTest()
     let normalizer = VocabNormalizer.selfTest()
+    let fake = EngineFake.selfTest()
     let engine = EngineSelfTests.all()
-    exit(fillers && formatting && echo && vocabulary && normalizer && engine ? 0 : 1)
+    exit(fillers && formatting && echo && vocabulary && normalizer && fake && engine ? 0 : 1)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
@@ -30,24 +31,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     /// transcribing: transcription mode (double-tap); dictation is off until it stops.
     private enum State { case idle, recording(Date, locked: Bool), tapPending, finishing, transcribing }
 
-    private let socketPath = NSHomeDirectory() + "/Library/Application Support/Ionian Flow/asr.sock"
-    private lazy var client = ASRClient(socketPath: socketPath)
-    private lazy var sidecar = SidecarManager(
-        asrDir: Bundle.main.object(forInfoDictionaryKey: "IonianFlowASRDir") as? String ?? "",
-        socketPath: socketPath
-    )
+    private let engine: SpeechEngine = NativeEngine(finalizer: ParakeetFinalizer())
     private let hotkey = HotkeyMonitor()
     private let audio = AudioCapture()
     private let overlay = OverlayPanel()
-    private lazy var transcriber = Transcriber(client: client, socketPath: socketPath, mic: audio)
+    private lazy var transcriber = Transcriber(engine: engine, mic: audio)
     private lazy var transcriptPanel = TranscriptPanel(model: transcriber.model)
     private lazy var vocabulary = VocabularyStore()
-    private lazy var sweeper = VaultSweeper(asrDir: sidecar.asrDir)
+    private lazy var sweeper = VaultSweeper(asrDir: Bundle.main.object(forInfoDictionaryKey: "IonianFlowASRDir") as? String ?? "")
     private let appModel = AppModel()
     private lazy var mainWindow = MainWindow(model: appModel, store: vocabulary, sweeper: sweeper, actions: AppActions(
         toggleTranscription: { [weak self] in self?.toggleTranscription() },
-        restartASR: { [weak self] in self?.restartASR() },
-        openLog: { [weak self] in self?.openLog() },
+        reloadEngine: { [weak self] in self?.reloadEngine() },
         chooseTranscriptsFolder: { [weak self] in self?.chooseTranscriptsFolder() },
         openTranscripts: { [weak self] in self?.openTranscripts() },
         setMicrophone: { [weak self] uid in
@@ -83,10 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             if case .transcribing = state { appModel.transcribing = true } else { appModel.transcribing = false }
         }
     }
-    private var lang: String?
     private var session = 0
-    /// ASR session of the current dictation; events from older sessions are ignored.
-    private var dictationSession = 0
+    /// Engine session of the current dictation; events from older sessions are ignored.
+    private var dictation = DictationFlow()
     private var lastTranscribePress: Date?
     /// Keeps the mic open briefly after release: people let go while the last syllable is still trailing.
     private let releaseTail: TimeInterval = 0.3
@@ -96,15 +90,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private let doubleTapWindow: TimeInterval = 0.35
     private var pendingTap: DispatchWorkItem?
     private var history: [String] = []
-    private var lastPing = Date.distantPast
-    private var lastPong = Date()
-    private var statusText = "ASR: starting"
+    private var statusText = "ASR: loading models"
     private var statusItem: NSStatusItem!
 
     func applicationDidFinishLaunching(_ note: Notification) {
         Settings.registerDefaults()
         setUpMenu()
-        setUpClient()
+        setUpEngine()
         if Settings.onboarded {
             AudioCapture.requestPermission { ok in if !ok { NSLog("Ionian Flow: microphone permission denied") } }
             _ = TextInserter.hasAccessibility(prompt: true)
@@ -113,8 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         startHotkey()
 
-        if !client.connect() { sidecar.start() }
-        scheduleReconnect()
+        engine.start()
+        appModel.cleanupAvailable = engine.capabilities.contains(.polish)
         if FinalPass.downloaded {  // ~80 MB once compiled: transcription can start with it right away
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self.transcriber.finalPass.prepare() }
         }
@@ -151,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             transcriber.finish()  // no time to wait for the last finals: save what's there
         }
         audio.shutdown()
-        sidecar.stop()
+        engine.stop()
     }
 
     // MARK: - Hotkey → audio → ASR
@@ -257,15 +249,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     private func beginDictation() {
-        guard client.isConnected else {
-            setStatus("ASR not ready yet")
+        guard engine.isReady else {
+            setStatus("ASR: loading models")
             return
         }
         flushTail()
-        lang = nil
         session += 1
-        dictationSession = client.start(language: Settings.language == "auto" ? "" : Settings.language)
-        audio.onAudio = { [client] pcm in client.sendAudio(pcm) }
+        let id = dictation.begin(engine, language: Settings.language == "auto" ? "" : Settings.language)
+        audio.onAudio = { [engine] pcm in engine.push(id, pcm: pcm) }
         audio.onLevel = { [overlay] level in
             DispatchQueue.main.async { overlay.model.level = 0.5 * overlay.model.level + 0.5 * level }  // smooth jitter
         }
@@ -274,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             try audio.begin(device: AudioDevices.resolve(Settings.microphone))
         } catch {
             NSLog("Ionian Flow: audio start failed: %@", error.localizedDescription)
-            client.cancel()
+            dictation.cancel(engine)
             return
         }
         state = .recording(Date(), locked: false)
@@ -297,8 +288,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     private func startTranscription() {
-        guard client.isConnected else {
-            setStatus("ASR not ready yet")
+        guard engine.isReady else {
+            setStatus("ASR: loading models")
             return
         }
         flushTail()
@@ -330,13 +321,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         play("Pop")
     }
 
-    /// Stops the post-release tail capture and asks the server for the final transcript.
+    /// Stops the post-release tail capture and asks the engine for the final transcript.
     private func flushTail() {
         guard let tail = pendingTail else { return }
         tail.cancel()
         pendingTail = nil
         audio.finish()
-        client.end()
+        dictation.end(engine)
     }
 
     private func cancelDictation() {
@@ -347,50 +338,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         pendingTap?.cancel()
         pendingTap = nil
         audio.finish()
-        client.cancel()
+        dictation.cancel(engine)
         state = .idle
         overlay.hide()
     }
 
-    private func setUpClient() {
-        client.onEvent = { [weak self] event in
+    private func setUpEngine() {
+        engine.onEvent = { [weak self] event in
             guard let self else { return }
             if self.transcriber.handleMain(event) { return }
             switch event {
             case .ready:
-                self.lastPong = Date()
+                self.appModel.cleanupAvailable = self.engine.capabilities.contains(.polish)
                 self.setStatus("ASR: ready")
-            case .pong:
-                self.lastPong = Date()
-            case .partial(let session, _, let text, let lang):
-                guard session == self.dictationSession else { return }
-                if case .idle = self.state { return }
-                self.overlay.model.update(self.polish(text, lang: lang ?? self.lang))
-                if let lang { self.overlay.model.lang = lang; self.lang = lang }
-            case .final(let session, _, let text, let lang, _, _):
-                guard session == self.dictationSession else { return }
-                if case .finishing = self.state {
-                    self.state = .idle
-                    self.overlay.hide()
+            case .partial, .final:
+                guard let update = self.dictation.update(for: event) else { return }
+                switch update {
+                case .partial(let text, let lang):
+                    if case .idle = self.state { return }
+                    self.overlay.model.update(text)
+                    if let lang { self.overlay.model.lang = lang }
+                case .final(let text, _):
+                    if case .finishing = self.state {
+                        self.state = .idle
+                        self.overlay.hide()
+                    }
+                    self.deliver(text)
                 }
-                self.deliver(self.polish(text, lang: lang ?? self.lang))
             case .polished, .summary:
                 break
-            case .error(let message):
-                NSLog("Ionian Flow: ASR error: %@", message)
-            case .disconnected:
-                self.setStatus("ASR: reconnecting")
-                self.cancelDictation()
-                self.flushTail()
-                self.state = .idle
-                self.overlay.hide()
+            case .error(let error):
+                NSLog("Ionian Flow: speech engine error: %@", String(describing: error))
+                if !self.engine.isReady { self.setStatus("ASR: error") }
             }
         }
-    }
-
-    /// Same cleanup for the live HUD and the paste, so what you see is what gets inserted.
-    private func polish(_ text: String, lang: String?) -> String {
-        TextFormatter.format(FillerFilter.clean(text, lang: lang))
     }
 
     private func deliver(_ text: String) {
@@ -412,34 +393,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         guard Settings.sounds, let sound = NSSound(named: NSSound.Name(name))?.copy() as? NSSound else { return }
         sound.volume = 0.25
         sound.play()
-    }
-
-    private func scheduleReconnect() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            guard let self else { return }
-            if self.client.isConnected {
-                self.checkHealth()
-            } else if !self.client.connect() {
-                self.setStatus("ASR: loading model")
-            }
-            self.scheduleReconnect()
-        }
-    }
-
-    /// SidecarManager restarts a server that exits; this catches one that hangs: no pong for 20 s.
-    /// Killing it hands over to that restart (and starts one if the server wasn't ours).
-    private func checkHealth() {
-        let now = Date()
-        if now.timeIntervalSince(lastPing) >= 5 {
-            client.ping()
-            lastPing = now
-        }
-        guard now.timeIntervalSince(lastPong) > 20 else { return }
-        NSLog("Ionian Flow: ASR server stopped answering, restarting it")
-        lastPong = now
-        if let pid = client.serverPID { kill(pid, SIGKILL) }
-        client.disconnect()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.sidecar.start() }
     }
 
     // MARK: - Menu bar
@@ -532,7 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private func setStatus(_ s: String) {
         statusText = s
         appModel.status = s
-        statusItem.button?.appearsDisabled = !client.isConnected
+        statusItem.button?.appearsDisabled = !engine.isReady
     }
 
     @objc private func pasteHistory(_ sender: NSMenuItem) {
@@ -581,13 +534,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         appModel.transcriptsFolder = url
     }
 
-    private func restartASR() {
-        setStatus("ASR: restarting")
-        sidecar.restart()
-    }
-
-    private func openLog() {
-        NSWorkspace.shared.open(URL(fileURLWithPath: sidecar.logPath))
+    /// Unloads and loads the speech models again.
+    private func reloadEngine() {
+        setStatus("ASR: loading models")
+        engine.stop()
+        engine.start()
     }
 
     // MARK: - Vocabulary
@@ -627,7 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private func setUseVocabulary(_ on: Bool) {
         guard on != Settings.useVocabulary else { return }
         Settings.useVocabulary = on
-        restartASR()  // the server takes the file as a launch argument
+        engine.reloadVocabulary()  // the live bias reads the file at session start; the final pass rebuilds its list
     }
 
     /// A scan you asked for always reports back; a background resync only when it found something.

@@ -6,7 +6,7 @@
 //   {"messages":[{"role":"system","content":"..."},{"role":"user","content":"..."}],
 //    "max_tokens":60, "one_line":true}                  -> {"text":"...","ms":123,"tokens":17}
 //   {"cmd":"stats"}                                      -> {"load_s":..,"rss_mb":..,"peak_rss_mb":..,"mlx_active_mb":..,"mlx_peak_mb":..}
-// Generation is greedy (temperature 0), thinking off: exactly what asr/polish.py asks mlx-lm for.
+// Generation is greedy (temperature 0), thinking off: exactly what the former Python polish.py asks mlx-lm for.
 import Foundation
 import MLX
 import MLXHuggingFace

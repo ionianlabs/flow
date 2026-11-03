@@ -38,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private lazy var transcriber = Transcriber(engine: engine, mic: audio)
     private lazy var transcriptPanel = TranscriptPanel(model: transcriber.model)
     private lazy var vocabulary = VocabularyStore()
-    private lazy var sweeper = VaultSweeper(asrDir: Bundle.main.object(forInfoDictionaryKey: "IonianFlowASRDir") as? String ?? "")
+    private lazy var sweeper = VaultSweeper()
     private let appModel = AppModel()
     private lazy var mainWindow = MainWindow(model: appModel, store: vocabulary, sweeper: sweeper, actions: AppActions(
         toggleTranscription: { [weak self] in self?.toggleTranscription() },

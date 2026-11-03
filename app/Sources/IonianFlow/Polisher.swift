@@ -1,7 +1,7 @@
 import Foundation
 import MLXLMCommon
 
-// Unit E (cleanup). Port of asr/polish.py polish: prompts, few-shot examples, glossary (domain + up to 15 terms
+// Unit E (cleanup). Port of the former Python polish.py polish: prompts, few-shot examples, glossary (domain + up to 15 terms
 // by trigram Jaccard >= 0.3), previous-segment context, every finish() guard, preload, the shared prefill rule (GemmaPrefill).
 // Gemma comes from ModelHub.gemma(); every generation runs inside ModelHub.serial.
 
@@ -16,7 +16,7 @@ struct PolishVocabulary: Equatable, Sendable {
     var terms: [PolishTerm] = []
 }
 
-/// Pure prompt building and output guards; 1:1 with asr/polish.py. Lengths count code points, as Python does.
+/// Pure prompt building and output guards; 1:1 with the former Python polish.py. Lengths count code points, as Python does.
 enum PolishRules {
     static let system = """
     You clean up one segment of a live meeting transcript produced by speech recognition.
@@ -253,7 +253,7 @@ final class Polisher: @unchecked Sendable {
 }
 
 enum PolisherCLI {
-    /// `--enginetest-polish`: JSON lines on stdin/stdout, driven by asr/bench_llm.py's `app:` backend.
+    /// `--enginetest-polish`: JSON lines on stdin/stdout, driven by the former Python bench_llm.py's `app:` backend.
     ///   {"text":..., "before":..., "domain":..., "terms":[{"text":..,"aliases":[..]}]} -> {"text":..., "ms":...}
     ///   {"cmd":"stats"} -> {"load_s":..., "peak_rss_mb":...}
     /// The model is loaded before the first line is read. Returns the process exit code.

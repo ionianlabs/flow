@@ -1,6 +1,6 @@
 import Foundation
 
-/// One line of the vocabulary file, parsed. The format and the Python parser are in asr/vocab.py;
+/// One line of the vocabulary file, parsed. The format and the Python parser are in the former Python vocab.py;
 /// keep the two in step (VocabNormalizer's selftest compares them on the same inputs).
 struct VocabTerm: Equatable {
     let text: String

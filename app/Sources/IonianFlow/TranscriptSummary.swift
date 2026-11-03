@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the LLM wrote about a finished transcript (asr/polish.py `summarize`).
+/// What the LLM wrote about a finished transcript (the former Python polish.py `summarize`).
 struct TranscriptSummary: Equatable {
     var description: String
     var tags: [String]

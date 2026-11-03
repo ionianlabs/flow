@@ -1,6 +1,6 @@
 import Foundation
 
-/// Writes terms the way the vocabulary does; the port of Vocabulary.normalize in asr/vocab.py,
+/// Writes terms the way the vocabulary does; the port of Vocabulary.normalize in the former Python vocab.py,
 /// which has the reasoning. "pool request" (an alias) becomes "pull request", spelling variants
 /// of rare terms are fixed ("data garage", "Net vora", "E T L"), near misses too, by spelling or
 /// sound ("Netfora", "Jana Waber"). Common words are left alone.

@@ -2,7 +2,7 @@ import FluidAudio
 import Foundation
 
 // Unit B (live). Streaming Nemotron: one LiveStream per session, behaviour-equal to the Session class in
-// asr/server.py (live decoder only, like its ";live" start option): cuts at sample/1280 encoder frames,
+// the former Python server.py (live decoder only, like its ";live" start option): cuts at sample/1280 encoder frames,
 // PUNCT_HOLD 8, leading-punctuation strip, Latin-only, flush padding, segment times, language tag.
 //
 // Two parts. SegmentTracker is the pure text/cut logic (the port of server.py's LiveStreamer; no models,
@@ -430,8 +430,8 @@ enum NativeLive {
         return ok
     }
 
-    /// `--enginetest-live [--socket PATH] [--per N] [--mixed DIR] [--data DIR] [--cut-every SECONDS] [--vocab FILE] [--no-python]`
-    /// Runs clips through NativeEngine and the Python server (own socket, see LiveParity) and prints the parity numbers.
+    /// `--enginetest-live [--per N] [--mixed DIR] [--data DIR] [--cut-every SECONDS] [--vocab FILE]`
+    /// Runs clips through NativeEngine (live decoder) and prints WER, language and segment checks.
     static func cli(_ args: [String]) -> Int32 {
         var done = false, code: Int32 = 0
         Task.detached {
@@ -444,63 +444,6 @@ enum NativeLive {
 }
 
 // MARK: --enginetest-live
-
-/// A minimal client of asr/server.py's socket protocol (frames: 1 byte type, 4 byte big-endian length, payload).
-private final class PythonClient {
-    struct Event { let type: String; let segment: Int; let text: String; let lang: String?; let start: Double?; let end: Double? }
-    private let fd: Int32
-    private let lock = NSLock()
-    private(set) var events: [Event] = []
-    private var buffer = Data()
-
-    init?(path: String) {
-        fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        _ = withUnsafeMutablePointer(to: &addr.sun_path) {
-            $0.withMemoryRebound(to: CChar.self, capacity: 104) { strncpy($0, path, 103) }
-        }
-        let ok = withUnsafePointer(to: &addr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
-        }
-        if ok != 0 { Darwin.close(fd); return nil }
-        Thread.detachNewThread { [self] in readLoop() }
-    }
-
-    func send(_ kind: UInt8, _ payload: Data = Data()) {
-        var f = Data([kind])
-        withUnsafeBytes(of: UInt32(payload.count).bigEndian) { f.append(contentsOf: $0) }
-        f.append(payload)
-        f.withUnsafeBytes { raw in
-            var off = 0
-            while off < raw.count {
-                let n = write(fd, raw.baseAddress! + off, raw.count - off)
-                if n <= 0 { return }
-                off += n
-            }
-        }
-    }
-
-    private func readLoop() {
-        var chunk = [UInt8](repeating: 0, count: 65536)
-        while true {
-            let n = read(fd, &chunk, chunk.count)
-            if n <= 0 { return }
-            buffer.append(contentsOf: chunk[0..<n])
-            while let nl = buffer.firstIndex(of: 10) {
-                let line = buffer[buffer.startIndex..<nl]
-                buffer = Data(buffer[(nl + 1)...])
-                guard let j = try? JSONSerialization.jsonObject(with: line) as? [String: Any], let type = j["type"] as? String else { continue }
-                let e = Event(type: type, segment: j["segment"] as? Int ?? 0, text: j["text"] as? String ?? (j["message"] as? String ?? ""),
-                              lang: j["lang"] as? String, start: j["start"] as? Double, end: j["end"] as? Double)
-                lock.lock(); events.append(e); lock.unlock()
-            }
-        }
-    }
-
-    func snapshot() -> [Event] { lock.lock(); defer { lock.unlock() }; return events }
-    func close() { Darwin.close(fd) }
-}
 
 private struct ParityClip { let id: String; let wav: URL; let ref: String; let lang: String }  // lang: "de", "en" or "" (auto)
 
@@ -575,36 +518,6 @@ enum LiveParity {
         return run
     }
 
-    private static func runPython(_ path: String, pcm: Data, lang: String, cuts: [Int], live: Bool) async -> Run? {
-        guard let c = PythonClient(path: path) else { return nil }
-        defer { c.close() }
-        let t0 = Date()
-        while !c.snapshot().contains(where: { $0.type == "ready" }), Date().timeIntervalSince(t0) < 10 { try? await Task.sleep(nanoseconds: 20_000_000) }
-        c.send(UInt8(ascii: "S"), Data((localeFor(lang) + (live ? ";live" : "")).utf8))
-        var pending = cuts
-        var i = 0
-        while i < pcm.count {
-            let end = min(pcm.count, i + 3200)
-            c.send(UInt8(ascii: "A"), pcm.subdata(in: i..<end))
-            while let k = pending.first, k * 2 <= end { c.send(UInt8(ascii: "K"), Data(String(k).utf8)); pending.removeFirst() }
-            i = end
-        }
-        c.send(UInt8(ascii: "E"))
-        let want = cuts.count + 1
-        let t1 = Date()
-        while c.snapshot().filter({ $0.type == "final" }).count < want, Date().timeIntervalSince(t1) < 120 { try? await Task.sleep(nanoseconds: 20_000_000) }
-        var run = Run()
-        for e in c.snapshot() {
-            switch e.type {
-            case "partial": run.partials += 1; run.firstPartialSegments.insert(e.segment)
-            case "final": run.finals[e.segment] = Seg(text: e.text, lang: e.lang, start: e.start, end: e.end)
-            case "error": run.errors += 1
-            default: break
-            }
-        }
-        return run
-    }
-
     final class Collector: @unchecked Sendable {
         private let lock = NSLock()
         private var events: [EngineEvent] = []
@@ -627,13 +540,10 @@ enum LiveParity {
 
     static func run(_ args: [String]) async -> Int32 {
         func opt(_ k: String, _ d: String) -> String { args.firstIndex(of: k).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? d }
-        let socketPath = opt("--socket", "/tmp/ionian-ne-b.sock")
         let per = Int(opt("--per", "5")) ?? 5
         let cutEvery = Double(opt("--cut-every", "4")) ?? 4
-        let usePython = !args.contains("--no-python") && FileManager.default.fileExists(atPath: socketPath)
         let dataDir = URL(fileURLWithPath: opt("--data", ProcessInfo.processInfo.environment["FLOW_BENCH"].map { $0 + "/data" } ?? ""))
         let mixedDir = URL(fileURLWithPath: opt("--mixed", ""))
-        if !usePython { say("(no Python server on \(socketPath): native only)") }
 
         var clips: [ParityClip] = []
         let man = manifest(dataDir.appendingPathComponent("manifest.jsonl"))
@@ -660,67 +570,40 @@ enum LiveParity {
         while !engine.isReady, Date().timeIntervalSince(t0) < 120 { try? await Task.sleep(nanoseconds: 50_000_000) }
         guard engine.isReady else { say("native engine never became ready (models missing?)"); return 2 }
 
-        var native = Tally(), pyLive = Tally(), nativeMixed = Tally(), pyMixed = Tally()
-        var agree = 0, compared = 0, durationDiffs: [Double] = [], startDiffs: [Double] = [], countEqual = 0, cutRuns = 0
-        var boundaryDiffs: [Int] = [], langDiffs = 0, partialsMissing = 0, errors = 0
+        var native = Tally(), nativeMixed = Tally()
+        var cutRuns = 0, wrongCount = 0, errors = 0
         var rows: [String] = []
 
-        func score(_ c: ParityClip, cuts: [Int], pcm: Data, into n: inout Tally, py l: inout Tally, cutPass: Bool) async {
+        // One pass per clip without cuts (scored), one with cuts every `cutEvery` seconds (segment count only).
+        func score(_ c: ParityClip, cuts: [Int], pcm: Data, into n: inout Tally) async {
             let nat = await runNative(engine, collector, pcm: pcm, lang: c.lang, cuts: cuts)
             errors += nat.errors
             let nText = (0...cuts.count).map { nat.finals[$0]?.text ?? "" }.joined(separator: " ")
-            let ref = words(c.ref)
-            if !cutPass { n.add(ref: ref, hyp: words(nText), text: nText) }
-            if nat.finals.count != cuts.count + 1 { rows.append("\(c.id) native: \(nat.finals.count) finals, wanted \(cuts.count + 1)") }
-            guard usePython, let py = await runPython(socketPath, pcm: pcm, lang: c.lang, cuts: cuts, live: true) else { return }
-            let pText = (0...cuts.count).map { py.finals[$0]?.text ?? "" }.joined(separator: " ")
-            if !cutPass {
-                l.add(ref: ref, hyp: words(pText), text: pText)
-                compared += 1
-                if words(nText) == words(pText) { agree += 1 }
-            } else {
-                cutRuns += 1
-                if nat.finals.count == py.finals.count { countEqual += 1 }
-                // Word offset of each boundary, native vs Python
-                var a = 0, b = 0
-                for k in 0..<cuts.count {
-                    a += words(nat.finals[k]?.text ?? "").count; b += words(py.finals[k]?.text ?? "").count
-                    boundaryDiffs.append(abs(a - b))
-                }
-            }
-            for (k, ns) in nat.finals {
-                guard let ps = py.finals[k] else { continue }
-                if let s1 = ns.start, let s2 = ps.start { startDiffs.append(abs(s1 - s2)) }
-                if let e1 = ns.end, let e2 = ps.end { durationDiffs.append(abs(e1 - e2)) }
-                if ns.lang != ps.lang, !ns.text.isEmpty { langDiffs += 1 }
-            }
-            if nat.partials == 0, py.partials > 0 { partialsMissing += 1 }
-            if !cutPass, words(nText) != words(pText) {
-                rows.append("\(c.id)\n   native: \(nText)\n   python: \(pText)")
+            if cuts.isEmpty { n.add(ref: words(c.ref), hyp: words(nText), text: nText) } else { cutRuns += 1 }
+            if nat.finals.count != cuts.count + 1 {
+                wrongCount += 1
+                rows.append("\(c.id): \(nat.finals.count) finals, wanted \(cuts.count + 1)")
             }
         }
 
         for (list, isMixed) in [(clips, false), (mixed, true)] {
             for c in list {
                 guard let pcm = try? readWav(c.wav) else { say("cannot read \(c.wav.lastPathComponent)"); continue }
-                var n = Tally(), l = Tally()
-                await score(c, cuts: [], pcm: pcm, into: &n, py: &l, cutPass: false)
+                var n = Tally()
+                await score(c, cuts: [], pcm: pcm, into: &n)
                 if isMixed { nativeMixed.refWords += n.refWords; nativeMixed.errors += n.errors; nativeMixed.clips += n.clips; nativeMixed.leaks += n.leaks
-                    pyMixed.refWords += l.refWords; pyMixed.errors += l.errors; pyMixed.clips += l.clips; pyMixed.leaks += l.leaks
-                } else {
-                    native.refWords += n.refWords; native.errors += n.errors; native.clips += n.clips; native.leaks += n.leaks
-                    pyLive.refWords += l.refWords; pyLive.errors += l.errors; pyLive.clips += l.clips; pyLive.leaks += l.leaks
-                }
+                } else { native.refWords += n.refWords; native.errors += n.errors; native.clips += n.clips; native.leaks += n.leaks }
                 // Second pass: cuts every cutEvery seconds, away from the clip's last second
                 let total = pcm.count / 2
                 let cuts = stride(from: Int(cutEvery * 16000), to: total - 16000, by: Int(cutEvery * 16000)).map { $0 }
                 if !isMixed, !cuts.isEmpty {
-                    var dn = Tally(), dl = Tally()
-                    await score(c, cuts: cuts, pcm: pcm, into: &dn, py: &dl, cutPass: true)
+                    var dn = Tally()
+                    await score(c, cuts: cuts, pcm: pcm, into: &dn)
                 }
                 say("\(c.id): done")
             }
         }
+
 
         // Dictation sessions: the finalizer's text replaces the live final; empty falls back to the live text.
         struct Fake: UtteranceFinalizer {
@@ -742,19 +625,11 @@ enum LiveParity {
             }
         }
 
-        say("\n== Parity (WER is word error rate against the references, lowercased, punctuation dropped)")
-        say(String(format: "FLEURS+VoxPopuli (%d clips): native %.2f %%   python live %@", native.clips, native.wer, usePython ? String(format: "%.2f %%", pyLive.wer) : "n/a"))
-        say(String(format: "Mixed de/en (%d clips): native %.2f %%   python live %@", nativeMixed.clips, nativeMixed.wer, usePython ? String(format: "%.2f %%", pyMixed.wer) : "n/a"))
-        say("Identical word sequence to Python live: \(agree) of \(compared) clips")
-        say("Non-Latin outputs: native \(native.leaks + nativeMixed.leaks), python \(pyLive.leaks + pyMixed.leaks)")
-        say("Cut runs: \(cutRuns) clips; equal segment count \(countEqual); boundary word-offset diff max \(boundaryDiffs.max() ?? 0), mean \(String(format: "%.2f", Double(boundaryDiffs.reduce(0, +)) / Double(max(1, boundaryDiffs.count))))")
-        func stat(_ v: [Double]) -> String {
-            let s = v.sorted(); guard !s.isEmpty else { return "n/a" }
-            return String(format: "n=%d median %.2f p90 %.2f max %.2f s, %.0f %% within 0.1 s", s.count, s[s.count / 2], s[Int(Double(s.count - 1) * 0.9)], s.last!, 100 * Double(s.filter { $0 <= 0.1 }.count) / Double(s.count))
-        }
-        say("Final start diff: \(stat(startDiffs))")
-        say("Final end diff:   \(stat(durationDiffs))")
-        say("Language tag differs on \(langDiffs) segments; clips with no native partial but Python partials: \(partialsMissing); native errors: \(errors)")
+        say("\n== Live decoder (WER is word error rate against the references, lowercased, punctuation dropped)")
+        say(String(format: "FLEURS+VoxPopuli (%d clips): %.2f %%", native.clips, native.wer))
+        say(String(format: "Mixed de/en (%d clips): %.2f %%", nativeMixed.clips, nativeMixed.wer))
+        say("Non-Latin outputs: \(native.leaks + nativeMixed.leaks)")
+        say("Cut runs: \(cutRuns) clips; wrong segment count \(wrongCount); engine errors \(errors)")
         for r in rows.prefix(40) { say(r) }
         return 0
     }

@@ -1,6 +1,6 @@
 import Foundation
 
-// Unit F: rank(), merge_variants() and one_edit() of asr/sweep.py.
+// Unit F: rank(), merge_variants() and one_edit() of the former Python sweep.py.
 
 struct RankedTerm: Equatable {
     var term: String

@@ -5,7 +5,7 @@ import MLXLMCommon
 import Tokenizers
 
 // Unit F: how the summary and the vault sweep talk to Gemma, and how the sweep is paused.
-// Generation is greedy with thinking off, as asr/polish.py asks mlx-lm for it, and follows the shared
+// Generation is greedy with thinking off, as the former Python polish.py asks mlx-lm for it, and follows the shared
 // prefill rule (GemmaPrefill). Every call runs alone on
 // ModelHub.serial, and checks a pause flag per token: a paused sweep gives the lane back at once, so
 // dictation is never held up by more than one token.

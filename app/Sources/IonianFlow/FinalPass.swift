@@ -3,7 +3,7 @@ import Foundation
 
 /// Transcription mode's final text: Parakeet TDT 0.6B v3 "Ultra" (FluidAudio, Core ML on the Neural
 /// Engine) transcribes every finished segment again. On FLEURS it makes half the streaming
-/// decoder's errors (German 4.5 % vs. 10.7 % WER, English 5.2 % vs. 11.8 %; asr/bench_wer.py) at
+/// decoder's errors (German 4.5 % vs. 10.7 % WER, English 5.2 % vs. 11.8 %; the former Python bench_wer.py) at
 /// ~0.1 s per segment, and leaves the GPU to the live text and the polish LLM. The model (~630 MB)
 /// loads (downloading once) through ModelHub on first use, shared with dictation; until it's ready the streaming decoder's finals are used as before.
 final class FinalPass {

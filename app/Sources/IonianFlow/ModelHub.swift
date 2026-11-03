@@ -166,31 +166,64 @@ actor ModelHub {
         return r == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
     }
 
-    /// Run `work` alone on the shared model lane: FIFO, one job at a time, held across awaits.
-    nonisolated func serial<T>(_ work: () async throws -> T) async rethrows -> T {
-        await gate.acquire()
-        defer { gate.release() }
+    /// Run `work` alone on the shared model lane: one job at a time, held across awaits. Jobs of the same
+    /// priority run in submission order; a `.high` job (a transcript final, a dictation final) always goes
+    /// before every waiting `.low` job (polish, summary, vault sweep), so cleanup never delays the text.
+    nonisolated func serial<T>(_ priority: LanePriority = .high, label: String = "job", _ work: () async throws -> T) async rethrows -> T {
+        let queued = Date()
+        await gate.acquire(priority)
+        let started = Date()
+        defer { gate.release(); LaneLog.record(label, priority, queued: queued, started: started, depth: gate.waiting) }
         return try await work()
     }
 
     private nonisolated let gate = SerialGate()
 }
 
-/// FIFO async mutex behind ModelHub.serial (an actor alone would interleave at every await).
+enum LanePriority: Int, Sendable { case high = 0, low = 1 }
+
+/// Optional per-job timing for the shared lane: with IONIAN_LANE_LOG=<file>, one CSV line per finished job
+/// (finish time, label, priority, wait ms, run ms, jobs still waiting). Off otherwise.
+enum LaneLog {
+    private static let t0 = Date()
+    private static let lock = NSLock()
+    private static let handle: FileHandle? = {
+        guard let path = ProcessInfo.processInfo.environment["IONIAN_LANE_LOG"] else { return nil }
+        FileManager.default.createFile(atPath: path, contents: Data("t,label,priority,wait_ms,run_ms,waiting\n".utf8))
+        return FileHandle(forWritingAtPath: path)
+    }()
+
+    static func record(_ label: String, _ p: LanePriority, queued: Date, started: Date, depth: Int) {
+        guard let handle else { return }
+        let now = Date()
+        let line = String(format: "%.3f,%@,%@,%.0f,%.0f,%d\n", now.timeIntervalSince(t0), label, p == .high ? "high" : "low",
+                          started.timeIntervalSince(queued) * 1000, now.timeIntervalSince(started) * 1000, depth)
+        lock.lock(); defer { lock.unlock() }
+        handle.seekToEndOfFile()
+        handle.write(Data(line.utf8))
+    }
+}
+
+/// Async mutex behind ModelHub.serial (an actor alone would interleave at every await): FIFO within a priority,
+/// high before low.
 final class SerialGate: @unchecked Sendable {
     private let lock = NSLock()
     private var busy = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waiters: [[CheckedContinuation<Void, Never>]] = [[], []]
 
-    func acquire() async {
+    /// Jobs queued right now.
+    var waiting: Int { lock.lock(); defer { lock.unlock() }; return waiters[0].count + waiters[1].count }
+
+    func acquire(_ priority: LanePriority = .high) async {
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
             lock.lock()
-            if busy { waiters.append(c); lock.unlock() } else { busy = true; lock.unlock(); c.resume() }
+            if busy { waiters[priority.rawValue].append(c); lock.unlock() } else { busy = true; lock.unlock(); c.resume() }
         }
     }
 
     func release() {
         lock.lock()
-        if waiters.isEmpty { busy = false; lock.unlock() } else { let next = waiters.removeFirst(); lock.unlock(); next.resume() }
+        let q = waiters[0].isEmpty ? 1 : 0
+        if waiters[q].isEmpty { busy = false; lock.unlock() } else { let next = waiters[q].removeFirst(); lock.unlock(); next.resume() }
     }
 }

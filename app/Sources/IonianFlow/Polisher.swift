@@ -235,7 +235,7 @@ final class Polisher: @unchecked Sendable {
     /// Greedy, thinking off, one line; stops at the first line break once the visible text has one.
     private func generate(system: String, user: String, maxTokens: Int) async throws -> String {
         let container = try await hub.gemma()
-        return try await hub.serial {
+        return try await hub.serial(.low, label: "polish") {
             let input = try await container.prepare(
                 input: UserInput(chat: [.system(system), .user(user)], additionalContext: ["enable_thinking": false]))
             let params = GemmaPrefill.parameters(maxTokens: maxTokens, promptTokens: input.text.tokens.size)  // n-2 prefill rule

@@ -58,7 +58,7 @@ final class FinalPass {
             var text: String?
             do {
                 // On the shared model lane, so a segment and a dictation final never overlap.
-                text = try await hub.serial {
+                text = try await hub.serial(label: "final") {
                     var state = TdtDecoderState.make()
                     return try await manager.transcribe(samples, decoderState: &state).text
                 }

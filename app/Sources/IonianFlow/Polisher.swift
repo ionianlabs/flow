@@ -2,7 +2,7 @@ import Foundation
 import MLXLMCommon
 
 // Unit E (cleanup). Port of asr/polish.py polish: prompts, few-shot examples, glossary (domain + up to 15 terms
-// by trigram Jaccard >= 0.3), previous-segment context, every finish() guard, preload, the n-1 prefill rule.
+// by trigram Jaccard >= 0.3), previous-segment context, every finish() guard, preload, the shared prefill rule (GemmaPrefill).
 // Gemma comes from ModelHub.gemma(); every generation runs inside ModelHub.serial.
 
 /// A glossary term as the prompt needs it.
@@ -238,11 +238,7 @@ final class Polisher: @unchecked Sendable {
         return try await hub.serial {
             let input = try await container.prepare(
                 input: UserInput(chat: [.system(system), .user(user)], additionalContext: ["enable_thinking": false]))
-            var params = GenerateParameters(maxTokens: maxTokens, temperature: 0)
-            // Prefill all but the last token(s) without logits: handed whole, the decode iterator computes lm_head
-            // logits for every prompt position (~2x slower). n-1 flips one near-tie case against Python's output
-            // (a "Uhr"); n-2 matches mlx-lm on all 16 bench cases and costs the same.
-            params.prefill.stepSize = max(1, input.text.tokens.size - 2)
+            let params = GemmaPrefill.parameters(maxTokens: maxTokens, promptTokens: input.text.tokens.size)  // n-2 prefill rule
             let stream = try await container.generate(input: input, parameters: params)
             var out = ""
             for await g in stream {

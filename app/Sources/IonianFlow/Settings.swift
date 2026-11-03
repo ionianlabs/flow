@@ -61,7 +61,13 @@ enum Settings {
     /// cleanup model (needs it downloaded). No UI: `defaults write dev.ionian.flow summarizeTranscripts -bool false`.
     static var summarizeTranscripts: Bool { d.bool(forKey: "summarizeTranscripts") }
 
-    static let defaultTranscriptsFolder = FileManager.default.homeDirectoryForCurrentUser
+    /// Test seam: with IONIAN_FLOW_TEST_DIR set, the vocabulary file, the transcripts folder and the sweep cache
+    /// live in that folder, so a CLI test run never reads or writes the user's own files.
+    static let testDir: URL? = ProcessInfo.processInfo.environment["IONIAN_FLOW_TEST_DIR"]
+        .flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
+
+    static let defaultTranscriptsFolder = testDir?.appendingPathComponent("Transcripts", isDirectory: true)
+        ?? FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Documents/Ionian Flow/Transcripts", isDirectory: true)
 
     /// Where transcription mode writes its Markdown files.
@@ -71,8 +77,8 @@ enum Settings {
     }
 
     /// Names, acronyms and jargon the recognizer should get right (format: asr/vocab.py).
-    static let vocabularyFile = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Documents/Ionian Flow/Vocabulary.md")
+    static let vocabularyFile = testDir?.appendingPathComponent("Vocabulary.md")
+        ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Ionian Flow/Vocabulary.md")
 
     /// Bias the recognizer toward the vocabulary and fix its spellings.
     static var useVocabulary: Bool {

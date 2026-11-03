@@ -5,8 +5,8 @@ import MLXLMCommon
 import Tokenizers
 
 // Unit F: how the summary and the vault sweep talk to Gemma, and how the sweep is paused.
-// Generation is greedy with thinking off, as asr/polish.py asks mlx-lm for it, and follows the n-1
-// prefill rule of scripts/llm-bench (prefill.stepSize = promptTokens - 1). Every call runs alone on
+// Generation is greedy with thinking off, as asr/polish.py asks mlx-lm for it, and follows the shared
+// prefill rule (GemmaPrefill). Every call runs alone on
 // ModelHub.serial, and checks a pause flag per token: a paused sweep gives the lane back at once, so
 // dictation is never held up by more than one token.
 
@@ -105,8 +105,7 @@ final class GemmaVaultLLM: VaultLLM {
             }
         }
         let input = try await container.prepare(input: UserInput(chat: msgs, additionalContext: ["enable_thinking": false]))
-        var params = GenerateParameters(maxTokens: maxTokens, temperature: 0)
-        params.prefill.stepSize = max(1, input.text.tokens.size - 1)  // n-1 prefill rule
+        let params = GemmaPrefill.parameters(maxTokens: maxTokens, promptTokens: input.text.tokens.size)  // shared prefill rule
         let stream = try await container.generate(input: input, parameters: params)
         var out = ""
         for await g in stream {

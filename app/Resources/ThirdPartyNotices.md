@@ -32,3 +32,11 @@ mlx-swift-lm) are MIT as well.
 
 FluidAudio (Apache 2.0), swift-transformers and swift-huggingface (Apache 2.0), mlx-swift and mlx-swift-lm (MIT).
 Their full licence texts are in the respective source repositories.
+
+## Word frequencies (shipped with the app)
+
+`wordfreq.tsv`, the German and English word-frequency table behind the vocabulary's common-word guard, is derived
+from the data of the wordfreq project (https://github.com/rspeer/wordfreq), which is licensed under CC BY-SA 4.0
+(https://creativecommons.org/licenses/by-sa/4.0/). The table was reduced to words at Zipf 3.0 and above and
+rescaled to integers; it is distributed under the same licence, CC BY-SA 4.0. wordfreq itself credits its sources
+(among them Wikipedia, OpenSubtitles, SUBTLEX, Google Books Ngrams, Reddit and Twitter) in its README.

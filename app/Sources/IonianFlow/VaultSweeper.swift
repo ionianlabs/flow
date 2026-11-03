@@ -40,10 +40,6 @@ final class VaultSweeper: ObservableObject {
 
     init() {}
 
-    /// The Python sweep is gone; the argument is ignored. Kept so callers compile until Phase 5 removes it.
-    @available(*, deprecated, message: "VaultSweeper no longer needs the ASR folder; use init()")
-    convenience init(asrDir: String) { self.init() }
-
     /// The vaults Obsidian knows, most recently opened first.
     static func knownVaults() -> [Vault] {
         let config = FileManager.default.homeDirectoryForCurrentUser

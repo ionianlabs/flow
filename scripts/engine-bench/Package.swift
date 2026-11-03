@@ -1,6 +1,6 @@
 // swift-tools-version: 6.0
 // Phase 0 spike of the native engine: FluidAudio's multilingual Nemotron streaming (Core ML) measured
-// against the Python sidecar. See main.swift for the subcommands.
+// against the former Python sidecar. See main.swift for the subcommands.
 import PackageDescription
 
 let package = Package(

@@ -28,7 +28,5 @@
     <string>Ionian Flow hears you while you hold the dictation key. Audio stays on your Mac.</string>
     <key>NSAudioCaptureUsageDescription</key>
     <string>Ionian Flow transcribes what your Mac plays, like the other side of a call, while you record a meeting. It stays on your Mac.</string>
-    <key>IonianFlowASRDir</key>
-    <string>__ASR_DIR__</string>
 </dict>
 </plist>

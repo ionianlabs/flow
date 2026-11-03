@@ -15,6 +15,9 @@ enum EngineCLI {
             ("--enginetest-sweep", VaultSweep.cli),           // F
             ("--enginetest-store", ModelStoreTests.cli),      // G
             ("--e2e-engine", E2E.cli),                        // integration
+            ("--score-dictation", WERScore.scoreDictationCLI),
+            ("--compare-transcribe", WERScore.compareTranscribeCLI),
+            ("--make-two-speaker", WERScore.makeTwoSpeakerCLI),
         ]
         for (flag, handler) in routes {
             if let i = args.firstIndex(of: flag) { return handler(Array(args[(i + 1)...])) }
@@ -34,6 +37,8 @@ enum EngineSelfTests {
             SummarizerCLI.selfTest(),    // F
             VaultSweep.selfTest(),       // F
             ModelStoreTests.selfTest(),  // G
+            WERScore.selfTest(),         // WER scoring
+            ModelSetupModel.selfTest(),  // H
         ]
         return !results.contains(false)
     }

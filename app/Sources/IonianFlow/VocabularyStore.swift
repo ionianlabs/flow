@@ -1,7 +1,7 @@
 import Foundation
 
 /// The vocabulary file: names, acronyms and jargon the recognizer should get right. The format and
-/// the Python parser are in asr/vocab.py; the shared Swift parser is VocabularyParser.swift. Edits rewrite single lines, so
+/// the Python parser are in the former Python vocab.py; the shared Swift parser is VocabularyParser.swift. Edits rewrite single lines, so
 /// free text and anything else in the file stays as it was. The ASR server re-reads the file on
 /// its own when it changes.
 final class VocabularyStore: ObservableObject {
@@ -215,7 +215,7 @@ final class VocabularyStore: ObservableObject {
 
     // MARK: Self-test
 
-    /// Leaves its file at /tmp/ionian-flow-vocab-selftest.md, so asr/vocab.py can be checked against it.
+    /// Leaves its file at /tmp/ionian-flow-vocab-selftest.md, so the former Python vocab.py can be checked against it.
     static func selfTest() -> Bool {
         let url = URL(fileURLWithPath: "/tmp/ionian-flow-vocab-selftest.md")
         let sample = template.replacingOccurrences(of: "## Terms\n", with: "## Terms\n- ACME\n- pull request (heard as: pool request)\n")

@@ -1,7 +1,7 @@
 import Foundation
 
 // Unit C. Model-free checks for DictationFinal (guard, diff); called from EngineSelfTests.all().
-// Mirrors asr/pk_post.py guard(); the words are invented.
+// Mirrors the former Python pk_post.py guard(); the words are invented.
 
 enum FinalizerSelfTest {
     private struct Table: WordFrequency {

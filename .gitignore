@@ -5,10 +5,6 @@ app/.swiftpm/
 scripts/parakeet-bench/.build/
 scripts/parakeet-bench/.swiftpm/
 
-# python
-asr/.venv/
-__pycache__/
-*.pyc
 
 # macOS / editors
 .DS_Store

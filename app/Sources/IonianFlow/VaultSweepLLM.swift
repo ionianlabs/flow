@@ -84,7 +84,7 @@ final class GemmaVaultLLM: VaultLLM {
             await control?.waitWhilePaused()
             try Task.checkCancellation()
             let c = try await container()
-            let result: String? = try await hub.serial { try await self.generate(c, messages, maxTokens) }
+            let result: String? = try await hub.serial(.low, label: "llm") { try await self.generate(c, messages, maxTokens) }
             if let result { return result }  // nil: paused mid-answer; ask again after the resume
         }
     }

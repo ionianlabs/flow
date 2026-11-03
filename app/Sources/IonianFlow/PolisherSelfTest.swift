@@ -53,8 +53,8 @@ enum PolisherSelfTest {
         check("finish ungrounded", fin("hello world foo", "alpha beta gamma delta"), "hello world foo")
         check("finish grounded by glossary", fin("hello world foo", "alpha beta gamma delta", "alpha beta gamma delta"), "alpha beta gamma delta")
         check("finish length 0.5", fin("ich bin am Montag da und gehe", "Ich bin da."), "ich bin am Montag da und gehe")
-        check("finish dropped tail", fin("one two three four five six seven", "one two three four five"), "one two three four five six seven")
-        check("finish tail ok", fin("one two three four five six seven", "one two three four"), "one two three four five six seven")
+        check("finish tail ok", fin("one two three four five six seven", "one two three four five"), "one two three four five")
+        check("finish dropped tail", fin("one two three four five six seven", "one two three four"), "one two three four five six seven")
         check("finish extra sentence passes", fin(src, "So the new build is like 20 percent faster, I think. Also more more more."),
               "So the new build is like 20 percent faster, I think. Also more more more.")
         var why = ""

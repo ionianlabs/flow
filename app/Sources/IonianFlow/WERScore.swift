@@ -230,7 +230,8 @@ enum WERScore {
         }
         let bn = blocks(newLog), bo = blocks(oldLog)
         print("Markdown speaker blocks: new \(bn.count), old \(bo.count), same order: \(bn == bo ? "True" : "False")")
-        print("note: the harness feeds files at 4x real time, so segment times are on a compressed wall-clock axis; only new-vs-old is meaningful.")
+        let speed = Double(ProcessInfo.processInfo.environment["IONIAN_GATE_SPEED"] ?? "") ?? 4
+        if speed != 1 { print("note: the harness feeds files at \(speed)x real time, so segment times are on a compressed wall-clock axis; only new-vs-old is meaningful.") }
         return 0
     }
 

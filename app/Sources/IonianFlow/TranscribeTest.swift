@@ -1,18 +1,20 @@
 import Foundation
 
-/// --transcribetest YOU.wav [THEM.wav] [--no-parakeet]: transcription mode on WAV files
+/// --transcribetest YOU.wav [THEM.wav] [--no-parakeet] [--no-polish]: transcription mode on WAV files
 /// (16 kHz mono Int16) instead of the mic and the system audio, on the native engine,
-/// at 4x real time. Prints the segments and the Markdown.
+/// at IONIAN_GATE_SPEED times real time (default 4). Prints the segments and the Markdown.
+/// --no-polish: no LLM cleanup or summary, so the scored text is the finals' own (deterministic run to run).
 func runTranscribeTest(_ args: [String]) {
     Settings.registerDefaults()
     let files = args.filter { !$0.hasPrefix("--") }
     guard let youFile = files.first, let you = loadWAV(youFile) else {
-        print("usage: --transcribetest YOU.wav [THEM.wav] [--no-parakeet]")
+        print("usage: --transcribetest YOU.wav [THEM.wav] [--no-parakeet] [--no-polish]")
         exit(2)
     }
     let them = files.dropFirst().first.flatMap(loadWAV)
     let engine = NativeEngine(finalizer: ParakeetFinalizer())
     let t = Transcriber(engine: engine, mic: AudioCapture())
+    t.cleanupDisabled = args.contains("--no-polish")
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("ionian-flow-transcribetest.md")
     let started = Date()
     t.onFinished = {

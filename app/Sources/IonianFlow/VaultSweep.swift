@@ -1,6 +1,6 @@
 import Foundation
 
-// Unit F (vault sweep). Port of asr/sweep.py: rule pipeline plus LLM extraction (2,000-character chunks),
+// Unit F (vault sweep). Port of the former Python sweep.py: rule pipeline plus LLM extraction (2,000-character chunks),
 // ranking (2+ notes, MIN_SCORE 2.5, recency, merge_variants, limit 120, 25 new per run), domain line,
 // rules-only fallback, a cache file of its own, pause/resume via task cancellation and SweepControl.
 // Writes through VocabularyFile.writeVaultBlock. The rules are in VaultSweepRules.swift, the ranking in

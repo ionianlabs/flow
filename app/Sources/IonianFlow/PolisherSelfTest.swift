@@ -1,7 +1,7 @@
 import Foundation
 
 // Unit E. Model-free checks for the Polisher guards and glossary; called from EngineSelfTests.all().
-// Expected values were produced by calling asr/polish.py's functions (messages, finish, grounded, ...) once.
+// Expected values were produced by calling the former Python polish.py's functions (messages, finish, grounded, ...) once.
 
 enum PolisherSelfTest {
     static func run() -> Bool {

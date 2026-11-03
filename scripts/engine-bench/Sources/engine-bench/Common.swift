@@ -74,7 +74,7 @@ func loadManager(chunk: Int, ship: String = "latin") async throws -> StreamingNe
 let converter = AudioConverter()
 func readSamples(_ url: URL) throws -> [Float] { try converter.resampleAudioFile(url) }
 
-/// A letter outside Basic Latin, Latin-1 and Latin Extended (asr/server.py's NON_LATIN).
+/// A letter outside Basic Latin, Latin-1 and Latin Extended (the former Python server.py's NON_LATIN).
 func hasNonLatin(_ text: String) -> Bool {
     text.unicodeScalars.contains { s in
         CharacterSet.letters.contains(s) && !(s.value <= 0x24F || (0x1E00...0x1EFF).contains(s.value))

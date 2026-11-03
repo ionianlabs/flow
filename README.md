@@ -24,7 +24,7 @@ Ionian Flow is dictation and meeting transcripts for the Mac, in German and Engl
 - **Free.** MIT licensed, no account, no subscription.
 
 ## Install it.
-You need a Mac with Apple Silicon, macOS 15 or later, about 8 GB of free disk space, the Xcode command line tools (`xcode-select --install`) and [uv](https://docs.astral.sh/uv/) (`brew install uv`).
+You need a Mac with Apple Silicon, macOS 15 or later, about 8 GB of free disk space and the Xcode command line tools (`xcode-select --install`). Flow is written in Swift. There is nothing else to install.
 
 ```bash
 git clone https://github.com/ionianlabs/flow.git
@@ -32,7 +32,7 @@ cd flow
 scripts/install.sh
 ```
 
-The script sets up the Python environment, downloads the speech and cleanup models once (about 6 GB), builds `build/Ionian Flow.app` and opens it. To update, run `git pull` and the script again. It skips what is done, and macOS keeps your permissions.
+The script creates a signing identity so macOS keeps your permissions, builds `build/Ionian Flow.app` and opens it. The models download on first launch, with progress in the setup guide: the speech model is required, the cleanup model is optional. To update, run `git pull` and the script again.
 
 ## Set it up.
 The first launch opens a setup guide.
@@ -91,7 +91,7 @@ Choose Settings in the menu bar, or press ⌘, for the Ionian Flow window. It ha
 </picture>
 
 ## Keep it private.
-Transcription and cleanup run on your Mac. There is no cloud option. Only the model downloads go online: once during install, and once more (about 630 MB) the first time you transcribe a meeting. After that Flow runs offline. It keeps only totals, such as word counts, never your text.
+Transcription and cleanup run on your Mac. There is no cloud option. Only the model downloads go online, once, on first launch. After that Flow runs offline. It keeps only totals, such as word counts, never your text.
 
 ## Questions.
 **Why does the key do nothing?** Allow Accessibility and Input Monitoring, then restart Flow. macOS applies these two only to a fresh start.

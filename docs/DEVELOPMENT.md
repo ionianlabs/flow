@@ -1,18 +1,21 @@
 # Developing Ionian Flow
 
 The [README](../README.md) is for people using Ionian Flow. This page is for building, changing and
-understanding it.
+understanding it. Flow is a Swift package (`app/`); there is no other runtime.
 
 ## Build from source
-`scripts/install.sh` runs these steps; run them by hand to see each one:
+You need a Mac with Apple Silicon, macOS 15 or later and the Xcode command line tools.
 ```bash
-cd asr && uv sync                     # Python 3.12 env: torch, transformers, mlx-lm
-uv run bench.py ../samples/*.wav      # downloads the speech model (~2.6 GB) once and benchmarks it
-uv run polish.py                      # downloads the cleanup LLM (~3.6 GB) once
-cd ..
+swift build --package-path app        # debug build, enough for the tests
 scripts/make-cert.sh                  # once: stable code signature (see below)
-scripts/build-app.sh && open "build/Ionian Flow.app"
+scripts/build-app.sh && open "build/Ionian Flow.app"   # release build, signed .app in build/
 ```
+`scripts/install.sh` runs `make-cert.sh`, `build-app.sh` and `open` for you.
+
+**Models.** Nothing is bundled. On first launch the setup guide downloads the models into
+`~/Library/Application Support/Ionian Flow/Models` (`ModelStore`, `ModelHub`): the speech models are
+required, the cleanup model (Gemma 4 E2B) is optional. After that the app runs offline.
+
 **Why make-cert?** macOS ties the three permissions to the app's code signature. Without a stable
 signature, every rebuild is a "new" app and you have to grant everything again. `make-cert.sh`
 creates a self-signed "Ionian Flow Dev" identity in its own keychain
@@ -21,47 +24,45 @@ no password prompt and no trust settings, and `build-app.sh` uses it automatical
 Remove it with `scripts/make-cert.sh --remove`.
 
 ## How it works
+Everything runs in one Swift process. Core ML models run on the Neural Engine through
+[FluidAudio](https://github.com/FluidInference/FluidAudio), the cleanup LLM runs on the GPU through
+mlx-swift-lm.
 ```
-Ionian Flow.app (Swift, menu bar)                    asr/server.py (Python sidecar)
- HotkeyMonitor  CGEventTap: right ⌥, Esc
- AudioCapture   AVAudioEngine → 16 kHz Int16 ──▶ Unix socket ──▶ Nemotron, live decoder (320 ms)
- AudioDevices   CoreAudio input selection                         + final decoder (1.12 s)
- OverlayPanel   SwiftUI + Liquid Glass        ◀── JSON partials/final + language tag
- FillerFilter   regex cleanup
- TextFormatter  lists + layout commands, live
- TextInserter   pasteboard swap + ⌘V
- SidecarManager spawns `uv run server.py`, restarts on crash (and on a hang: no pong for 20 s)
- Transcriber    transcription mode: one session ──▶ 2nd connection, 2nd decoder set ("Them"),
-                per stream, cut into segments        live decoder only
-                Markdown store                 ──▶ polish.py: Gemma 4 E2B via MLX
- FinalPass      Parakeet Ultra (FluidAudio, Core ML on the Neural Engine): each segment's final text
- SystemAudioCapture  Core Audio process tap, gaps filled with silence, rebuilt on output changes
- TranscriptPanel     side panel
+HotkeyMonitor   CGEventTap: right ⌥, Esc
+AudioCapture    AVAudioEngine → 16 kHz Int16 ──▶ SpeechEngine (protocol)
+AudioDevices    CoreAudio input selection          └ NativeEngine + NativeLive
+OverlayPanel    SwiftUI + Liquid Glass                 live Nemotron, one stream per session and channel
+FillerFilter    regex cleanup                        DictationFinal: on key release, Parakeet re-reads
+TextFormatter   lists + layout commands, live          the utterance, CTC rescoring, common-word guard
+TextInserter    pasteboard swap + ⌘V
+Transcriber     transcription mode: sessions for mic ("You") and system audio ("Them"), cut into
+                segments, Markdown store
+FinalPass       Parakeet Ultra: each segment's final text
+Polisher        Gemma 4 E2B: cleanup per segment        Summarizer: summary and frontmatter
+VaultSweep      Gemma 4 E2B: vocabulary from a vault    (VaultSweeper schedules it)
+ModelHub        lazy single loads, the serial lane, unload on memory pressure
+ModelStore      the Models folder: download, verify, remove
+SystemAudioCapture  Core Audio process tap, gaps filled with silence, rebuilt on output changes
+TranscriptPanel     side panel
 ```
-- **Two decoders, one pass each.** The dictation pill uses 320 ms chunks (`--lookahead 3`, ~20 ms compute per
-  chunk on an M5 Pro). In parallel, a second instance with 1.12 s of right context (`--final-lookahead 13`)
-  produces the text that gets pasted. NVIDIA reports lower error rates at the longer context
-  (German FLEURS 8.9 → 8.2 % WER). Both run as streams, so the final text still arrives ~120 ms after the
-  mic closes. `--final-lookahead 3` switches back to a single decoder.
-- The model runs in fp16 (same transcripts as fp32 in our tests, ~25 % faster); `--fp32` to compare.
-  The instances share the GPU chunk by chunk: generate() keeps streaming state on the model object,
-  and Metal asserts when two threads use the GPU at once (that includes model loads and the MLX
-  polish model). Each decoder serves one session at a time; a new session waits for the previous one
-  to flush.
-- Transcription mode's system audio runs concurrently with the mic, so it gets a second decoder set,
-  loaded on first use (~1.2 GB per decoder). With Parakeet making the finals it only needs the live
-  decoder; the final decoder of a set loads when a session asks for it.
-- `--vocabulary FILE` (the app passes `~/Documents/Ionian Flow/Vocabulary.md`, or `""` when it's off) is
-  re-read at the start of a session when it changed; `--no-boost` keeps only the spelling fixes and the
-  glossary, `--boost-start`/`--boost-strength` tune the bonus (default 1 and 3 logits).
-- `--language de-DE` pins the language for every session; the app's Language menu does the same per dictation.
+- **SpeechEngine** (`SpeechEngine.swift`) is the protocol the app talks to: sessions per channel
+  (`.mic`, `.system`) and kind (`.dictation`, `.transcription`), events for partial text, cuts and
+  finals. `EngineFake.swift` implements it for tests.
+- **NativeEngine / NativeLive** run the streaming Nemotron decoder at 560 ms chunks per channel (1.12 s
+  swallowed words when speaking fast). They cut segments at encoder frames, hold punctuation briefly
+  (`PUNCT_HOLD`), keep output to Latin script, pad on flush, tag the language and apply the live
+  vocabulary bias.
+- **DictationFinal** runs when you release the key: Parakeet Ultra re-reads the whole utterance, a CTC
+  pass rescores terms from the vocabulary, a guard (Zipf 4.0) reverts changes to common words, and
+  `VocabNormalizer` fixes spellings. **FinalPass** gives transcription segments the same Parakeet.
+- **ModelHub** loads each model once and on demand, runs the GPU work through one serial lane (a
+  priority lane for dictation), and unloads models when macOS reports memory pressure.
+- **Polisher, Summarizer, VaultSweep** are Gemma 4 E2B prompts with output guards; `GemmaPrefill.swift`
+  holds back the last two prompt tokens from the prefill, so generation matches mlx-lm.
 - Output is limited to Latin script. In auto mode the language tag only arrives at the end of the first
-  sentence, and until then the first words could come out in Devanagari, Hebrew or CJK (80 % of the
-  vocabulary). `--no-latin-only` lifts the limit, for Greek, Russian and other scripts.
-- The socket protocol is documented in `asr/server.py`; the app talks to
-  `~/Library/Application Support/Ionian Flow/asr.sock` and reuses a server you started by hand.
-- The app starts the sidecar with `HF_HUB_OFFLINE=1`, so run `bench.py` once to cache the model.
-  Sidecar log: `~/Library/Logs/Ionian Flow/asr.log`.
+  sentence, and until then the first words could come out in Devanagari, Hebrew or CJK.
+- `defaults write dev.ionian.flow parakeetFinals -bool false` and `summarizeTranscripts -bool false`
+  turn the Parakeet finals and the summaries off.
 
 ## Vocabulary internals
 How the vault scan works:
@@ -75,13 +76,13 @@ How the vault scan works:
 - **Few terms, on purpose:** more biased terms mean more false insertions and a bigger glossary. A term
   needs two notes (one is enough only for a note alias, title or `[[link|alias]]`), a score above a
   floor (notes × mentions × recency, recent notes count up to 5× more), at most 120 are kept
-  (`--limit`), and one run adds at most 25 new ones (`--max-new`); the rest come in on later runs if
+  (`limit`), and one run adds at most 25 new ones (`maxNew`); the rest come in on later runs if
   they still rank. Terms already in the file keep their place. In the review sheet and the banner,
   Reject all sends every new term to Ignore (after a confirmation).
-- **One model for everything** (`asr/bench_llm.py`, October 2026): Gemma 4 E2B passed all 16 cleanup
+- **One model for everything** (October 2026 benchmark): Gemma 4 E2B passed all 16 cleanup
   cases at ~130 ms, where Qwen 3.5 and larger Gemma/Nemotron models translated a segment or took 2 to 6 times
   as long. For the vault scan Qwen 3.5 4B finds more names (86 % vs. 60 % on hand-labelled notes) but
-  would be a second ~3 GB download; `sweep.py --model mlx-community/Qwen3.5-4B-MLX-4bit` uses it anyway.
+  would be a second ~3 GB download.
 
 How the list is used, at three points:
 1. **While decoding**, the recognizer gets a small bonus for tokens that start a vocabulary term at a
@@ -96,7 +97,7 @@ How the list is used, at three points:
 3. **In transcription mode**, the polish LLM gets the domain and the ~15 terms that resemble something
    in the segment.
 
-On the benchmark (64 TTS clips in German and English, `asr/bench_vocab.py`), terms come out right
+On the benchmark (64 TTS clips in German and English), terms come out right
 64 % of the time instead of 36 % (53 % with the spelling fixes alone), sentences without terms don't
 get worse, and nothing is invented in silence or noise. Parakeet, which gets no decoding bonus, gets
 75 % with the spelling fixes (39 % raw). The near-miss matching was tuned on misses from this
@@ -106,9 +107,9 @@ audio would teach the model TTS voices; retraining takes hours, would have to be
 notes change, and can cost general accuracy. Biasing applies a change on the next dictation.
 
 ## Transcription internals
-- **One recognizer session per stream** for the whole meeting, cut into segments at pauses (`K`
-  frames). The recognizer keeps its context and detected language across cuts; only the text is split.
-  transformers hands every decoder step to the streamer, blanks included, and each blank is one 80 ms
+- **One recognizer session per stream** for the whole meeting, cut into segments at pauses.
+  The recognizer keeps its context and detected language across cuts; only the text is split.
+  Every decoder step is reported, blanks included, and each blank is one 80 ms
   encoder frame, so every token has its audio time: the text splits at the exact frame, a full stop
   that comes a few frames late stays with its sentence, and segments carry audio times (the Markdown
   and the You/Them order use them). A 31-minute session decodes as fast at the end as at the start.
@@ -123,9 +124,8 @@ notes change, and can cost general accuracy. Biasing applies a change on the nex
   of NVIDIA's Parakeet TDT 0.6B v3) as a Core ML model from FluidAudio, on the Neural Engine. It
   transcribes each finished segment's audio again, ~0.1 s per segment, and makes half the errors of the
   1.12 s streaming decoder (see the benchmark below). The model (~630 MB) downloads the first time you
-  transcribe; until then, and if it fails, the server's final decoder makes the finals as before. From
-  then on it loads at launch (0.3 s, ~80 MB) and the server runs only the live decoders (`S` payload
-  `;live`). `defaults write dev.ionian.flow parakeetFinals -bool false` turns it off.
+  transcribe; until then, and if it fails, the live decoder's text is the final. The engine runs only
+  the live decoders. `defaults write dev.ionian.flow parakeetFinals -bool false` turns it off.
 - **On speakers** the mic also hears the other side. When the Mac plays through its speakers, a
   display, HDMI or AirPlay, the mic runs through macOS voice processing, which removes what the
   speakers play (any app's audio) and keeps your voice, also while you talk over someone. Other apps
@@ -152,7 +152,7 @@ notes change, and can cost general accuracy. Biasing applies a change on the nex
 - Toggle from scripts or Shortcuts: post the distributed notification `dev.ionian.flow.toggleTranscription`.
 
 ## Benchmark: final text
-`asr/bench_wer.py` on the full FLEURS test sets (862 German, 647 English clips, M5 Pro, November 2026),
+The Python benchmark harness (since removed) ran the full FLEURS test sets (862 German, 647 English clips, M5 Pro, November 2026),
 Nemotron exactly as the app runs it (fp16, lookahead 13, auto language, Latin only), Parakeet through
 `scripts/parakeet-bench`, both scored with the same normalizer (lowercase, no punctuation):
 
@@ -191,21 +191,22 @@ Images in this repo come only from the app's offscreen renderer or from headless
 - `scripts/make-banner.mjs` renders the README banners in `docs/images/` with headless Chromium, from the brand's `tokens.css`, fonts, chrome stills and the Flow sign. It needs Playwright: `npm i playwright && npx playwright install chromium`, then `PLAYWRIGHT_DIR=<folder with node_modules> IONIAN_BRAND=../brand node scripts/make-banner.mjs`.
 
 ## Commands
+`...` means `"build/Ionian Flow.app/Contents/MacOS/IonianFlow"`. The engine tests need
+`IONIAN_FLOW_TEST_DIR`, a folder with an optional `Vocabulary.md`, so they never read your own folders
+(and `--selftest` needs no models). Models come from the Models folder; download them with the app once.
+
 | Command | What it does |
 |---|---|
-| `cd asr && uv run bench.py ../samples/*.wav` | Real-time factor, per-chunk compute, transcripts |
-| `cd asr && uv run server.py --socket /tmp/t.sock`, then `uv run smoke.py ../samples/de.wav --socket /tmp/t.sock` | Stream a WAV through the server at speaking pace |
-| `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --selftest` | Filler-filter and formatter test cases |
-| `cd asr && uv run test_segments.py --socket /tmp/t.sock` | One session cut into segments: texts, audio times, a 35 s silence (server running) |
-| `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --transcribetest /tmp/t.sock you.wav [them.wav] [--no-parakeet]` | Transcription mode on WAV files instead of mic and system audio, 4× real time (server running) |
-| `cd asr && uv run --with pyarrow --with jiwer bench_wer.py prepare FLEURS_DIR DIR`, then `bench_wer.py nemotron DIR`, `swift run -c release --package-path ../scripts/parakeet-bench parakeet-bench DIR`, `bench_wer.py score DIR` | WER of the final text, Nemotron vs. Parakeet (FLEURS `de_de.parquet`, `en_us.parquet` from Hugging Face) |
+| `IONIAN_FLOW_TEST_DIR=<dir> swift run --package-path app IonianFlow --selftest` (or the built binary) | Model-free tests: filler filter, formatter, and every engine unit (live cuts, finalizer guard, hub, polish, summary, sweep) |
+| `... --enginetest-live [--per N] [--data DIR] [--mixed DIR] [--cut-every S] [--vocab FILE]` | Clips through the live decoder: WER, language tags, segment counts |
+| `... --enginetest-dictation vocab DIR`, `dict MANIFEST VOCAB.md OUTDIR`, `latency MANIFEST VOCAB.md` | The dictation final pass on a clip set (hypotheses as JSON lines), and release-to-text latency |
+| `... --enginetest-hub`, `--enginetest-polish`, `--enginetest-summary`, `--enginetest-sweep --vault DIR --out FILE [--no-llm]` | Model hub, cleanup (JSON lines on stdin), summaries on fixtures, vocabulary sweep |
+| `... --e2e-engine load\|reload\|unload\|dictation MANIFEST OUTDIR [perGroup]` | Whole-app engine run: model load and unload, dictation end to end |
+| `... --transcribetest you.wav [them.wav] [--no-parakeet]` | Transcription mode on WAV files (16 kHz mono) instead of mic and system audio, 4× real time |
+| `... --score-dictation`, `--compare-transcribe`, `--make-two-speaker` | WER scoring of dictation hypotheses and of a transcribetest run against its references, and building a two-speaker test file (Swift, `WERScore.swift`) |
 | `open -n "build/Ionian Flow.app" --args --mictest` | Capture 1 s from each input device, write chunk counts and start latency to `/tmp/ionian-flow-mictest.txt` (runs with the app's mic permission) |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --demo` | Loop a fake dictation through the pill (design work, no mic) |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --transcript-demo` | Loop a fake meeting through the transcription panel |
-| `cd asr && uv run polish.py "so the the build is uh twenty percent faster"` | Run the polish LLM on a segment (with a sample glossary) |
-| `cd asr && uv run sweep.py --vault ~/notes --out /tmp/Vocabulary.md` | Learn a vocabulary from a vault (`--no-llm`: rules only) |
-| `cd asr && uv run bench_vocab.py [--vocabulary FILE] [--show]` | Term recall and damage to ordinary speech, boost off vs. on |
-| `cd asr && uv run bench_llm.py mlx:<hf id> ollama:<tag> [--task sweep --vault … --gold …]` | Compare LLMs on transcript polish and vault extraction, with the production prompts |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --onboarding-demo [STEP]` | The setup guide, from step 0 to 4 |
 | `"build/Ionian Flow.app/Contents/MacOS/IonianFlow" --vocabulary-demo [FILE]` | The Ionian Flow window on a copy of a vocabulary file (`IONIAN_FLOW_DEMO_PAGE=General` for another page) |
 | `swift scripts/make-icon.swift app/Resources/AppIcon.icns` | Regenerate the app icon |

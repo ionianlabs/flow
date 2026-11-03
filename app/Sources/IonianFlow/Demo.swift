@@ -97,7 +97,7 @@ func runVocabularyDemo(file: String?) {
     try? FileManager.default.removeItem(at: url)
     if let file { try? FileManager.default.copyItem(atPath: file, toPath: url.path) }
     let store = VocabularyStore(url: url)
-    let sweeper = VaultSweeper(asrDir: "")
+    let sweeper = VaultSweeper()
     let vocabulary = VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in })
     let model = AppModel()
     model.status = "ASR: ready"  // the look of a running app, for design work and screenshots

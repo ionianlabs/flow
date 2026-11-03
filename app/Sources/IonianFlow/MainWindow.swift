@@ -499,7 +499,7 @@ private struct TranscriptionPage: View {
     model.page = page
     model.status = "ASR: ready"
     model.hotkeyActive = true
-    let sweeper = VaultSweeper(asrDir: "")
+    let sweeper = VaultSweeper()
     let store = VocabularyStore(url: file ?? URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ionian-flow-render.md"), watch: false)
     let actions = AppActions(
         toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},

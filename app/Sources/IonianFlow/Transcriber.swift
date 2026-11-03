@@ -132,6 +132,7 @@ private final class Stream {
     var liveFinals: [Int: (text: String, lang: String?, start: Double?, end: Double?)] = [:]
     var parakeet: [Int: String?] = [:]
     var awaitingParakeet: Set<Int> = []
+    var audioSeconds: [Int: Double] = [:]  // main thread: length of the audio sent to Parakeet, per segment index
     // The current segment's audio for Parakeet: written on the audio thread, taken at cuts and at stop.
     private var pcm: [Int16] = []
     private let lock = NSLock()
@@ -160,6 +161,7 @@ private final class Stream {
         liveFinals = [:]
         parakeet = [:]
         awaitingParakeet = []
+        audioSeconds = [:]
     }
 
     init(speaker: Speaker, channel: Channel) {
@@ -339,6 +341,7 @@ final class Transcriber {
     private func finishSegment(_ stream: Stream, index: Int, audio: [Int16]) {
         guard finalPass.isReady, stream.segments[index] != nil, audio.count >= 3_200 else { return }
         stream.awaitingParakeet.insert(index)
+        stream.audioSeconds[index] = Double(audio.count) / 16_000
         finalPass.transcribe(audio) { [weak self] text in
             stream.awaitingParakeet.remove(index)
             stream.parakeet[index] = .some(text)
@@ -386,11 +389,16 @@ final class Transcriber {
         stream.segments[index] = nil
         stream.liveFinals[index] = nil
         let text = (stream.parakeet.removeValue(forKey: index) ?? nil) ?? live.text
+        let seconds = stream.audioSeconds.removeValue(forKey: index)
         if let start = live.start, let end = live.end {
             update(id) {
                 $0.start = stream.started.addingTimeInterval(start)
                 $0.end = stream.started.addingTimeInterval(end)
             }
+        } else if let seconds {
+            // The live decoder heard no word here (Parakeet may have): without word times the end would stay
+            // at the wall time of the last partial. The segment's own audio length gives it.
+            update(id) { $0.end = $0.start.addingTimeInterval(seconds) }
         }
         // The spelling pass runs here for every final: the engine only delivers recognizer text.
         // (Dictation gets it inside the engine's DictationFinal, so it is not applied twice there.)

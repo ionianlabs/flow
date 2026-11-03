@@ -5,7 +5,7 @@ import Foundation
 /// Engine) transcribes every finished segment again. On FLEURS it makes half the streaming
 /// decoder's errors (German 4.5 % vs. 10.7 % WER, English 5.2 % vs. 11.8 %; asr/bench_wer.py) at
 /// ~0.1 s per segment, and leaves the GPU to the live text and the polish LLM. The model (~630 MB)
-/// downloads on first use; until it's ready the streaming decoder's finals are used as before.
+/// loads (downloading once) through ModelHub on first use, shared with dictation; until it's ready the streaming decoder's finals are used as before.
 final class FinalPass {
     /// Loaded once before: later launches load it right away (from disk, 0.3 s).
     static var downloaded: Bool { Settings.parakeetFinals && UserDefaults.standard.bool(forKey: "parakeetDownloaded") }
@@ -15,6 +15,9 @@ final class FinalPass {
     private var loading = false
     private var waiting: [(Bool) -> Void] = []
     private var manager: AsrManager?
+    private let hub: ModelHub
+
+    init(hub: ModelHub = .shared) { self.hub = hub }
 
     /// Loads the model in the background (downloading it once); `done` on main.
     func prepare(_ done: @escaping (Bool) -> Void = { _ in }) {
@@ -22,17 +25,12 @@ final class FinalPass {
         waiting.append(done)
         guard !loading else { return }
         loading = true
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { [hub] in
             var asr: AsrManager?
             do {
                 let t = Date()
-                let models = try await AsrModels.downloadAndLoad(version: .ultra)
-                let manager = AsrManager(config: .default)
-                try await manager.loadModels(models)
-                var state = TdtDecoderState.make()
-                _ = try await manager.transcribe([Float](repeating: 0, count: 16_000), decoderState: &state)
+                asr = try await hub.parakeet().asr  // the one shared instance (also dictation's final)
                 NSLog("Ionian Flow: Parakeet ready (%.1f s)", Date().timeIntervalSince(t))
-                asr = manager
             } catch {
                 NSLog("Ionian Flow: Parakeet unavailable, keeping the streaming finals: %@", error.localizedDescription)
             }
@@ -56,11 +54,14 @@ final class FinalPass {
         let pad = [Float](repeating: 0, count: 4_800)
         var samples = pad + pcm.map { Float($0) / 32_768 } + pad
         if samples.count < 16_000 { samples += [Float](repeating: 0, count: 16_000 - samples.count) }
-        Task.detached(priority: .userInitiated) { [samples] in
-            var state = TdtDecoderState.make()
+        Task.detached(priority: .userInitiated) { [samples, hub] in
             var text: String?
             do {
-                text = try await manager.transcribe(samples, decoderState: &state).text
+                // On the shared model lane, so a segment and a dictation final never overlap.
+                text = try await hub.serial {
+                    var state = TdtDecoderState.make()
+                    return try await manager.transcribe(samples, decoderState: &state).text
+                }
             } catch {
                 NSLog("Ionian Flow: Parakeet failed on a segment: %@", error.localizedDescription)
             }

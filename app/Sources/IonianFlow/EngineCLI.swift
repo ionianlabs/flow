@@ -13,6 +13,7 @@ enum EngineCLI {
             ("--enginetest-polish", PolisherCLI.cli),         // E
             ("--enginetest-summary", SummarizerCLI.cli),      // F
             ("--enginetest-sweep", VaultSweep.cli),           // F
+            ("--e2e-engine", E2E.cli),                        // integration
         ]
         for (flag, handler) in routes {
             if let i = args.firstIndex(of: flag) { return handler(Array(args[(i + 1)...])) }

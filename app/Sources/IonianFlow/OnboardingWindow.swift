@@ -380,8 +380,11 @@ private struct TryStep: View {
                         }
                     }
                 HStack(spacing: Space.s3) {
-                    StatusDot(state: model.recognizerReady ? .ready : .working, word: model.recognizerReady ? "Ready" : "Starting")
-                    if !model.recognizerReady {
+                    StatusDot(state: model.recognizerReady ? .ready : model.recognizerFailed ? .off : .working,
+                              word: model.recognizerReady ? "Ready" : model.recognizerFailed ? "Error" : "Loading models")
+                    if model.recognizerFailed {
+                        Text("The speech models didn't load. Try Reload in Settings.").ionianText(IonianType.small).foregroundStyle(Color.muted)
+                    } else if !model.recognizerReady {
                         Text("The first start takes a moment.").ionianText(IonianType.small).foregroundStyle(Color.muted)
                     }
                 }

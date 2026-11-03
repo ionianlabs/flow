@@ -290,8 +290,12 @@ enum ModelStoreTests {
             check(monotonic(p2) && p2.last == 1, "run 2 progress monotonic to 1 (\(p2.count) updates, first \(String(format: "%.3f", p2.first ?? -1)))")
             check(store.isInstalled(.speech), "installed after resume; \(mb(total)) on disk, resume took \(String(format: "%.0f", secs2)) s")
             // Files complete at cancel (not .partial) must be byte-identical in size afterwards.
-            let completed = inv1.filter { !$0.key.hasSuffix(".partial") }
+            let completed = inv1.filter { !$0.key.contains(".partial") }
             let changed = completed.filter { inv2[$0.key] != $0.value }
+            for c in changed { print("     changed: \(c.key) \(c.value) -> \(inv2[c.key].map(String.init) ?? "gone")") }
+            let partialBytes = inv1.filter { $0.key.hasSuffix(".partial") }
+            print("     partials at cancel: \(partialBytes.map { "\($0.key) \(mb($0.value))" })")
+            for (k, v) in partialBytes { let f = String(k.dropLast(8)); print("     partial \(f): final size \(inv2[f].map(mb) ?? "missing")") }
             check(changed.isEmpty, "\(completed.count) files complete at cancel kept their size (\(mb(completed.values.reduce(0, +)))); remaining to fetch \(mb(total - completed.values.reduce(0, +)))")
             // Load and transcribe from the temp root.
             do {

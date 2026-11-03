@@ -1,6 +1,6 @@
 import Foundation
 
-// Unit F (summaries). Port of asr/polish.py summary: 12k-character chunks, notes, then JSON; clean_summary
+// Unit F (summaries). Port of the former Python polish.py summary: 12k-character chunks, notes, then JSON; clean_summary
 // (tags, keywords present in the transcript, date grounding with WHEN_DE); empty result = nil (no summary).
 // Gemma comes from ModelHub.gemma(); generation runs inside ModelHub.serial (see VaultSweepLLM.swift).
 

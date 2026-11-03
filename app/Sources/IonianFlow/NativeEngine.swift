@@ -6,7 +6,7 @@ import Foundation
 // (buffer PCM, call an UtteranceFinalizer on end()), and forwarding polish/summarize to Polisher/Summarizer.
 // Streaming itself lives in NativeLive.swift (LiveStream).
 //
-// Differences from asr/server.py's Session, on purpose:
+// Differences from the former Python server.py's Session, on purpose:
 //  - Live text only (the ";live" mode the app used for transcription). The second, slower final decoder is gone:
 //    dictation finals come from the UtteranceFinalizer, transcription finals are the live finals.
 //  - `lang` is the manager's first detected language tag of the session (FluidAudio exposes only that one);

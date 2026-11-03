@@ -9,9 +9,10 @@ import MLX
 // public members of `ModelStore`.
 //  - Everything lives under `ModelStore.root` (~/Library/Application Support/Ionian Flow/Models), offline after
 //    the first run. Nothing is hosted by us: speech models come from FluidAudio's Hugging Face repos, Gemma from
-//    mlx-community on Hugging Face, mlx.metallib from the MLX build (see activateMetallib).
+//    mlx-community on Hugging Face. MLX's Metal kernels (mlx.metallib) are compiled at build time and ship inside
+//    the signed app (Resources/mlx.metallib, see activateMetallib): nothing about them is downloaded.
 //  - `.speech` is required (Nemotron live, Parakeet final, CTC vocabulary). `.cleanup` is optional (Gemma 4 E2B
-//    plus mlx.metallib): skipping it turns cleanup, summaries and LLM vault extraction off; the sweep runs rules only.
+//    only): skipping it turns cleanup, summaries and LLM vault extraction off; the sweep runs rules only.
 //  - Downloads are resumable and idempotent: calling `download` for an installed item returns at once.
 //  - Developer switches: IONIAN_FLOW_MODELS overrides the root; IONIAN_FLOW_DEV_HF_CACHE=1 makes ModelHub read the
 //    Hugging Face / FluidAudio caches that Python tools left behind. Release builds never set either.
@@ -185,8 +186,6 @@ final class ModelStore: @unchecked Sendable {
         speechDirectory.appendingPathComponent(CtcModels.defaultCacheDirectory(for: .ctc110m).lastPathComponent)
     }
     static var gemmaDirectory: URL { root.appendingPathComponent("gemma-4-e2b-it-4bit", isDirectory: true) }
-    /// Where MLX's Metal kernels live (see `activateMetallib`).
-    static var metallibURL: URL { root.appendingPathComponent("mlx/mlx.metallib") }
 
     /// mlx-community/gemma-4-e2b-it-4bit at a pinned revision (Gemma terms; see ThirdPartyNotices.md).
     static let gemmaRevision = "238767527555cb75a05732a84dff5d6ba0dd6809"
@@ -331,9 +330,27 @@ final class ModelStore: @unchecked Sendable {
 
     // MARK: MLX Metal kernels
 
-    /// Points MLX at our mlx.metallib (MLX.GPU.metallib, mlx-swift's public override) when it is on disk.
-    /// Must run before MLX's first GPU use. Without the file MLX falls back to its own lookup (next to the binary).
+    /// Where MLX's compiled Metal kernels are, first hit wins: IONIAN_FLOW_METALLIB (developer override), the app
+    /// bundle's Resources/mlx.metallib, then mlx.metallib next to the binary or in a parent folder (a bare
+    /// `swift build` binary under app/.build/<triple>/<config>/ finds the app/.build/mlx.metallib that
+    /// scripts/build-metallib.sh writes). nil when none exists.
+    static func metallibLocation(env: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
+        let fm = FileManager.default
+        if let p = env["IONIAN_FLOW_METALLIB"], !p.isEmpty { return fm.fileExists(atPath: p) ? URL(fileURLWithPath: p) : nil }
+        if let r = Bundle.main.resourceURL?.appendingPathComponent("mlx.metallib"), fm.fileExists(atPath: r.path) { return r }
+        var dir = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
+            .resolvingSymlinksInPath().deletingLastPathComponent()
+        for _ in 0..<5 {
+            let c = dir.appendingPathComponent("mlx.metallib")
+            if fm.fileExists(atPath: c.path) { return c }
+            dir = dir.deletingLastPathComponent()
+        }
+        return nil
+    }
+
+    /// Points MLX at the app's own mlx.metallib (MLX.GPU.metallib, mlx-swift's public override). Must run before
+    /// MLX's first GPU use. Without a file MLX falls back to its own lookup (next to the binary).
     static func activateMetallib() {
-        if FileManager.default.fileExists(atPath: metallibURL.path) { GPU.metallib = metallibURL }
+        if let u = metallibLocation() { GPU.metallib = u }
     }
 }

@@ -1,8 +1,10 @@
 import FluidAudio
 import Foundation
+import MLX
 import MLXHuggingFace
 import MLXLLM
 import MLXLMCommon
+import Tokenizers
 
 // Unit D (ModelHub). The single owner of every model in the process (24 GB machine, one process):
 // lazy loads, one serial lane for Parakeet/CTC/Gemma work, unload policy, memory sampling.
@@ -32,23 +34,137 @@ actor ModelHub {
 
     init() {}
 
-    /// Nemotron multilingual streaming manager for one channel (560 ms chunks, Latin ship), loaded lazily.
-    func nemotron(_ channel: Channel) async throws -> StreamingNemotronMultilingualAsrManager { fatalError("Unit D") }
+    // One in-flight/finished load Task per model; concurrent callers await the same Task (no double load).
+    private var nemotronTasks: [Channel: Task<StreamingNemotronMultilingualAsrManager, Error>] = [:]
+    private var parakeetTask: Task<ParakeetModels, Error>?
+    private var gemmaTask: Task<ModelContainer, Error>?
+    private var loadedSet: Set<HubModel> = []
+    /// How many times each model really loaded (test hook: must stay at 1 without an unload in between).
+    private(set) var loadCounts: [HubModel: Int] = [:]
+    /// Wall seconds of the last load per model (test/log hook).
+    private(set) var loadSeconds: [HubModel: Double] = [:]
 
-    /// Parakeet Ultra + CTC (ctc110m), loaded lazily.
-    func parakeet() async throws -> ParakeetModels { fatalError("Unit D") }
+    private func record(_ m: HubModel, _ t0: Date) {
+        loadedSet.insert(m)
+        loadCounts[m, default: 0] += 1
+        loadSeconds[m] = Date().timeIntervalSince(t0)
+    }
+
+    /// Nemotron multilingual streaming manager for one channel (560 ms chunks, Latin ship), loaded lazily.
+    /// The logits step decoder that vocabulary biasing needs is loaded by FluidAudio on the first
+    /// `setCustomVocabulary` call (it is skipped by default to save memory).
+    func nemotron(_ channel: Channel) async throws -> StreamingNemotronMultilingualAsrManager {
+        if let t = nemotronTasks[channel] { return try await t.value }
+        let which: HubModel = channel == .mic ? .nemotronMic : .nemotronSystem
+        let t = Task { () -> StreamingNemotronMultilingualAsrManager in
+            let t0 = Date()
+            let dir = try await StreamingNemotronMultilingualAsrManager.downloadVariant(languageCode: "de", chunkMs: 560)
+            let m = StreamingNemotronMultilingualAsrManager()
+            try await m.loadModels(from: dir)
+            _ = try await m.process(samples: [Float](repeating: 0, count: 16000))
+            _ = try await m.finish()
+            await m.reset()
+            await self.record(which, t0)
+            return m
+        }
+        nemotronTasks[channel] = t
+        do { return try await t.value } catch { if nemotronTasks[channel] != nil { nemotronTasks[channel] = nil }; throw error }
+    }
+
+    /// Parakeet Ultra + CTC (ctc110m), ONE shared instance, loaded lazily.
+    func parakeet() async throws -> ParakeetModels {
+        if let t = parakeetTask { return try await t.value }
+        let t = Task { () -> ParakeetModels in
+            let t0 = Date()
+            let models = try await AsrModels.downloadAndLoad(version: .ultra)
+            let asr = AsrManager(config: .default)
+            try await asr.loadModels(models)
+            var warm = TdtDecoderState.make()
+            _ = try await asr.transcribe([Float](repeating: 0, count: 16000), decoderState: &warm)
+            let ctc = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+            await self.record(.parakeet, t0)
+            return ParakeetModels(asr: asr, ctc: ctc)
+        }
+        parakeetTask = t
+        do { return try await t.value } catch { parakeetTask = nil; throw error }
+    }
 
     /// Gemma 4 E2B (4 bit), loaded lazily. Throws .modelMissing("gemma") when not downloaded.
-    func gemma() async throws -> ModelContainer { fatalError("Unit D") }
+    func gemma() async throws -> ModelContainer {
+        if let t = gemmaTask { return try await t.value }
+        guard let dir = Self.gemmaDirectory() else { throw EngineError.modelMissing("gemma") }
+        let t = Task { () -> ModelContainer in
+            let t0 = Date()
+            let c = try await LLMModelFactory.shared.loadContainer(from: dir, using: #huggingFaceTokenizerLoader())
+            await self.record(.gemma, t0)
+            return c
+        }
+        gemmaTask = t
+        do { return try await t.value } catch { gemmaTask = nil; throw error }
+    }
+
+    /// Newest cached snapshot of the Gemma weights, if complete.
+    private nonisolated static func gemmaDirectory() -> URL? {
+        let home = ProcessInfo.processInfo.environment["HF_HOME"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/huggingface")
+        let snaps = home.appendingPathComponent("hub/models--mlx-community--gemma-4-e2b-it-4bit/snapshots")
+        let dirs = (try? FileManager.default.contentsOfDirectory(at: snaps, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let fm = FileManager.default
+        return dirs.sorted {
+            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return a > b
+        }.first { fm.fileExists(atPath: $0.appendingPathComponent("config.json").path)
+            && fm.fileExists(atPath: $0.appendingPathComponent("model.safetensors").path) }
+    }
 
     /// True when the cleanup model is on disk (drives EngineCapabilities.polish/.summary). Cheap, no load.
-    nonisolated func gemmaAvailable() -> Bool { fatalError("Unit D") }
+    nonisolated func gemmaAvailable() -> Bool { Self.gemmaDirectory() != nil }
 
-    func isLoaded(_ m: HubModel) -> Bool { fatalError("Unit D") }
-    /// Drop a model from memory (the next accessor reloads it).
-    func unload(_ m: HubModel) async { fatalError("Unit D") }
-    /// Physical footprint of the process in MB (as coexist-bench physFootprintMB).
-    nonisolated func footprintMB() -> Double { fatalError("Unit D") }
+    func isLoaded(_ m: HubModel) -> Bool { loadedSet.contains(m) }
+
+    /// Drop a model from memory (the next accessor reloads it). Callers that still hold the instance keep it
+    /// alive until they let go, so drop your references first. Gemma also clears MLX's buffer cache.
+    ///
+    /// Unload policy (deliberately simple): the hub never unloads on its own. The owner of each model decides:
+    ///  - Gemma (~3 GB with the GPU cache) is the one worth dropping: call `unload(.gemma)` when no
+    ///    polish/summary/sweep job has run for a while (suggested 10 min idle) or on memory pressure
+    ///    (see `onMemoryPressure`). The reload costs a few seconds.
+    ///  - Nemotron managers are dropped when their session ends only if the app wants the memory back.
+    ///  - Parakeet is shared by dictation and the final pass; keep it unless under critical pressure.
+    func unload(_ m: HubModel) async {
+        switch m {
+        case .nemotronMic: nemotronTasks[.mic] = nil
+        case .nemotronSystem: nemotronTasks[.system] = nil
+        case .parakeet: parakeetTask = nil
+        case .gemma: gemmaTask = nil
+        }
+        loadedSet.remove(m)
+        if m == .gemma { MLX.Memory.clearCache() }
+    }
+
+    private var pressureSource: DispatchSourceMemoryPressure?
+    /// Install a system memory-pressure handler: on warning/critical it unloads Gemma (the cheapest to
+    /// reload, the largest to hold). Idempotent. Call once at app start if wanted.
+    func installMemoryPressureHandler() {
+        guard pressureSource == nil else { return }
+        let src = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
+        src.setEventHandler { Task { await ModelHub.shared.unload(.gemma) } }
+        src.resume()
+        pressureSource = src
+    }
+
+    /// Physical footprint of the process in MB (TASK_VM_INFO phys_footprint). Core ML weights mostly do not show here.
+    nonisolated func footprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let r = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return r == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+    }
 
     /// Run `work` alone on the shared model lane: FIFO, one job at a time, held across awaits.
     nonisolated func serial<T>(_ work: () async throws -> T) async rethrows -> T {

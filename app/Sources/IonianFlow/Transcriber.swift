@@ -77,46 +77,6 @@ final class TranscriptModel: ObservableObject {
     }
 }
 
-/// Cuts a continuous stream into segments at pauses, so every finished segment can be shown as
-/// final and polished right away. Runs on the audio thread.
-private struct Segmenter {
-    private var samples = 0
-    private var silent = 0
-    private var heard = false
-    private var floor: Float = 0.01
-    private static let rate = 16_000
-
-    static func rms(_ pcm: Data) -> Float {
-        pcm.withUnsafeBytes { raw in
-            let s = raw.bindMemory(to: Int16.self)
-            var sum: Float = 0
-            for v in s { let f = Float(v) / 32768; sum += f * f }
-            return sqrt(sum / Float(max(1, s.count)))
-        }
-    }
-
-    /// Feeds one chunk; at a cut, how many samples before the chunk's end the segment ends: the
-    /// middle of the pause.
-    mutating func feed(_ pcm: Data) -> Int? {
-        let rms = Self.rms(pcm), n = pcm.count / 2
-        // Noise floor: follows quiet stretches down at once, creeps up slowly during speech.
-        floor = rms < floor ? rms : floor + (rms - floor) * 0.005
-        let speech = rms > max(0.006, floor * 3)
-        samples += n
-        silent = speech ? 0 : silent + n
-        heard = heard || speech
-        let seconds = Double(samples) / Double(Self.rate), pause = Double(silent) / Double(Self.rate)
-        // Pauses only end a segment that has speech in it; silence just keeps streaming.
-        let cut = heard && ((seconds >= 2 && pause >= 0.7) || (seconds >= 20 && pause >= 0.3))
-        guard cut || seconds >= 40 else { return nil }
-        let back = cut ? silent / 2 : 0
-        samples = back
-        silent = back
-        heard = false
-        return back
-    }
-}
-
 /// One audio source and its engine session.
 private final class Stream {
     let speaker: Speaker
@@ -204,6 +164,7 @@ final class Transcriber {
         them.reset()
         model.cleanupOff = !cleanupAvailable
         if cleanupAvailable { engine.polish(id: 0, text: "", before: "") }  // load the LLM while the first segment is spoken
+        Task { await Segmenter.prepare() }  // pause detection; the energy gate cuts until it's loaded
         if !finalPass.isReady { finalPass.prepare() }  // takes over from the next segment once loaded
 
         mic.warmSeconds = 0

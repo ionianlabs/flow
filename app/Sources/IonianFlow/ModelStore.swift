@@ -184,6 +184,11 @@ final class ModelStore: @unchecked Sendable {
     static var ctcDirectory: URL {
         speechDirectory.appendingPathComponent(CtcModels.defaultCacheDirectory(for: .ctc110m).lastPathComponent)
     }
+    /// Silero VAD for transcription segments: VadManager's base directory (it adds Models/silero-vad-coreml).
+    static var vadDirectory: URL { speechDirectory.appendingPathComponent("vad", isDirectory: true) }
+    static var vadModelDirectory: URL {
+        vadDirectory.appendingPathComponent("Models/silero-vad-coreml/\(ModelNames.VAD.sileroVadFile)", isDirectory: true)
+    }
     static var gemmaDirectory: URL { root.appendingPathComponent("gemma-4-e2b-it-4bit", isDirectory: true) }
     /// Where MLX's Metal kernels live (see `activateMetallib`).
     static var metallibURL: URL { root.appendingPathComponent("mlx/mlx.metallib") }
@@ -207,7 +212,7 @@ final class ModelStore: @unchecked Sendable {
     }()
 
     /// Approximate sizes of FluidAudio's downloads (measured on disk): Nemotron de/560 ms, Parakeet Ultra, CTC 110m.
-    private static let speechParts: [Int64] = [611_000_000, 632_000_000, 103_000_000]
+    private static let speechParts: [Int64] = [611_000_000, 632_000_000, 103_000_000, 2_000_000]
 
     private let lock = NSLock()
     private var flags: [ModelItem: CancelFlag] = [:]
@@ -238,6 +243,7 @@ final class ModelStore: @unchecked Sendable {
         return nemotron
             && AsrModels.modelsExist(at: parakeetDirectory, version: .ultra)
             && CtcModels.modelsExist(at: ctcDirectory)
+            && FileManager.default.fileExists(atPath: vadModelDirectory.path)
             && !hasPartial(speechDirectory)
     }
 
@@ -322,6 +328,7 @@ final class ModelStore: @unchecked Sendable {
                 to: Self.speechDirectory, progressHandler: stage(0))
             _ = try await AsrModels.download(to: Self.parakeetDirectory, version: .ultra, progressHandler: stage(1))
             _ = try await CtcModels.download(to: Self.ctcDirectory, variant: .ctc110m)
+            _ = try await VadManager(modelDirectory: Self.vadDirectory)  // downloads (about 2 MB) and loads once
         }
         flag.setOnCancel { work.cancel() }
         defer { flag.setOnCancel(nil) }

@@ -184,6 +184,8 @@ enum PolishRules {
 
 final class Polisher: @unchecked Sendable {
     private let hub: ModelHub
+    /// The model's unfiltered output of the last polish (diagnostics for the parity test).
+    private(set) var lastRaw = ""
     /// Where the glossary comes from; the app reads the vocabulary file, tests inject their own.
     var vocabulary: @Sendable () -> PolishVocabulary?
 
@@ -223,6 +225,7 @@ final class Polisher: @unchecked Sendable {
         let context = PolishRules.context(v, text: text)
         let m = PolishRules.messages(text, context: context, before: before)
         guard let raw = try? await generate(system: m.system, user: m.user, maxTokens: PolishRules.maxTokens(text)) else { return nil }
+        lastRaw = raw
         let out = PolishRules.finish(text, raw, context: context) { problem in
             FileHandle.standardError.write(Data("polish output rejected (\(problem))\n".utf8))
         }
@@ -236,8 +239,10 @@ final class Polisher: @unchecked Sendable {
             let input = try await container.prepare(
                 input: UserInput(chat: [.system(system), .user(user)], additionalContext: ["enable_thinking": false]))
             var params = GenerateParameters(maxTokens: maxTokens, temperature: 0)
-            // n-1 prefill: without it the decode iterator computes lm_head logits for every prompt position.
-            params.prefill.stepSize = max(1, input.text.tokens.size - 1)
+            // Prefill all but the last token(s) without logits: handed whole, the decode iterator computes lm_head
+            // logits for every prompt position (~2x slower). n-1 flips one near-tie case against Python's output
+            // (a "Uhr"); n-2 matches mlx-lm on all 16 bench cases and costs the same.
+            params.prefill.stepSize = max(1, input.text.tokens.size - 2)
             let stream = try await container.generate(input: input, parameters: params)
             var out = ""
             for await g in stream {
@@ -303,7 +308,7 @@ enum PolisherCLI {
             let t = Date()
             // nil = fall back to the raw text, which is also what the Python finish() returns on a rejection.
             let out = await polisher.polish(text: text, before: req["before"] as? String ?? "", vocabulary: vocab) ?? text
-            emit(["text": out, "ms": Date().timeIntervalSince(t) * 1000])
+            emit(["text": out, "ms": Date().timeIntervalSince(t) * 1000, "raw": polisher.lastRaw])
         }
         return 0
     }

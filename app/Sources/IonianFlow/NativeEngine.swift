@@ -123,6 +123,7 @@ final class NativeEngine: SpeechEngine, @unchecked Sendable {
     func stop() {
         lock.lock()
         stopped = true
+        _ready = false  // start() announces .ready again
         let streams = Array(active.values)
         active = [:]
         lock.unlock()

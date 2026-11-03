@@ -415,7 +415,7 @@ enum NativeLive {
         return ok
     }
 
-    /// `--enginetest-live [--socket PATH] [--per N] [--mixed DIR] [--data DIR] [--cut-every SECONDS] [--no-python]`
+    /// `--enginetest-live [--socket PATH] [--per N] [--mixed DIR] [--data DIR] [--cut-every SECONDS] [--vocab FILE] [--no-python]`
     /// Runs clips through NativeEngine and the Python server (own socket, see LiveParity) and prints the parity numbers.
     static func cli(_ args: [String]) -> Int32 {
         var done = false, code: Int32 = 0
@@ -637,7 +637,8 @@ enum LiveParity {
         say("\(clips.count) clips + \(mixed.count) mixed; cuts every \(cutEvery) s in the second pass")
 
         let collector = Collector()
-        let engine = NativeEngine(finalizer: nil, vocabularyURL: nil, useVocabulary: false)
+        let vocab = opt("--vocab", "")
+        let engine = NativeEngine(finalizer: nil, vocabularyURL: vocab.isEmpty ? nil : URL(fileURLWithPath: vocab), useVocabulary: !vocab.isEmpty)
         engine.onEvent = { collector.add($0) }
         engine.start()
         let t0 = Date()
@@ -706,9 +707,29 @@ enum LiveParity {
             }
         }
 
+        // Dictation sessions: the finalizer's text replaces the live final; empty falls back to the live text.
+        struct Fake: UtteranceFinalizer {
+            let reply: String
+            func finalize(pcm: [Float], lang: String?) async -> String { reply.isEmpty ? "" : "\(reply) \(pcm.count) \(lang ?? "auto")" }
+        }
+        if let c = clips.first, let pcm = try? readWav(c.wav) {
+            for reply in ["FAKE", ""] {
+                let de = NativeEngine(finalizer: Fake(reply: reply), vocabularyURL: nil, useVocabulary: false)
+                let col = Collector()
+                de.onEvent = { col.add($0) }
+                let id = de.beginSession(SessionOptions(language: localeFor(c.lang), channel: .mic, kind: .dictation))
+                de.push(id, pcm: pcm); de.cut(id, at: 16000); de.end(id)
+                let t = Date()
+                while col.finals() < 1, Date().timeIntervalSince(t) < 60 { try? await Task.sleep(nanoseconds: 20_000_000) }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                let fin = col.take().compactMap { e -> String? in if case .final(_, let seg, let text, _, _, _) = e { return "seg \(seg): \(text)" } else { return nil } }
+                say("dictation finalizer \(reply.isEmpty ? "empty (fallback)" : "set"): \(fin)")
+            }
+        }
+
         say("\n== Parity (WER is word error rate against the references, lowercased, punctuation dropped)")
-        say(String(format: "FLEURS+VoxPopuli (%d clips): native %.2f %%   python live %.2f %%", native.clips, native.wer, pyLive.wer))
-        say(String(format: "Mixed de/en (%d clips): native %.2f %%   python live %.2f %%", nativeMixed.clips, nativeMixed.wer, pyMixed.wer))
+        say(String(format: "FLEURS+VoxPopuli (%d clips): native %.2f %%   python live %@", native.clips, native.wer, usePython ? String(format: "%.2f %%", pyLive.wer) : "n/a"))
+        say(String(format: "Mixed de/en (%d clips): native %.2f %%   python live %@", nativeMixed.clips, nativeMixed.wer, usePython ? String(format: "%.2f %%", pyMixed.wer) : "n/a"))
         say("Identical word sequence to Python live: \(agree) of \(compared) clips")
         say("Non-Latin outputs: native \(native.leaks + nativeMixed.leaks), python \(pyLive.leaks + pyMixed.leaks)")
         say("Cut runs: \(cutRuns) clips; equal segment count \(countEqual); boundary word-offset diff max \(boundaryDiffs.max() ?? 0), mean \(String(format: "%.2f", Double(boundaryDiffs.reduce(0, +)) / Double(max(1, boundaryDiffs.count))))")

@@ -58,7 +58,9 @@ actor ModelHub {
         let which: HubModel = channel == .mic ? .nemotronMic : .nemotronSystem
         let t = Task { () -> StreamingNemotronMultilingualAsrManager in
             let t0 = Date()
-            let dir = try await StreamingNemotronMultilingualAsrManager.downloadVariant(languageCode: "de", chunkMs: 560)
+            let dir = try await StreamingNemotronMultilingualAsrManager.downloadVariant(
+                languageCode: ModelStore.nemotronLanguage, chunkMs: ModelStore.nemotronChunkMs,
+                to: ModelStore.devCaches ? nil : ModelStore.speechDirectory)
             let m = StreamingNemotronMultilingualAsrManager()
             try await m.loadModels(from: dir)
             _ = try await m.process(samples: [Float](repeating: 0, count: 16000))
@@ -76,12 +78,12 @@ actor ModelHub {
         if let t = parakeetTask { return try await t.value }
         let t = Task { () -> ParakeetModels in
             let t0 = Date()
-            let models = try await AsrModels.downloadAndLoad(version: .ultra)
+            let models = try await AsrModels.downloadAndLoad(to: ModelStore.devCaches ? nil : ModelStore.parakeetDirectory, version: .ultra)
             let asr = AsrManager(config: .default)
             try await asr.loadModels(models)
             var warm = TdtDecoderState.make()
             _ = try await asr.transcribe([Float](repeating: 0, count: 16000), decoderState: &warm)
-            let ctc = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+            let ctc = try await CtcModels.downloadAndLoad(to: ModelStore.devCaches ? nil : ModelStore.ctcDirectory, variant: .ctc110m)
             await self.record(.parakeet, t0)
             return ParakeetModels(asr: asr, ctc: ctc)
         }
@@ -95,6 +97,7 @@ actor ModelHub {
         guard let dir = Self.gemmaDirectory() else { throw EngineError.modelMissing("gemma") }
         let t = Task { () -> ModelContainer in
             let t0 = Date()
+            ModelStore.activateMetallib()
             let c = try await LLMModelFactory.shared.loadContainer(from: dir, using: #huggingFaceTokenizerLoader())
             await self.record(.gemma, t0)
             return c
@@ -103,8 +106,14 @@ actor ModelHub {
         do { return try await t.value } catch { gemmaTask = nil; throw error }
     }
 
-    /// Newest cached snapshot of the Gemma weights, if complete.
+    /// Our own Gemma copy (ModelStore.root) when complete; otherwise, only with IONIAN_FLOW_DEV_HF_CACHE=1, the newest
+    /// complete snapshot in the Hugging Face cache that Python tools left behind.
     private nonisolated static func gemmaDirectory() -> URL? {
+        if ModelStore.filesInstalled(ModelStore.gemmaFiles, at: ModelStore.gemmaDirectory) { return ModelStore.gemmaDirectory }
+        return ModelStore.devCaches ? devGemmaDirectory() : nil
+    }
+
+    private nonisolated static func devGemmaDirectory() -> URL? {
         let home = ProcessInfo.processInfo.environment["HF_HOME"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/huggingface")
         let snaps = home.appendingPathComponent("hub/models--mlx-community--gemma-4-e2b-it-4bit/snapshots")

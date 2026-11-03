@@ -5,6 +5,8 @@ import UserNotifications
 
 IonianFont.register()
 
+if let rc = EngineCLI.run(CommandLine.arguments) { exit(rc) }
+
 if let i = CommandLine.arguments.firstIndex(of: "--vocab-normalize"), CommandLine.arguments.count > i + 2 {
     exit(VocabNormalizer.normalizeFile(vocabulary: CommandLine.arguments[i + 1], input: CommandLine.arguments[i + 2]) ? 0 : 1)
 }
@@ -19,7 +21,8 @@ if CommandLine.arguments.contains("--selftest") {
     let echo = Transcriber.echoSelfTest()
     let vocabulary = VocabularyStore.selfTest()
     let normalizer = VocabNormalizer.selfTest()
-    exit(fillers && formatting && echo && vocabulary && normalizer ? 0 : 1)
+    let engine = EngineSelfTests.all()
+    exit(fillers && formatting && echo && vocabulary && normalizer && engine ? 0 : 1)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {

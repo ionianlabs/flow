@@ -143,7 +143,8 @@ enum E2E {
         let after = (MLX.Memory.activeMemory, MLX.Memory.cacheMemory)
         say("after unload(.gemma): \(mem())")
         let freed = Double(loaded.0 + loaded.1 - after.0 - after.1) / 1_048_576
-        say(String(format: "freed %.0f MB of %.0f MB (isLoaded=%d)", freed, Double(loaded.0 + loaded.1) / 1_048_576, hub.isLoaded(.gemma) ? 1 : 0))
+        let stillLoaded = await hub.isLoaded(.gemma)
+        say(String(format: "freed %.0f MB of %.0f MB (isLoaded=%d)", freed, Double(loaded.0 + loaded.1) / 1_048_576, stillLoaded ? 1 : 0))
         // Reload works afterwards.
         engine.polish(id: 3, text: "and then we go home", before: "")
         let again = await waitFor({ if case .polished(3, _) = $0 { return true } else { return false } })

@@ -153,6 +153,22 @@ final class ResumableFetch: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     }
 }
 
+/// Forwards progress only when it grew by 0.1 % or more (never backwards), and always the final 1.
+final class Monotonic: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = -1.0
+    private let sink: @Sendable (Double) -> Void
+    init(_ sink: @escaping @Sendable (Double) -> Void) { self.sink = sink }
+    func report(_ p: Double) {
+        let v = min(1, max(0, p))
+        lock.lock()
+        let emit = v >= 1 ? last < 1 : v >= last + 0.001
+        if emit { last = v }
+        lock.unlock()
+        if emit { sink(v) }
+    }
+}
+
 final class ModelStore: @unchecked Sendable {
     static let shared = ModelStore()
 
@@ -235,12 +251,17 @@ final class ModelStore: @unchecked Sendable {
         }
     }
 
-    private static func speechInstalled() -> Bool {
+    /// Every Nemotron bundle with its weights, plus tokenizer and metadata.
+    private static func nemotronInstalled() -> Bool {
         let fm = FileManager.default
         let v = nemotronVariantDirectory
-        let nemotron = ["preprocessor.mlmodelc", "encoder.mlmodelc", "decoder.mlmodelc", "joint.mlmodelc", "tokenizer.json", "metadata.json"]
-            .allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).path) }
-        return nemotron
+        return ["preprocessor.mlmodelc", "encoder.mlmodelc", "decoder.mlmodelc", "joint.mlmodelc"]
+            .allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).appendingPathComponent("weights/weight.bin").path) }
+            && ["tokenizer.json", "metadata.json"].allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).path) }
+    }
+
+    private static func speechInstalled() -> Bool {
+        return nemotronInstalled()
             && AsrModels.modelsExist(at: parakeetDirectory, version: .ultra)
             && CtcModels.modelsExist(at: ctcDirectory)
             && FileManager.default.fileExists(atPath: vadModelDirectory.path)
@@ -266,8 +287,8 @@ final class ModelStore: @unchecked Sendable {
     func download(_ item: ModelItem, progress: @escaping @Sendable (Double) -> Void) async throws {
         if isInstalled(item) { progress(1); return }
         let flag = CancelFlag()
-        lock.lock(); flags[item] = flag; lock.unlock()
-        defer { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
+        register(item, flag)
+        defer { unregister(item, flag) }
         do {
             switch item {
             case .speech: try await downloadSpeech(flag, progress)
@@ -280,6 +301,9 @@ final class ModelStore: @unchecked Sendable {
         }
         progress(1)
     }
+
+    private func register(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); flags[item] = flag; lock.unlock() }
+    private func unregister(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
 
     /// Stops a running download of the item; partial files stay for the next resume.
     func cancel(_ item: ModelItem) {
@@ -318,6 +342,14 @@ final class ModelStore: @unchecked Sendable {
     /// Stages are weighted by approximate size; FluidAudio reports per-stage fractions.
     private func downloadSpeech(_ flag: CancelFlag, _ progress: @escaping @Sendable (Double) -> Void) async throws {
         let parts = Self.speechParts.map(Double.init), total = parts.reduce(0, +)
+        // FluidAudio treats a Nemotron variant as cached as soon as metadata.json exists, and it downloads that file
+        // before the large weights. After a cancel the variant is incomplete but looks cached: drop the marker so the
+        // next call re-enters the (resumable, per-file) download. Finished files and .partial files stay.
+        if !Self.nemotronInstalled() {
+            try? FileManager.default.removeItem(at: Self.nemotronVariantDirectory.appendingPathComponent("metadata.json"))
+        }
+        let meter = Monotonic(progress)
+        let progress: @Sendable (Double) -> Void = { meter.report($0) }
         func stage(_ i: Int) -> @Sendable (DownloadProgress) -> Void {
             let base = parts[..<i].reduce(0, +), part = parts[i]
             return { p in progress(min(1, (base + p.fractionCompleted * part) / total)) }

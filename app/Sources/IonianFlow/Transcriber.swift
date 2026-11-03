@@ -148,7 +148,9 @@ final class Transcriber {
     private var summaryID = 0
     private var pendingSummaries: [Int: URL] = [:]  // summary request -> its transcript file
     /// The cleanup model is downloaded: segments get polished, the transcript a summary.
-    var cleanupAvailable: Bool { engine.capabilities.contains(.polish) }
+    var cleanupAvailable: Bool { !cleanupDisabled && engine.capabilities.contains(.polish) }
+    /// --transcribetest --no-polish: score the Parakeet finals themselves; the LLM's wording varies run to run.
+    var cleanupDisabled = false
 
     init(engine: SpeechEngine, mic: AudioCapture) {
         self.mic = mic

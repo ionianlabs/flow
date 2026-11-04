@@ -57,8 +57,9 @@ import SwiftUI
         Surface(size: CGSize(width: 720, height: 220), backdrop: true, make: {
             let model = OverlayModel()
             model.visible = true
-            model.startedAt = Date().addingTimeInterval(-7)
+            model.startedAt = Date().addingTimeInterval(-5)
             model.update(text)
+            model.startedAt = model.startedAt.addingTimeInterval(-2)  // the words are in by the first frame
             model.lang = "de-DE"
             model.level = 0.03
             model.locked = locked

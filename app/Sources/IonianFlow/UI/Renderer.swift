@@ -61,12 +61,10 @@ import SwiftUI
     /// General in a known state: neutral sample totals (2,545 words, 23 min of meetings) unless fresh.
     private static func generalSurface(_ state: RenderState, width: CGFloat) -> Surface {
         Surface(size: CGSize(width: width, height: 1000), make: {
-            if state != .fresh {
-                UserDefaults.standard.setVolatileDomain(
-                    UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
-                        .merging(["statsWords": 2545, "statsTranscribedSeconds": 1380]) { $1 },
-                    forName: UserDefaults.argumentDomain)
-            }
+            var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            domain["statsWords"] = state == .fresh ? 0 : 2545
+            domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
+            UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
             return AnyView(mainViewForRender(page: .general, state: state))
         })
     }

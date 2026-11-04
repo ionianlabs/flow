@@ -81,9 +81,10 @@ final class ModelSetupModel: ObservableObject {
         let store = self.store
         Task { @MainActor [weak self] in
             do {
-                try await store.download(item) { p in
-                    Task { @MainActor [weak self] in self?.progressed(item, gen, p) }
+                let report: @Sendable (Double) -> Void = { [weak self] p in
+                    Task { @MainActor in self?.progressed(item, gen, p) }
                 }
+                try await store.download(item, progress: report)
                 self?.finished(item, gen, nil)
             } catch {
                 self?.finished(item, gen, error)
@@ -211,10 +212,10 @@ private struct ModelStepRow: View {
         case .installed:
             StatusDot(state: .ready, word: "Installed")
         case .downloading(let p):
-            StatusDot(state: .working, word: "\(Int(p * 100)) %")
+            StatusDot(state: .working, word: "\(Int(p * 100))%")
             Button("Cancel ›") { models.cancel(item) }.buttonStyle(.monoLink)
         case .paused(let p):
-            StatusDot(state: .off, word: "Paused \(Int(p * 100)) %")
+            StatusDot(state: .off, word: "Paused \(Int(p * 100))%")
             Button("Resume ›") { models.start(item) }.buttonStyle(.monoLink)
         case .failed(let message):
             StatusDot(state: .off, word: "Failed")
@@ -267,7 +268,7 @@ struct SpeechModelRow: View {
         case .installed: StatusDot(state: .ready, word: "Installed", wordColor: Color.muted)
         case .downloading(let p):
             HStack(spacing: Space.s4) {
-                StatusDot(state: .working, word: "\(Int(p * 100)) %", wordColor: Color.muted)
+                StatusDot(state: .working, word: "\(Int(p * 100))%", wordColor: Color.muted)
                 Button("Cancel ›") { models.cancel(.speech) }.buttonStyle(.monoLink)
             }
         case .paused:
@@ -316,7 +317,7 @@ struct CleanupModelRow: View {
             }
         case .downloading(let p):
             HStack(spacing: Space.s4) {
-                StatusDot(state: .working, word: "\(Int(p * 100)) %", wordColor: Color.muted)
+                StatusDot(state: .working, word: "\(Int(p * 100))%", wordColor: Color.muted)
                 Button("Cancel ›") { models.cancel(.cleanup) }.buttonStyle(.monoLink)
             }
         case .paused:

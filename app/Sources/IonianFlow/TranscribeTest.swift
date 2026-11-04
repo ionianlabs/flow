@@ -13,7 +13,8 @@ func runTranscribeTest(_ args: [String]) {
     }
     let them = files.dropFirst().first.flatMap(loadWAV)
     let engine = NativeEngine(finalizer: ParakeetFinalizer())
-    let t = Transcriber(engine: engine, mic: AudioCapture())
+    // Test harness: driven from the main thread and one feeder thread, exactly as the app does.
+    nonisolated(unsafe) let t = Transcriber(engine: engine, mic: AudioCapture())
     t.cleanupDisabled = args.contains("--no-polish")
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("ionian-flow-transcribetest.md")
     let started = Date()

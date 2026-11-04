@@ -4,7 +4,14 @@ import Foundation
 /// then whenever notes changed (checked at most every 30 min, and only while Ionian Flow is idle).
 /// The scan is paused (SweepControl) while you dictate or transcribe, so it never competes with live
 /// recognition for the GPU, and it runs at background task priority. The vault is only read.
-final class VaultSweeper: ObservableObject {
+/// Weak handle that can cross into the detached scan without keeping the sweeper alive.
+private struct WeakRef: Sendable {
+    weak var value: VaultSweeper?
+    init(_ value: VaultSweeper) { self.value = value }
+}
+
+// @unchecked Sendable: all state is read and written on the main thread only (the detached scan hops back to main to touch it).
+final class VaultSweeper: ObservableObject, @unchecked Sendable {
     struct Vault: Hashable {
         let name: String
         let url: URL
@@ -118,20 +125,21 @@ final class VaultSweeper: ObservableObject {
         if isBusy() { pause() }
         let id = UUID()
         taskID = id
-        task = Task.detached(priority: requested ? .utility : .background) { [weak self, o] in
+        let ref = WeakRef(self)
+        task = Task.detached(priority: requested ? .utility : .background) { [ref, o] in
             do {
                 let r = try await VaultSweep.run(o, makeLLM: { GemmaVaultLLM(control: control) }, control: control) { p in
                     DispatchQueue.main.async {
-                        guard let self, self.taskID == id else { return }
+                        guard let self = ref.value, self.taskID == id else { return }
                         switch p {
                         case .reading(let d, let n): self.phase = .reading(done: d, of: n)
                         case .learning(let d, let n): self.phase = .learning(done: d, of: n)
                         }
                     }
                 }
-                await MainActor.run { self?.finished(id, .success(r), first: first, requested: requested) }
+                await MainActor.run { ref.value?.finished(id, .success(r), first: first, requested: requested) }
             } catch {
-                await MainActor.run { self?.finished(id, .failure(error), first: first, requested: requested) }
+                await MainActor.run { ref.value?.finished(id, .failure(error), first: first, requested: requested) }
             }
         }
     }

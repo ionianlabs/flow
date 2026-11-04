@@ -7,7 +7,7 @@ import MLXLMCommon
 // (--enginetest-hub: loads every model, samples memory, exercises unload).
 //
 //   --enginetest-hub [--minutes N] [--data DIR]      (run under: flock /tmp/ionian-ne-models.lock ...)
-// --data defaults to $FLOW_BENCH/data or ../flow-bench/bench/data next to the repo checkout (from #filePath).
+// --data DIR (a folder with manifest.jsonl) or, without it, $FLOW_BENCH/data; no other guess.
 
 enum ModelHubCLI {
 
@@ -22,7 +22,8 @@ enum ModelHubCLI {
             else if args[i] == "--data", i + 1 < args.count { data = args[i + 1]; i += 2 }
             else { i += 1 }
         }
-        let dataDir = URL(fileURLWithPath: data ?? defaultDataDir())
+        guard let dataPath = benchDataDir(explicit: data) else { return 2 }
+        let dataDir = URL(fileURLWithPath: dataPath)
         var rc: Int32 = 1
         let done = DispatchSemaphore(value: 0)
         Task { rc = await HubTest(minutes: minutes, dataDir: dataDir).run(); done.signal() }
@@ -30,12 +31,12 @@ enum ModelHubCLI {
         return rc
     }
 
-    private static func defaultDataDir(_ file: String = #filePath) -> String {
-        if let b = ProcessInfo.processInfo.environment["FLOW_BENCH"] { return b + "/data" }
-        // <repo>/app/Sources/IonianFlow/Dev/ModelHubCLI.swift -> <repo>/../flow-bench/bench/data
-        var u = URL(fileURLWithPath: file)
-        for _ in 0..<5 { u.deleteLastPathComponent() }
-        return u.deletingLastPathComponent().appendingPathComponent("flow-bench/bench/data").path
+    /// The bench data folder: an explicit `--data DIR`, else `$FLOW_BENCH/data`. Nil (with a message) when neither is set.
+    static func benchDataDir(explicit: String?) -> String? {
+        if let d = explicit, !d.isEmpty { return d }
+        if let b = ProcessInfo.processInfo.environment["FLOW_BENCH"], !b.isEmpty { return b + "/data" }
+        print("no bench data: pass --data DIR (a folder with manifest.jsonl) or set FLOW_BENCH to the FLEURS bench folder (it holds data/manifest.jsonl)")
+        return nil
     }
 }
 

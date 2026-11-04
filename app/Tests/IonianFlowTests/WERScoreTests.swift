@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import IonianFlow
 
-// Crafted cases; the expected values are what asr/bench_wer.normalize gave in Python (2026-11-03), and
+// Crafted cases; the expected values are what the former Python normalizer gave (2026-11-03), and
 // WER values worked out by hand (jiwer's corpus WER is sum of edits over sum of reference words).
 
 extension IonianFlowTests {

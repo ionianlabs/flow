@@ -25,6 +25,10 @@ if otool -L "$APP/Contents/MacOS/IonianFlow" | grep -q "@rpath/libswiftCompatibi
   install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/IonianFlow"
   codesign --force --sign - "$APP/Contents/Frameworks/libswiftCompatibilitySpan.dylib" >/dev/null 2>&1 || true
 fi
+# Drop rpaths into this Mac's toolchains (Xcode, Metal Toolchain cryptex): they do not exist on a user's Mac.
+otool -l "$APP/Contents/MacOS/IonianFlow" | awk '/LC_RPATH/{r=1} r&&/ path /{print $2; r=0}' | while read -r p; do
+  case "$p" in /Applications/*|/Library/Developer/*|/var/run/*|/private/var/run/*) install_name_tool -delete_rpath "$p" "$APP/Contents/MacOS/IonianFlow" ;; esac
+done
 cp "$ROOT/app/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp -R "$ROOT/app/Resources/Fonts" "$APP/Contents/Resources/Fonts"
 cp -R "$ROOT/app/Resources/Chrome" "$APP/Contents/Resources/Chrome"

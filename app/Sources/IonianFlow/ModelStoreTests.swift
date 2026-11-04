@@ -177,6 +177,7 @@ enum ModelStoreTests {
     /// ~/.cache/huggingface) + one Gemma load through ModelHub; prints where MLX read its kernels from.
     static func cli(_ args: [String]) -> Int32 {
         if args.first == "speech" { return speechCLI(Array(args.dropFirst())) }
+        if args.first == "download" { return downloadCLI(Array(args.dropFirst())) }
         guard args.first == "gemma" else {
             FileHandle.standardError.write(Data("usage: --enginetest-store gemma [SNAPSHOT_DIR] | speech [CANCEL_AT_FRACTION]\n".utf8)); return 2
         }
@@ -321,6 +322,49 @@ enum ModelStoreTests {
         }
         done.wait()
         return rc
+    }
+
+    /// `--enginetest-store download [speech] [cleanup]` (default both, in the onboarding order): the real download
+    /// into IONIAN_FLOW_MODELS (required, so the user's own root is never used), progress and byte counts printed.
+    /// Acceptance test of the built app on a fresh machine; kill it mid-way and run again to see the resume.
+    static func downloadCLI(_ args: [String]) -> Int32 {
+        guard let root = ProcessInfo.processInfo.environment["IONIAN_FLOW_MODELS"], !root.isEmpty else {
+            FileHandle.standardError.write(Data("download needs IONIAN_FLOW_MODELS (an empty temp folder)\n".utf8)); return 2
+        }
+        print("root: \(root)")
+        unsetenv("IONIAN_FLOW_DEV_HF_CACHE")
+        let items: [ModelItem] = args.isEmpty ? [.speech, .cleanup] : args.compactMap(ModelItem.init(rawValue:))
+        var rc: Int32 = 0
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            for item in items {
+                let t = Date()
+                let was = ModelStore.shared.isInstalled(item)
+                let last = LastPrinted()
+                do {
+                    try await ModelStore.shared.download(item) { p in
+                        if last.shouldPrint(p) { print("\(item.rawValue) \(Int(p * 100)) %"); fflush(stdout) }
+                    }
+                    let bytes = inventory(item == .speech ? ModelStore.speechDirectory : ModelStore.gemmaDirectory).values.reduce(0, +)
+                    let ok = ModelStore.shared.isInstalled(item)
+                    print("\(ok ? "ok  " : "FAIL") \(item.rawValue): installed=\(ok) (was \(was)), \(bytes) bytes on disk, \(String(format: "%.1f", Date().timeIntervalSince(t))) s")
+                    if !ok { rc = 1 }
+                } catch { print("FAIL \(item.rawValue): \(error)"); rc = 1 }
+            }
+            done.signal()
+        }
+        done.wait()
+        return rc
+    }
+
+    private final class LastPrinted: @unchecked Sendable {
+        private let lock = NSLock()
+        private var last = -1.0
+        func shouldPrint(_ p: Double) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if p - last >= 0.05 || (p >= 1 && last < 1) { last = p; return true }
+            return false
+        }
     }
 
     private static func newestSnapshot() -> URL? {

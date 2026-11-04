@@ -112,7 +112,7 @@ enum SweepRules {
             let (aliases, values) = frontmatterValues(m.group(1)!)
             for a in aliases { add(a, "alias") }
             for v in values {
-                for s in shaped.all(v).map(\.whole) + phrase.all(v).map { $0.group(1)! } { add(s, "shaped") }
+                for s in shaped.all(v).map(\.whole) + phrase.all(v).map({ $0.group(1)! }) { add(s, "shaped") }
             }
             body = (text as NSString).substring(from: m.end)
         }

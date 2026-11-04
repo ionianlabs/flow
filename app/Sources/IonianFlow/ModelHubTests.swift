@@ -196,7 +196,7 @@ private struct HubTest {
         await hub.unload(.gemma)
         let unloaded = await !hub.isLoaded(.gemma)
         check(unloaded, "unload(.gemma) marks it unloaded")
-        if let g = try? await hub.gemma(), let out = try? await hub.serial { try await Self.polish("hello there this is a test", g) } {
+        if let g = try? await hub.gemma(), let out = try? await hub.serial(.high, label: "job", { try await Self.polish("hello there this is a test", g) }) {
             let n = await hub.loadCounts[.gemma] ?? 0
             check(n == 2 && !out.isEmpty, "gemma reloads after unload and works")
         } else { check(false, "gemma reload") }

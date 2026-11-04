@@ -6,7 +6,7 @@ import Foundation
 // (zipf 4.0, port of the former Python pk_post.py guard()), then VocabNormalizer. Models come from ModelHub.parakeet();
 // FinalPass (transcription mode) shares the same instance.
 
-protocol UtteranceFinalizer {
+protocol UtteranceFinalizer: Sendable {
     /// pcm: 16 kHz mono Float. lang: "de"/"en"/nil (auto; Parakeet detects it itself).
     /// Returns "" when the final pass failed or heard nothing; the caller then keeps the live text.
     func finalize(pcm: [Float], lang: String?) async -> String

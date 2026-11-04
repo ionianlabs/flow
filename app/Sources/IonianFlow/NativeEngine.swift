@@ -159,7 +159,7 @@ final class NativeEngine: SpeechEngine, @unchecked Sendable {
             manager: { try await hub.nemotron(channel) },
             prepare: { [self] manager in await prepare(manager, channel: channel) },
             lane: lane,
-            finalize: o.kind == .dictation ? finalizer.map { f in { pcm, lang in await f.finalize(pcm: pcm, lang: lang) } } : nil,
+            finalize: o.kind == .dictation ? finalizer.map { f in { @Sendable pcm, lang in await f.finalize(pcm: pcm, lang: lang) } } : nil,
             emit: { [self] in emit($0) })
         let stream = LiveStream(id: id, options: o, deps: deps)
         lock.lock(); active[o.channel] = stream; sessions[id] = stream; lock.unlock()

@@ -250,33 +250,48 @@ private struct ModelProgress: View {
 
 // MARK: - Settings rows
 
-/// The two rows in General > Models. Used inside a `SettingsSection` (each row is one card row).
+/// The rows in General > Models: one short line each, the state and its action on the right, the detail in the tooltip.
+/// Speech: the download phase, and once installed whether the recognizer itself is loaded (`recognizer`).
 struct SpeechModelRow: View {
     @ObservedObject var models: ModelSetupModel
+    var recognizer: StatusDot
+    var reload: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            SettingRow("Speech", "Nemotron for live text, Parakeet for the final pass. About \(models.bytesText(.speech)). Required.") {
-                trailing
-            }
-            ModelProgress(phase: models.phase(.speech))
+    /// The dot and word for the row: the download while there is one, otherwise the recognizer's own state.
+    static func status(phase: ModelPhase, recognizer: (state: StatusState, word: String)) -> (state: StatusState, word: String) {
+        switch phase {
+        case .installed: return recognizer
+        case .downloading(let p): return (.working, "Downloading \(Int(p * 100)) %")
+        case .paused(let p): return (.off, "Paused at \(Int(p * 100)) %")
+        case .failed: return (.off, "Error")
+        case .missing: return (.off, "Not downloaded")
         }
     }
 
-    @ViewBuilder private var trailing: some View {
-        switch models.phase(.speech) {
-        case .installed: StatusDot(state: .ready, word: "Installed", wordColor: Color.muted)
-        case .downloading(let p):
-            HStack(spacing: Space.s4) {
-                StatusDot(state: .working, word: "\(Int(p * 100))%", wordColor: Color.muted)
-                Button("Cancel ›") { models.cancel(.speech) }.buttonStyle(.monoLink)
+    var body: some View {
+        let phase = models.phase(.speech)
+        let status = Self.status(phase: phase, recognizer: (recognizer.state, recognizer.word))
+        VStack(alignment: .leading, spacing: Space.s2) {
+            SettingRow("Speech", "Required. On this Mac, offline.") {
+                HStack(spacing: Space.s4) {
+                    StatusDot(state: status.state, word: status.word, wordColor: Color.muted)
+                    action(phase)
+                }
+                .buttonStyle(.monoLink)
             }
-        case .paused:
-            Button("Resume ›") { models.start(.speech) }.buttonStyle(.monoLink)
-        case .failed:
-            Button("Try again ›") { models.start(.speech) }.buttonStyle(.monoLink)
-        case .missing:
-            Button("Download ›") { models.start(.speech) }.buttonStyle(.monoLink)
+            ModelProgress(phase: phase)
+        }
+        .help("Nemotron for live text, Parakeet for the final pass, on this Mac's GPU. Nothing goes to the cloud. "
+            + "About \(models.bytesText(.speech)), stored in Application Support.")
+    }
+
+    @ViewBuilder private func action(_ phase: ModelPhase) -> some View {
+        switch phase {
+        case .installed: Button("Reload ›", action: reload)
+        case .downloading: Button("Cancel ›") { models.cancel(.speech) }
+        case .paused: Button("Resume ›") { models.start(.speech) }
+        case .failed: Button("Try again ›") { models.start(.speech) }
+        case .missing: Button("Download ›") { models.start(.speech) }
         }
     }
 }
@@ -288,23 +303,24 @@ struct CleanupModelRow: View {
     var body: some View {
         let phase = models.phase(.cleanup)
         VStack(alignment: .leading, spacing: Space.s2) {
-            SettingRow("Cleanup", detail(phase)) { trailing(phase) }
+            SettingRow("Cleanup", line(phase)) { trailing(phase) }
             ModelProgress(phase: phase)
         }
+        .help("Gemma, on this Mac. It tidies transcripts, writes summaries and reads names from your vault. "
+            + "Without it transcripts stay as heard, there is no summary, and the word scan uses rules only. "
+            + "Stored in Application Support, works offline.")
         .confirmationDialog("Remove the cleanup model. You can download it again.", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { models.remove(.cleanup) }
         }
     }
 
-    private func detail(_ phase: ModelPhase) -> String {
+    /// One short line: what it adds, and its size while it isn't on disk.
+    func line(_ phase: ModelPhase) -> String {
+        let adds = "Optional. Punctuation, summaries and vocabulary extraction."
         switch phase {
-        case .installed:
-            return "Gemma, on this Mac. Tidies transcripts, writes summaries and reads names from your vault."
-        case .failed(let message):
-            return message
-        default:
-            return "Off. Gemma, about \(models.bytesText(.cleanup)). Without it transcripts stay as heard, there is no summary, "
-                + "and the word scan uses rules only."
+        case .installed: return adds
+        case .failed(let message): return message
+        default: return adds + " \(models.bytesText(.cleanup))."
         }
     }
 
@@ -317,7 +333,7 @@ struct CleanupModelRow: View {
             }
         case .downloading(let p):
             HStack(spacing: Space.s4) {
-                StatusDot(state: .working, word: "\(Int(p * 100))%", wordColor: Color.muted)
+                StatusDot(state: .working, word: "Downloading \(Int(p * 100)) %", wordColor: Color.muted)
                 Button("Cancel ›") { models.cancel(.cleanup) }.buttonStyle(.monoLink)
             }
         case .paused:
@@ -333,15 +349,16 @@ struct CleanupModelRow: View {
     }
 }
 
-/// Link to the third-party notices file (shipped in the app's resources by the download unit). Absent: no link.
+/// A quiet footer link to the third-party notices file (shipped in the app's resources). Absent: no link.
 struct ThirdPartyNoticesRow: View {
     static var url: URL? { Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "md") }
 
     var body: some View {
         if let url = Self.url {
-            SettingRow("Third-party notices", "Licenses of the models and libraries Ionian Flow uses.") {
-                Button("Open ↗") { NSWorkspace.shared.open(url) }.buttonStyle(.monoLink)
-            }
+            Button("Third-party notices ↗") { NSWorkspace.shared.open(url) }
+                .buttonStyle(.monoLink)
+                .help("Licenses of the models and libraries Ionian Flow uses.")
+                .padding(.horizontal, Space.s1)
         }
     }
 }

@@ -1,0 +1,1169 @@
+{
+  "partials" : [
+    {
+      "text" : "Hallo",
+      "t" : 1.1315029859542847
+    },
+    {
+      "text" : "Hallo Team, ich",
+      "t" : 1.6435589790344238
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch",
+      "t" : 2.243417978286743
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die",
+      "t" : 2.7395689487457275
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation",
+      "t" : 3.3355239629745483
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute",
+      "t" : 3.92524790763855
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag",
+      "t" : 4.431404948234558
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können",
+      "t" : 5.0355939865112305
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das",
+      "t" : 5.531926989555359
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting mor",
+      "t" : 6.136985898017883
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um ze",
+      "t" : 6.734622955322266
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen",
+      "t" : 7.232517957687378
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey",
+      "t" : 8.344780921936035
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you",
+      "t" : 8.937770962715149
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the",
+      "t" : 9.527225971221924
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request",
+      "t" : 10.043149948120117
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before",
+      "t" : 10.631115913391113
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch?",
+      "t" : 11.143972992897034
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the",
+      "t" : 11.741991996765137
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming",
+      "t" : 12.343028903007507
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks",
+      "t" : 12.837345957756042
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good",
+      "t" : 13.43478000164032
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now",
+      "t" : 13.934599995613098
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now.",
+      "t" : 14.536240935325623
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim",
+      "t" : 15.135434985160828
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke",
+      "t" : 15.63749098777771
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die",
+      "t" : 16.242891907691956
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation",
+      "t" : 16.73964500427246
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute",
+      "t" : 17.334990978240967
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nach",
+      "t" : 17.935633897781372
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag",
+      "t" : 18.440891981124878
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir",
+      "t" : 19.032188892364502
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting",
+      "t" : 19.541579961776733
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen",
+      "t" : 20.128018975257874
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn U",
+      "t" : 20.743491888046265
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen",
+      "t" : 21.23942494392395
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen?",
+      "t" : 21.83800995349884
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey,",
+      "t" : 22.332693934440613
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review",
+      "t" : 22.931854963302612
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull",
+      "t" : 23.538644909858704
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request",
+      "t" : 24.042239904403687
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch",
+      "t" : 24.634891986846924
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think",
+      "t" : 25.128254890441895
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming",
+      "t" : 25.73236393928528
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming laten",
+      "t" : 26.333951950073242
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really",
+      "t" : 26.829835891723633
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now",
+      "t" : 27.427472949028015
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now.",
+      "t" : 28.52106499671936
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim",
+      "t" : 29.143982887268066
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schic",
+      "t" : 29.644402980804443
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die",
+      "t" : 30.232616901397705
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation",
+      "t" : 30.72873091697693
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute",
+      "t" : 31.340632915496826
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag",
+      "t" : 31.93763291835785
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können",
+      "t" : 32.420933961868286
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das",
+      "t" : 33.02138793468475
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting",
+      "t" : 33.52345895767212
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um",
+      "t" : 34.11830997467041
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen",
+      "t" : 34.72766292095184
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you",
+      "t" : 36.406057953834534
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the",
+      "t" : 36.919718980789185
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull reque",
+      "t" : 37.533445954322815
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before",
+      "t" : 38.03750395774841
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch",
+      "t" : 38.6414989233017
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think",
+      "t" : 39.132484912872314
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming",
+      "t" : 39.739643931388855
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency",
+      "t" : 40.32234489917755
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good",
+      "t" : 40.817054986953735
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now",
+      "t" : 41.4172899723053
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello",
+      "t" : 42.53574991226196
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim",
+      "t" : 43.136735916137695
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke e",
+      "t" : 43.62891888618469
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Prä",
+      "t" : 44.23486590385437
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation",
+      "t" : 44.74233794212341
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute",
+      "t" : 45.33439600467682
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag",
+      "t" : 45.94202995300293
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir",
+      "t" : 46.439061999320984
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das",
+      "t" : 47.02779293060303
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting mor",
+      "t" : 47.53784799575806
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn",
+      "t" : 48.13887596130371
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen",
+      "t" : 48.73351299762726
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey",
+      "t" : 49.8430939912796
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you re",
+      "t" : 50.328266978263855
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the",
+      "t" : 50.9419549703598
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request",
+      "t" : 51.530300974845886
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before",
+      "t" : 52.02200698852539
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch?",
+      "t" : 52.63074588775635
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the",
+      "t" : 53.12452697753906
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming",
+      "t" : 53.73126995563507
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks",
+      "t" : 54.34321188926697
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good",
+      "t" : 54.83455491065979
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now",
+      "t" : 55.423998951911926
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now.",
+      "t" : 55.92275893688202
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo te",
+      "t" : 56.52475988864899
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schic",
+      "t" : 57.12387490272522
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die",
+      "t" : 57.62628889083862
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation",
+      "t" : 58.22855496406555
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute",
+      "t" : 58.73906493186951
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmi",
+      "t" : 59.338318943977356
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag",
+      "t" : 59.94195795059204
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir",
+      "t" : 60.44199895858765
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting",
+      "t" : 61.03854298591614
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen",
+      "t" : 61.52228391170502
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr",
+      "t" : 62.145129919052124
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen",
+      "t" : 62.72821497917175
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen?",
+      "t" : 63.24053990840912
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you",
+      "t" : 63.8424369096756
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review",
+      "t" : 64.34182691574097
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull",
+      "t" : 64.9418249130249
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before",
+      "t" : 65.54267692565918
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch",
+      "t" : 66.04493594169617
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think",
+      "t" : 66.63596999645233
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming",
+      "t" : 67.13853394985199
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming laten",
+      "t" : 67.73633897304535
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really",
+      "t" : 68.33586800098419
+    },
+    {
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen you review the pull request before launch I think the streaming latency looks really good now. Hello Tim, ich schicke euch die Präsentation heute Nachmittag können wir das Meeting morgen um zehn Uhr machen. Hey, can you review the pull request before launch? I think the streaming latency looks really good now. Hallo team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen? Hey, can you review the pull request before launch? I think the streaming latency looks really good now",
+      "t" : 68.82738697528839
+    }
+  ],
+  "release" : 69.60139894485474,
+  "lang" : "de-DE",
+  "levels" : [
+    0,
+    0,
+    0,
+    0,
+    0.13614486,
+    0.1523862,
+    0.192216,
+    0.07023241,
+    0.13042837,
+    0.18761018,
+    0.15754123,
+    0.010239816,
+    0.00010796604,
+    0.18965155,
+    0.061401874,
+    0.0660265,
+    0.1315625,
+    0.15038267,
+    0.1257479,
+    0.14224759,
+    0.032468554,
+    0.14765857,
+    0.024337232,
+    0.16137548,
+    0.13021442,
+    0.13931164,
+    0.1386924,
+    0.070668824,
+    0.016065815,
+    0.17631575,
+    0.17832144,
+    0.13929127,
+    0.18752104,
+    0.06264404,
+    0.18855463,
+    0.17477679,
+    0.13728441,
+    0.09168637,
+    0.156193,
+    0.042033173,
+    0.14186026,
+    0.04940587,
+    0.0047321385,
+    0.00033505898,
+    0.00010152543,
+    0.022172567,
+    0.18643141,
+    0.19567227,
+    0.16336022,
+    0.1632168,
+    0.15772966,
+    0.16958743,
+    0.04683167,
+    0.15784454,
+    0.17097211,
+    0.068147816,
+    0.18494342,
+    0.17859194,
+    0.18162747,
+    0.11339696,
+    0.108864434,
+    0.16523887,
+    0.083608784,
+    0.13300295,
+    0.18014857,
+    0.10113755,
+    0.15878816,
+    0.1702252,
+    0.17076638,
+    0.05356766,
+    0.11146101,
+    0.11642479,
+    0.0027880399,
+    0,
+    0,
+    0,
+    0,
+    0.04203935,
+    0.2003307,
+    0.15956937,
+    0.069151394,
+    0.0006177803,
+    7.315869e-05,
+    0.12870353,
+    0.24888526,
+    0.25891858,
+    0.1990446,
+    0.18829504,
+    0.202322,
+    0.25816688,
+    0.14685039,
+    0.104587995,
+    0.16597061,
+    0.19562228,
+    0.21065737,
+    0.042902544,
+    0.16842009,
+    0.16729355,
+    0.018118948,
+    0.15360299,
+    0.028213006,
+    0.21338381,
+    0.19370605,
+    0.21295696,
+    0.2182026,
+    0.19033392,
+    0.033532534,
+    0.012642142,
+    6.3695166e-05,
+    0.06224508,
+    0.18354614,
+    0.12466165,
+    0.22789073,
+    0.028954623,
+    0.16004471,
+    0.027794706,
+    0.18992624,
+    0.24705659,
+    0.25056028,
+    0.23967253,
+    0.20848694,
+    0.08628581,
+    0.21578456,
+    0.07114325,
+    0.22664976,
+    0.207432,
+    0.06988765,
+    0.09451127,
+    0.2414128,
+    0.2149926,
+    0.18089047,
+    0.16584735,
+    0.14225334,
+    0.24052404,
+    0.1841435,
+    0.14308536,
+    0.03581902,
+    0,
+    0,
+    0,
+    0,
+    0.000113460155,
+    0.13663848,
+    0.15270627,
+    0.19213656,
+    0.06886425,
+    0.1334809,
+    0.18632416,
+    0.15652011,
+    0.009453606,
+    0.000112473426,
+    0.19086693,
+    0.05800412,
+    0.068906724,
+    0.12990023,
+    0.15041661,
+    0.125895,
+    0.14214067,
+    0.032375995,
+    0.14758578,
+    0.02846073,
+    0.16075456,
+    0.13035867,
+    0.13911732,
+    0.14334364,
+    0.0606712,
+    0.016306216,
+    0.1795879,
+    0.17569983,
+    0.13900548,
+    0.18723466,
+    0.062500216,
+    0.18874252,
+    0.17918776,
+    0.1310815,
+    0.09211456,
+    0.15591851,
+    0.04454175,
+    0.14147426,
+    0.04830232,
+    0.0047341427,
+    0.00030543222,
+    0.0001018717,
+    0.022356726,
+    0.18731797,
+    0.19515699,
+    0.16300833,
+    0.163405,
+    0.1574684,
+    0.17001829,
+    0.045239083,
+    0.15915042,
+    0.16978243,
+    0.068314336,
+    0.18521518,
+    0.17835665,
+    0.18458202,
+    0.109132275,
+    0.108025774,
+    0.16569416,
+    0.082696795,
+    0.1356719,
+    0.17995617,
+    0.09788208,
+    0.15907717,
+    0.170046,
+    0.17091995,
+    0.052796368,
+    0.11168571,
+    0.11620759,
+    0.0026164886,
+    0,
+    0,
+    0,
+    0,
+    0.04675695,
+    0.1994897,
+    0.15934937,
+    0.069061756,
+    0.0005158735,
+    7.300338e-05,
+    0.13057283,
+    0.25281966,
+    0.25471693,
+    0.20237516,
+    0.18398114,
+    0.20265144,
+    0.25865927,
+    0.15068546,
+    0.09684339,
+    0.16656408,
+    0.1953355,
+    0.21152048,
+    0.037391383,
+    0.16965531,
+    0.16606393,
+    0.017695433,
+    0.15407409,
+    0.025653698,
+    0.21375449,
+    0.19388111,
+    0.21307133,
+    0.21815728,
+    0.18965468,
+    0.033760298,
+    0.011849633,
+    6.301067e-05,
+    0.06285721,
+    0.18336362,
+    0.1254664,
+    0.2279228,
+    0.024782175,
+    0.1600598,
+    0.027872087,
+    0.19090572,
+    0.24784349,
+    0.25122038,
+    0.23791271,
+    0.20861539,
+    0.08459988,
+    0.2173636,
+    0.06638761,
+    0.22707194,
+    0.20693482,
+    0.06961093,
+    0.09549401,
+    0.2434419,
+    0.21289891,
+    0.18013811,
+    0.16791789,
+    0.14034754,
+    0.24124162,
+    0.18287124,
+    0.14315276,
+    0.03497681,
+    0,
+    0,
+    0,
+    0,
+    0.000276479,
+    0.13682945,
+    0.15281011,
+    0.19450855,
+    0.06128946,
+    0.1357576,
+    0.18491676,
+    0.15621628,
+    0.008868982,
+    0.000113969465,
+    0.1911651,
+    0.057483517,
+    0.070573464,
+    0.12881353,
+    0.15278506,
+    0.12733902,
+    0.13831112,
+    0.032431114,
+    0.1475236,
+    0.032760687,
+    0.16002849,
+    0.13394256,
+    0.13555928,
+    0.14365488,
+    0.059927583,
+    0.016694687,
+    0.1802411,
+    0.17583245,
+    0.13853365,
+    0.18778315,
+    0.061239988,
+    0.18903592,
+    0.17852707,
+    0.13077281,
+    0.09274479,
+    0.15552203,
+    0.052100822,
+    0.13891058,
+    0.04818087,
+    0.004734447,
+    0.00030065526,
+    0.00010218833,
+    0.022454448,
+    0.1894942,
+    0.19382171,
+    0.16213521,
+    0.16687523,
+    0.15372042,
+    0.17030016,
+    0.044210237,
+    0.16068523,
+    0.16832647,
+    0.070368424,
+    0.18502934,
+    0.17796904,
+    0.18437718,
+    0.10988992,
+    0.10723125,
+    0.16762055,
+    0.07871477,
+    0.13579097,
+    0.18040906,
+    0.09687813,
+    0.16297595,
+    0.16662994,
+    0.17085595,
+    0.052024737,
+    0.11221924,
+    0.11568806,
+    0.0022493252,
+    0,
+    0,
+    0,
+    0,
+    0.053400673,
+    0.20102622,
+    0.15635166,
+    0.066597484,
+    0.00033349445,
+    7.2799776e-05,
+    0.13224882,
+    0.25256428,
+    0.25784877,
+    0.19909164,
+    0.18246296,
+    0.2067004,
+    0.2557362,
+    0.15058509,
+    0.09599153,
+    0.16689755,
+    0.19555028,
+    0.21116835,
+    0.036885403,
+    0.1701249,
+    0.16561793,
+    0.017067924,
+    0.15425602,
+    0.024957778,
+    0.21776503,
+    0.1898547,
+    0.21434525,
+    0.2174812,
+    0.1884506,
+    0.03382899,
+    0.011602948,
+    6.225324e-05,
+    0.06473678,
+    0.18277411,
+    0.12709422,
+    0.22710192,
+    0.023582282,
+    0.16007574,
+    0.028208906,
+    0.1954502,
+    0.24573542,
+    0.25036862,
+    0.23792286,
+    0.20799221,
+    0.08445082,
+    0.21814425,
+    0.06366906,
+    0.2278468,
+    0.20820041,
+    0.06289101,
+    0.09667123,
+    0.24503116,
+    0.21072955,
+    0.17990698,
+    0.16885945,
+    0.1449729,
+    0.23889482,
+    0.18154399,
+    0.14351001,
+    0.032935426,
+    0,
+    0,
+    0,
+    0,
+    0.00032614212,
+    0.13711816,
+    0.15265507,
+    0.19545564,
+    0.05804221,
+    0.13785388,
+    0.18470846,
+    0.15463312,
+    0.0077842507,
+    0.00011435696,
+    0.19162337,
+    0.05612815,
+    0.07091799,
+    0.12854615,
+    0.15317303,
+    0.12910016,
+    0.13628256,
+    0.0325619,
+    0.1474454,
+    0.03415722,
+    0.15996471,
+    0.13563465,
+    0.13359426,
+    0.14422455,
+    0.058540303,
+    0.017178481,
+    0.1802376,
+    0.17606473,
+    0.14111288,
+    0.18759134,
+    0.055604596,
+    0.19100045,
+    0.17647952,
+    0.13037305,
+    0.09641768,
+    0.15326227,
+    0.0576066,
+    0.13672805,
+    0.048155494,
+    0.0047349585,
+    0.00029243183,
+    0.00010281299,
+    0.02291792,
+    0.19002236,
+    0.19378816,
+    0.16150251,
+    0.16762604,
+    0.15292864,
+    0.17041926,
+    0.043664787,
+    0.16072352,
+    0.1682837,
+    0.07922425,
+    0.18449253,
+    0.17485453,
+    0.1844717,
+    0.11291566,
+    0.10372804,
+    0.16899747,
+    0.07571284,
+    0.13612661,
+    0.18053906,
+    0.09616246,
+    0.16515933,
+    0.16659915,
+    0.16886505,
+    0.05182068,
+    0.112783045,
+    0.11510499,
+    0.0020182899,
+    0,
+    0,
+    0,
+    0,
+    0.056988366,
+    0.2007022,
+    0.15557754,
+    0.06641444,
+    0.00017752899,
+    7.266773e-05,
+    0.13584517,
+    0.25233656,
+    0.2566983,
+    0.19925582,
+    0.18159974,
+    0.20854156,
+    0.254867,
+    0.14974055,
+    0.09560352,
+    0.16767928,
+    0.19546701,
+    0.21082813,
+    0.035907153,
+    0.17049119,
+    0.16528504,
+    0.01616656,
+    0.15434922,
+    0.024422992,
+    0.21810748,
+    0.19245936,
+    0.21201044,
+    0.21814214,
+    0.18728845,
+    0.033911053,
+    0.011217748,
+    6.2094085e-05,
+    0.07482205,
+    0.17891048,
+    0.13000475,
+    0.22567692,
+    0.02119197,
+    0.16008687,
+    0.028297292,
+    0.1959599,
+    0.24654815,
+    0.25071615,
+    0.23855597,
+    0.20597678,
+    0.083217174,
+    0.21846662,
+    0.06280259,
+    0.22814971,
+    0.20955954,
+    0.056360465,
+    0.1052302,
+    0.24253501,
+    0.21037075,
+    0.17889248,
+    0.1691159,
+    0.14827088,
+    0.2369352,
+    0.18160361,
+    0.14322245,
+    0.03195476,
+    0,
+    0,
+    0,
+    0,
+    0.00036356208,
+    0.14252484,
+    0.14860027,
+    0.19485828,
+    0.05766261,
+    0.1379142,
+    0.18561757,
+    0.15346447,
+    0.00734749,
+    0.00011572562,
+    0.19187212,
+    0.05578316,
+    0.07474311,
+    0.12615311,
+    0.15324098,
+    0.12926617,
+    0.13610536,
+    0.033060584,
+    0.14726703,
+    0.034937087,
+    0.15982622,
+    0.1357578,
+    0.13343795,
+    0.14450997,
+    0.057820566,
+    0.017439868,
+    0.18035688,
+    0.17646958,
+    0.14138956,
+    0.1872809,
+    0.055303033,
+    0.19104555,
+    0.17627224,
+    0.13013232,
+    0.099582724,
+    0.15120997,
+    0.058504153,
+    0.1363656,
+    0.048101068,
+    0.0047357567,
+    0.0002792077,
+    0.00010377099,
+    0.023344574,
+    0.19088633,
+    0.19511352,
+    0.15885459,
+    0.16793923,
+    0.1525498,
+    0.1715924,
+    0.03875265,
+    0.16109762,
+    0.16792744,
+    0.08193515,
+    0.18371013,
+    0.17465517,
+    0.18442242,
+    0.11420819,
+    0.10199379,
+    0.16981794,
+    0.07385457,
+    0.13772114,
+    0.17974855,
+    0.09537012,
+    0.16602941,
+    0.16700684,
+    0.16777194,
+    0.051445525,
+    0.11324435,
+    0.11457765,
+    0.0018066689,
+    0,
+    0,
+    0,
+    0,
+    0.059767842,
+    0.20103168,
+    0.1541351,
+    0.06633809,
+    0.00015811632,
+    7.2831754e-05,
+    0.1383817,
+    0.2519933,
+    0.2564208,
+    0.19859159,
+    0.18139842,
+    0.21063171,
+    0.25599876,
+    0.14566822,
+    0.09405825,
+    0.16913415,
+    0.19507608,
+    0.21027382,
+    0.03448694,
+    0.17287819,
+    0.16279627,
+    0.01591544,
+    0.15459608,
+    0.023300381,
+    0.21876945,
+    0.19211268,
+    0.21215148,
+    0.21962635,
+    0.18491061,
+    0.03391879,
+    0.0110554295,
+    6.205189e-05,
+    0.07593346,
+    0.1784866,
+    0.13443354,
+    0.22322622,
+    0.019243604,
+    0.16008319,
+    0.02847121,
+    0.19691122,
+    0.24925838,
+    0.2481444,
+    0.23893702,
+    0.20755073,
+    0.07535242,
+    0.22036923,
+    0.056561045,
+    0.23028302,
+    0.20725235,
+    0.055140346,
+    0.1068316,
+    0.24201795,
+    0.21091618,
+    0.1780314,
+    0.16937678,
+    0.14974216,
+    0.2362038,
+    0.18497498,
+    0.1381602,
+    0.031779826,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}

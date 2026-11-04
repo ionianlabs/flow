@@ -253,7 +253,4 @@ product: TaskBoard
         done.wait()
         return rc
     }
-
-    /// Model-free checks (rule pipeline, ranking), called from --selftest.
-    static func selfTest() -> Bool { VaultSweepSelfTest.run() }
 }

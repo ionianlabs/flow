@@ -1,4 +1,4 @@
-// Expected values for VaultSweepSelfTest, produced once by the reference implementation before the Python engine was removed. Do not edit.
+// Expected values for VaultSweepTests, produced once by the reference implementation before the Python engine was removed. Do not edit.
 enum VaultSweepExpected {
     static let json = #"""
 {

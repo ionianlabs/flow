@@ -433,24 +433,6 @@ final class Transcriber {
         return out
     }
 
-    static func echoSelfTest() -> Bool {
-        let them = ["Hey, can you review the pull request before launch? I think the streaming latency looks really good now."]
-        let cases: [(String, String)] = [
-            ("Hey can you review the pull request before launch", ""),
-            ("Hey can you review the pull request yes I'll do it before launch", "Yes I'll do it"),
-            ("Hey can you review the full request before launch", ""),  // one misheard word inside
-            ("Sure, I'll review it after lunch.", "Sure, I'll review it after lunch."),
-            ("I think the streaming latency looks really good now, but the build is slow", "But the build is slow"),
-            ("Ja genau, das machen wir so.", "Ja genau, das machen wir so."),
-        ]
-        var ok = true
-        for (input, want) in cases {
-            let got = stripEcho(input, theirs: them)
-            print(got == want ? "PASS" : "FAIL", " echo: \(input)  ->  \(got)")
-            ok = ok && got == want
-        }
-        return ok
-    }
 
     /// Re-checks finished "You" segments once more "Them" text is in.
     private func removeEchoes() {

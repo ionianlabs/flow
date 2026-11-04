@@ -131,7 +131,7 @@ final class VocabNormalizer {
 /// spelling (Damerau-Levenshtein similarity >= 0.75 over the letters) or by sound (same Kölner
 /// Phonetik code and similarity >= 0.6). Spans shorter than 5 letters, spans made only of common
 /// words and single words that are real words stay: a real word beats a guess.
-private final class FuzzyTerms {
+final class FuzzyTerms {
     private var text: [String: String] = [:]  // letters-only key -> term
     private var keys: [Int: [[Unicode.Scalar]]] = [:]  // word count -> keys
     private var keyStrings: [Int: [String]] = [:]
@@ -280,79 +280,9 @@ private final class FuzzyTerms {
     }
 }
 
-// MARK: Self-test
+// MARK: Dev hooks
 
 extension VocabNormalizer {
-    /// The asserts from vocab.py's __main__, with the same strings, plus cologne and the parser's edge cases.
-    static func selfTest() -> Bool {
-        var ok = true
-        func check<T: Equatable>(_ got: T, _ want: T, _ what: String) {
-            if got != want { ok = false; print("FAIL normalizer: \(what): got \(got), want \(want)") }
-        }
-        if WordFrequencyTable.shared.isEmpty { print("FAIL normalizer: wordfreq.tsv missing (app/Resources)"); return false }
-
-        let start = VocabularyParser.start, end = VocabularyParser.end
-        var sample = VocabularyFile.template.replacingOccurrences(of: "## Terms\n", with: "## Terms\n- ACME\n- pull request (heard as: pool request, pul request)\n")
-        sample = sample.replacingOccurrences(of: "## Ignore\n", with: "## Ignore\n- Helper\n")
-        sample += "\n\(start) x -->\n## From vault: Notes\n### People\n- Jana Weber\n- ACME\n### Terms\n- Helper\n\(end)\n"
-        var v = VocabularyParser.parse(sample)
-        check(v.terms.map { "\($0.text)/\($0.isVault ? "vault" : "manual")" }, ["ACME/manual", "pull request/manual", "Jana Weber/vault"], "parse terms")
-        check(v.ignored, ["Helper"], "ignore")
-        var n = VocabNormalizer(v)
-        check(n.normalize("the pool request and a Pool Request."), "the pull request and a pull request.", "alias")
-        check(n.normalize("a whirlpool requester"), "a whirlpool requester", "alias boundary")
-
-        n = VocabNormalizer(markdown: "## Terms\n- ToP\n- IonianFlow\n- Data Garage\n- Netvora\n- ETL\n- ACME\n")
-        for (raw, want) in [
-            ("the top shelf is full", "the top shelf is full"),
-            ("an open flow of ideas, in Ionianflow", "an open flow of ideas, in IonianFlow"),
-            ("im data garage und im Datagarage", "im Data Garage und im Data Garage"),
-            ("Net vora baut für die acme", "Netvora baut für die ACME"),
-            ("die E T L Planung", "die ETL Planung"),
-        ] { check(n.normalize(raw), want, raw) }
-
-        // Fuzzy: by spelling and by sound, and the guards.
-        n = VocabNormalizer(markdown: "## Terms\n- Netvora\n- Jana Weber\n- Northwind Logistics\n- Gamma\n")
-        for (raw, want) in [
-            ("bei Netfora", "bei Netvora"),
-            ("Jana Waber schrieb", "Jana Weber schrieb"),
-            ("Northwind Logistic", "Northwind Logistics"),
-            ("das Gamma Modell", "das Gamma Modell"),
-            ("ein netvoraa", "ein Netvora"),
-        ] { check(n.normalize(raw), want, raw) }
-
-        check(FuzzyTerms.cologne("Meyer"), "67", "cologne Meyer")
-        check(FuzzyTerms.cologne("Maier"), "67", "cologne Maier")
-        check(FuzzyTerms.cologne("Müller-Lüdenscheidt"), FuzzyTerms.cologne("Mueller Ludenscheidt"), "cologne umlauts")
-        check(FuzzyTerms.damerauLevenshtein(Array("ca".unicodeScalars), Array("abc".unicodeScalars)), 2, "unrestricted DL")
-
-        // Parser edge cases shared with vocab.parse: CRLF, tab bullets, the first non-empty Domain line.
-        v = VocabularyParser.parse("Domain:\r\nDomain: Logistics\r\n## Terms\r\n-\tACME\r\n* Jana (heard as: Jaana, Yana)\r\n---\r\n")
-        check(v.domain, "Logistics", "domain")
-        check(v.terms.map(\.text), ["ACME", "Jana"], "crlf and tab bullets")
-        check(v.terms.last?.aliases ?? [], ["Jaana", "Yana"], "aliases")
-
-        // Vault block: rewritten in place, domain filled once, old markers upgraded.
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ionian-flow-vocab-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let url = dir.appendingPathComponent("Vocabulary.md")
-        do {
-            try VocabularyFile.writeVaultBlock(to: url, groups: [("People", ["Jana Weber"]), ("Acronyms", ["ToP"])], heading: "From vault: Notes", domain: "logistics IT")
-            try VocabularyFile.writeVaultBlock(to: url, groups: [("People", ["Max Muster"])], heading: "From vault: Notes", domain: "something else")
-            let w = VocabularyParser.parse(try String(contentsOf: url, encoding: .utf8))
-            check(w.domain, "logistics IT", "vault domain")
-            check(w.terms.map(\.text), ["Max Muster"], "vault block")
-            try "Domain:\n## Terms\n- ACME\n<!-- openflow:vault:start x -->\n## old\n### People\n- Old\n<!-- openflow:vault:end -->\n".write(to: url, atomically: true, encoding: .utf8)
-            try VocabularyFile.writeVaultBlock(to: url, groups: [("People", ["New"])], heading: "h")
-            let text = try String(contentsOf: url, encoding: .utf8)
-            check(text.contains("openflow"), false, "old marker upgraded")
-            check(VocabularyParser.parse(text).terms.map(\.text), ["ACME", "New"], "old block replaced")
-        } catch { ok = false; print("FAIL normalizer: vault block: \(error)") }
-
-        print(ok ? "normalizer ok" : "normalizer FAILED")
-        return ok
-    }
-
     /// Dev hook for scripts/vocab_parity.py: `--wordfreq-zipf words.txt` prints "de en" Zipf values per line.
     static func zipfFile(_ path: String) -> Bool {
         guard let words = try? String(contentsOfFile: path, encoding: .utf8) else { return false }

@@ -1,7 +1,7 @@
 import Foundation
 
-// Unit 0 (skeleton). Routes the --enginetest-* flags to the owning unit's entry point and runs the units'
-// model-free self tests. Each unit only changes its own file; this file changes only when a flag is added.
+// Unit 0 (skeleton). Routes the --enginetest-* flags to the owning unit's entry point. (The model-free
+// self tests are in Tests/IonianFlowTests: `swift test --package-path app`.) Each unit only changes its own file; this file changes only when a flag is added.
 
 enum EngineCLI {
     /// Returns an exit code when `args` holds an engine test flag, nil otherwise (the app starts normally).
@@ -24,23 +24,5 @@ enum EngineCLI {
             if let i = args.firstIndex(of: flag) { return handler(Array(args[(i + 1)...])) }
         }
         return nil
-    }
-}
-
-enum EngineSelfTests {
-    /// Model-free tests of every unit; true when all pass (all run, no short-circuit).
-    static func all() -> Bool {
-        let results = [
-            NativeLive.selfTest(),       // B
-            FinalizerSelfTest.run(),     // C
-            ModelHubTests.selfTest(),    // D
-            PolisherSelfTest.run(),      // E
-            SummarizerCLI.selfTest(),    // F
-            VaultSweep.selfTest(),       // F
-            ModelStoreTests.selfTest(),  // G
-            WERScore.selfTest(),         // WER scoring
-            ModelSetupModel.selfTest(),  // H
-        ]
-        return !results.contains(false)
     }
 }

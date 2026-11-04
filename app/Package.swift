@@ -25,5 +25,13 @@ let package = Package(
             path: "Sources/IonianFlow",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // Model-free checks run by default; the ones that need downloaded models are gated behind
+        // IONIAN_FLOW_MODEL_TESTS=1 (see Tests/IonianFlowTests/Support.swift).
+        .testTarget(
+            name: "IonianFlowTests",
+            dependencies: ["IonianFlow"],
+            path: "Tests/IonianFlowTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

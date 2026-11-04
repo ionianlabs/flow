@@ -17,7 +17,7 @@ import Foundation
 final class LiveVocabulary: @unchecked Sendable {
     static let maxTerms = 1000
     static let minLetters = 2
-    /// Phase 0 (scripts/engine-bench vocab, 560 ms chunks): a flat 4.5 per token, FluidAudio's default, recalled the
+    /// Phase 0 (vocab test, 560 ms chunks): a flat 4.5 per token, FluidAudio's default, recalled the
     /// most terms (43 % vs 28 % off, python boost 66 % with spelling pass) and lowered control WER (16.4 vs 22.4).
     static let weight: Float = 4.5
 

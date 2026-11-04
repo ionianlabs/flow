@@ -161,8 +161,8 @@ notes change, and can cost general accuracy. Biasing applies a change on the nex
 
 ## Benchmark: final text
 The Python benchmark harness (since removed) ran the full FLEURS test sets (862 German, 647 English clips, M5 Pro, November 2026),
-Nemotron exactly as the app runs it (fp16, lookahead 13, auto language, Latin only), Parakeet through
-`scripts/parakeet-bench`, both scored with the same normalizer (lowercase, no punctuation):
+Nemotron exactly as the app runs it (fp16, lookahead 13, auto language, Latin only), Parakeet via
+FluidAudio (Ultra, CTC rescoring off), both scored with the same normalizer (lowercase, no punctuation):
 
 | | WER de | WER en | without number clips de / en | long files: seam loss de / en | speed |
 |---|---|---|---|---|---|

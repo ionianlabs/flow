@@ -2,13 +2,9 @@
 build/
 app/.build/
 app/.swiftpm/
-scripts/parakeet-bench/.build/
-scripts/parakeet-bench/.swiftpm/
 
 
 # macOS / editors
 .DS_Store
 .vscode/
 *.log
-scripts/engine-bench/.build/
-scripts/coexist-bench/.build/

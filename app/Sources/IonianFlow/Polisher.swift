@@ -47,6 +47,9 @@ enum PolishRules {
 
     static let glossarySize = 15
 
+    /// The content guard (see `faithful`); tests and the offline bench switch it off to measure the model alone.
+    nonisolated(unsafe) static var faithfulGuard = true
+
     private static let think = try! NSRegularExpression(pattern: "<think>.*?</think>", options: [.dotMatchesLineSeparators])
     private static let label = try! NSRegularExpression(pattern: #"^((Segment|Output):\s*)+"#)
     private static let word = try! NSRegularExpression(pattern: #"\w+"#)
@@ -113,6 +116,7 @@ enum PolishRules {
         else if looping(out) { problem = "loop" }
         else if !grounded(out, text + " " + context) { problem = "invented words" }
         else if droppedTail(text, out) { problem = "dropped the end" }
+        else if faithfulGuard && !faithful(text, out, context: context) { problem = "changed wording" }
         else { problem = nil }
         guard let problem else { return out }
         rejected?(problem)
@@ -144,6 +148,94 @@ enum PolishRules {
         var counts: [[String]: Int] = [:]
         for i in 0..<(w.count - 2) { counts[Array(w[i..<(i + 3)]), default: 0] += 1 }
         return counts.values.contains { $0 >= 4 }
+    }
+
+    // MARK: content guard
+
+    private static let fillers: Set<String> = ["äh", "ähm", "ah", "ahm", "uh", "um", "uhm", "er", "erm", "hm", "hmm", "mhm", "eh"]
+    private static let corrections: Set<String> = ["no", "nein", "sorry", "pardon", "mean", "meine", "meinte", "actually", "eigentlich", "wait", "warte", "rather", "besser"]
+    private static let numberWords: Set<String> = [
+        "null", "eins", "ein", "eine", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn", "elf", "zwölf",
+        "zwanzig", "dreißig", "vierzig", "fünfzig", "hundert", "tausend", "komma", "prozent", "uhr", "euro", "million", "millionen",
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "twenty", "thirty",
+        "forty", "fifty", "hundred", "thousand", "point", "percent", "dollar", "billion", "oh", "o", "clock", "und", "and",
+    ]
+
+    /// Lowercase words without punctuation or apostrophes (what the transcript scorer compares).
+    static func plainWords(_ s: String) -> [String] {
+        words(s.lowercased().replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\u{2019}", with: ""))
+    }
+
+    private static func hasDigit(_ w: String) -> Bool { w.unicodeScalars.contains { $0.properties.numericType == .decimal } }
+
+    /// Similarity of two words in 0...1 (2 * common characters in order / total), like a diff ratio.
+    static func similarity(_ a: String, _ b: String) -> Double {
+        let x = Array(a.unicodeScalars), y = Array(b.unicodeScalars)
+        if x.isEmpty && y.isEmpty { return 1 }
+        var d = [[Int]](repeating: [Int](repeating: 0, count: y.count + 1), count: x.count + 1)
+        for i in 0..<x.count { for j in 0..<y.count { d[i + 1][j + 1] = x[i] == y[j] ? d[i][j] + 1 : max(d[i][j + 1], d[i + 1][j]) } }
+        return 2 * Double(d[x.count][y.count]) / Double(x.count + y.count)
+    }
+
+    /// An inflection change (welches -> welche, den -> dem): one word extends the other or differs in the last letter only.
+    private static func inflected(_ a: String, _ b: String) -> Bool {
+        let x = Array(a.unicodeScalars), y = Array(b.unicodeScalars)
+        let common = zip(x, y).prefix { $0 == $1 }.count
+        return common >= min(x.count, y.count) - 1 && common >= 2 && abs(x.count - y.count) <= 3
+    }
+
+    /// Differing stretches of two word lists (longest common subsequence): (input range, output range).
+    static func hunks(_ a: [String], _ b: [String]) -> [(Range<Int>, Range<Int>)] {
+        var d = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in stride(from: a.count - 1, through: 0, by: -1) {
+            for j in stride(from: b.count - 1, through: 0, by: -1) {
+                d[i][j] = a[i] == b[j] ? d[i + 1][j + 1] + 1 : max(d[i + 1][j], d[i][j + 1])
+            }
+        }
+        var out: [(Range<Int>, Range<Int>)] = []
+        var i = 0, j = 0, si = 0, sj = 0, open = false
+        func close() { if open { out.append((si..<i, sj..<j)); open = false } }
+        while i < a.count || j < b.count {
+            if i < a.count && j < b.count && a[i] == b[j] { close(); i += 1; j += 1; continue }
+            if !open { si = i; sj = j; open = true }
+            if j >= b.count || (i < a.count && d[i + 1][j] >= d[i][j + 1]) { i += 1 } else { j += 1 }
+        }
+        close()
+        return out
+    }
+
+    /// The output may fix punctuation, case, spelling of a misheard word, numbers and fillers, stutters and self-corrections,
+    /// and nothing else: it must not move, drop, add or rephrase words, nor change a word's inflection.
+    /// (Measured on a 30-minute meeting test, such edits were the whole WER loss of the polish step.)
+    static func faithful(_ text: String, _ out: String, context: String = "") -> Bool {
+        let a = plainWords(text), b = plainWords(out)
+        let known = Set(plainWords(context))
+        for (r, p) in hunks(a, b) {
+            let R = Array(a[r]), P = Array(b[p])
+            if P.isEmpty {  // deletion
+                let kept = R.filter { !fillers.contains($0) }
+                if kept.isEmpty { continue }
+                let n = kept.count  // a stutter: the words come again right before or after (fillers between them do not count)
+                let before = a[..<r.lowerBound].filter { !fillers.contains($0) }, after = a[r.upperBound...].filter { !fillers.contains($0) }
+                if (before.count >= n && Array(before.suffix(n)) == kept) || (after.count >= n && Array(after.prefix(n)) == kept) { continue }
+                if n <= 8 && R.contains(where: { corrections.contains($0) }) { continue }  // a self-correction
+                return false
+            }
+            if R.isEmpty {  // words the speaker did not say, except a unit after a number (20% -> 20 percent)
+                if P.allSatisfy({ numberWords.contains($0) }) { continue }
+                return false
+            }
+            if P.allSatisfy({ known.contains($0) }) { continue }  // the speaker's own vocabulary
+            if (P.contains(where: hasDigit) || R.contains(where: hasDigit)) && R.count <= 6 && P.count <= 6
+                && (R.allSatisfy({ hasDigit($0) || numberWords.contains($0) || $0.count <= 2 }) || (P.allSatisfy(hasDigit) && R.count <= 4)) { continue }  // numbers and units
+            if R.count == P.count {
+                if zip(R, P).allSatisfy({ similarity($0, $1) >= 0.45 && !inflected($0, $1) }) { continue }  // a misheard word
+                return false
+            }
+            if similarity(R.joined(), P.joined()) >= 0.8 { continue }  // words joined or split
+            return false
+        }
+        return true
     }
 
     // MARK: glossary selection
@@ -188,6 +280,8 @@ final class Polisher: @unchecked Sendable {
     private(set) var lastRaw = ""
     /// Where the glossary comes from; the app reads the vocabulary file, tests inject their own.
     var vocabulary: @Sendable () -> PolishVocabulary?
+    /// Bench only: another system prompt.
+    nonisolated(unsafe) var systemPrompt = PolishRules.system
 
     init(hub: ModelHub = .shared, vocabulary: (@Sendable () -> PolishVocabulary?)? = nil) {
         self.hub = hub
@@ -224,7 +318,7 @@ final class Polisher: @unchecked Sendable {
         if text.pyStrip.isEmpty { return nil }  // an empty request only warms the model up
         let context = PolishRules.context(v, text: text)
         let m = PolishRules.messages(text, context: context, before: before)
-        guard let raw = try? await generate(system: m.system, user: m.user, maxTokens: PolishRules.maxTokens(text)) else { return nil }
+        guard let raw = try? await generate(system: systemPrompt, user: m.user, maxTokens: PolishRules.maxTokens(text)) else { return nil }
         lastRaw = raw
         let out = PolishRules.finish(text, raw, context: context) { problem in
             FileHandle.standardError.write(Data("polish output rejected (\(problem))\n".utf8))
@@ -254,7 +348,8 @@ final class Polisher: @unchecked Sendable {
 
 enum PolisherCLI {
     /// `--enginetest-polish`: JSON lines on stdin/stdout.
-    ///   {"text":..., "before":..., "domain":..., "terms":[{"text":..,"aliases":[..]}]} -> {"text":..., "ms":...}
+    ///   {"text":..., "before":..., "domain":..., "terms":[{"text":..,"aliases":[..]}], "system":..., "guard":"off"} -> {"text":..., "ms":...}
+    ///   ("system" replaces the system prompt from then on, "guard":"off" skips the content guard: bench only)
     ///   {"cmd":"stats"} -> {"load_s":..., "peak_rss_mb":...}
     /// The model is loaded before the first line is read. Returns the process exit code.
     static func cli(_ args: [String]) -> Int32 {
@@ -301,6 +396,8 @@ enum PolisherCLI {
                         PolishTerm(text: $0["text"] as? String ?? "", aliases: $0["aliases"] as? [String] ?? [])
                     })
             }
+            if let sys = req["system"] as? String { polisher.systemPrompt = sys }
+            PolishRules.faithfulGuard = req["guard"] as? String != "off"
             let t = Date()
             // nil = fall back to the raw text, which is also what the Python finish() returns on a rejection.
             let out = await polisher.polish(text: text, before: req["before"] as? String ?? "", vocabulary: vocab) ?? text

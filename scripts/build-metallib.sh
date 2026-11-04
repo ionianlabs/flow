@@ -62,7 +62,9 @@ FOUND="$(xcrun -sdk macosx -f metal 2>&1)" || {
   exit 1
 }
 PROBE="$(xcrun -sdk macosx metal --version 2>&1 || true)"
-classify "$PROBE"
+# A working compiler prints "Apple metal version ..." first; its InstalledDir line contains "MetalToolchain", so only
+# classify the output as an error when that version line is missing.
+if ! echo "$PROBE" | head -1 | grep -q "metal version"; then classify "$PROBE"; fi
 if ! echo "$PROBE" | head -1 | grep -qi "metal"; then
   echo "error: unexpected output from the Metal compiler: $PROBE" >&2
   echo "       If it mentions the toolchain: xcodebuild -downloadComponent MetalToolchain" >&2

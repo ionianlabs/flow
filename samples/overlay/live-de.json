@@ -1,0 +1,132 @@
+{
+  "partials" : [
+    {
+      "t" : 1.1285220384597778,
+      "text" : "Hallo"
+    },
+    {
+      "t" : 1.6393020153045654,
+      "text" : "Hallo Team, ich"
+    },
+    {
+      "t" : 2.244486093521118,
+      "text" : "Hallo Team, ich schicke euch"
+    },
+    {
+      "t" : 2.728511095046997,
+      "text" : "Hallo Team, ich schicke euch die"
+    },
+    {
+      "t" : 3.3383160829544067,
+      "text" : "Hallo Team, ich schicke euch die Präsentation"
+    },
+    {
+      "t" : 3.935485005378723,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute"
+    },
+    {
+      "t" : 4.430815100669861,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag"
+    },
+    {
+      "t" : 5.036980032920837,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können"
+    },
+    {
+      "t" : 5.538311004638672,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das"
+    },
+    {
+      "t" : 6.130804061889648,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting mor"
+    },
+    {
+      "t" : 6.736505031585693,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um ze"
+    },
+    {
+      "t" : 7.240467071533203,
+      "text" : "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Können wir das Meeting morgen um zehn Uhr machen"
+    }
+  ],
+  "levels" : [
+    0,
+    0,
+    0,
+    0,
+    0.13614486,
+    0.1523862,
+    0.192216,
+    0.07023241,
+    0.13042837,
+    0.18761018,
+    0.15754123,
+    0.010239816,
+    0.00010796604,
+    0.18965155,
+    0.061401874,
+    0.0660265,
+    0.1315625,
+    0.15038267,
+    0.1257479,
+    0.14224759,
+    0.032468554,
+    0.14765857,
+    0.024337232,
+    0.16137548,
+    0.13021442,
+    0.13931164,
+    0.1386924,
+    0.070668824,
+    0.016065815,
+    0.17631575,
+    0.17832144,
+    0.13929127,
+    0.18752104,
+    0.06264404,
+    0.18855463,
+    0.17477679,
+    0.13728441,
+    0.09168637,
+    0.156193,
+    0.042033173,
+    0.14186026,
+    0.04940587,
+    0.0047321385,
+    0.00033505898,
+    0.00010152543,
+    0.022172567,
+    0.18643141,
+    0.19567227,
+    0.16336022,
+    0.1632168,
+    0.15772966,
+    0.16958743,
+    0.04683167,
+    0.15784454,
+    0.17097211,
+    0.068147816,
+    0.18494342,
+    0.17859194,
+    0.18162747,
+    0.11339696,
+    0.108864434,
+    0.16523887,
+    0.083608784,
+    0.13300295,
+    0.18014857,
+    0.10113755,
+    0.15878816,
+    0.1702252,
+    0.17076638,
+    0.05356766,
+    0.11146101,
+    0.11642479,
+    0.0027880399,
+    0,
+    0,
+    0
+  ],
+  "lang" : "de-DE",
+  "release" : 7.504338026046753
+}

@@ -52,13 +52,34 @@ extension IonianFlowTests {
         check("finish ungrounded", fin("hello world foo", "alpha beta gamma delta"), "hello world foo")
         check("finish grounded by glossary", fin("hello world foo", "alpha beta gamma delta", "alpha beta gamma delta"), "alpha beta gamma delta")
         check("finish length 0.5", fin("ich bin am Montag da und gehe", "Ich bin da."), "ich bin am Montag da und gehe")
+        R.faithfulGuard = false  // the older guards alone
         check("finish tail ok", fin("one two three four five six seven", "one two three four five"), "one two three four five")
+        R.faithfulGuard = true
+        check("finish tail ok, but words dropped", fin("one two three four five six seven", "one two three four five"), "one two three four five six seven")
         check("finish dropped tail", fin("one two three four five six seven", "one two three four"), "one two three four five six seven")
-        check("finish extra sentence passes", fin(src, "So the new build is like 20 percent faster, I think. Also more more more."),
-              "So the new build is like 20 percent faster, I think. Also more more more.")
+        check("finish extra sentence rejected", fin(src, "So the new build is like 20 percent faster, I think. Also more more more."), src)
         var why = ""
         _ = R.finish("hello world foo", "alpha beta gamma delta") { why = $0 }
         check("finish reason", why, "invented words")
+
+        // faithful: only punctuation, case, fillers, stutters, self-corrections, numbers and misheard words may change
+        func ok(_ a: String, _ b: String, _ ctx: String = "") -> Bool { R.faithful(a, b, context: ctx) }
+        check("faithful punctuation", ok("so the build is fast i think", "So the build is fast, I think."), true)
+        check("faithful filler+stutter+number", ok(src, "So the new build is like 20 percent faster, I think."), true)
+        check("faithful german number", ok("also ich denke um zehn Uhr", "Also, ich denke, um 10 Uhr."), true)
+        check("faithful decimal", ok("two point five million users", "2.5 million users"), true)
+        check("faithful unit", ok("a full 20% of the water", "A full 20 percent of the water"), true)
+        check("faithful self-correction", ok("meet on Tuesday no sorry Wednesday at ten", "Meet on Wednesday at 10."), true)
+        check("faithful misheard", ok("kannst du den pool request reviewen", "Kannst du den pull request reviewen?"), true)
+        check("faithful glossary", ok("we run nemo tron locally", "We run Nemotron locally.", "Known terms: Nemotron"), true)
+        check("faithful reorder", ok("die Strömung am Strand gebrochen", "Die Strömung gebrochen am Strand"), false)
+        check("faithful dropped words", ok("one two three four five", "one two five"), false)
+        check("faithful dropped tail fragment", ok("began to develop. one of the biggest developments", "Began to develop."), false)
+        check("faithful added words", ok("it works", "It works well."), false)
+        check("faithful inflection", ok("das Gebrüll des Löwens", "Das Gebrüll des Löwen"), false)
+        check("faithful rewording", ok("verheiratet zu sein", "verheiratet sind"), false)
+        check("faithful restart over filler", ok("um I think we should uh we should push the release", "I think we should push the release."), true)
+        check("faithful identical", ok("hello", "Hello."), true)
 
         // glossary selection and context
         let terms = [

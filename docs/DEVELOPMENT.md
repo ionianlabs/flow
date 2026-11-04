@@ -162,7 +162,7 @@ notes change, and can cost general accuracy. Biasing applies a change on the nex
 ## Benchmark: final text
 The Python benchmark harness (since removed) ran the full FLEURS test sets (862 German, 647 English clips, M5 Pro, November 2026),
 Nemotron exactly as the app runs it (fp16, lookahead 13, auto language, Latin only), Parakeet via
-FluidAudio (Ultra, CTC rescoring off), both scored with the same normalizer (lowercase, no punctuation):
+FluidAudio (Ultra), both scored with the same normalizer (lowercase, no punctuation):
 
 | | WER de | WER en | without number clips de / en | long files: seam loss de / en | speed |
 |---|---|---|---|---|---|
@@ -202,6 +202,7 @@ Images in this repo come only from the app's offscreen renderer or from headless
 `...` means `"build/Ionian Flow.app/Contents/MacOS/IonianFlow"`. The engine tests need
 `IONIAN_FLOW_TEST_DIR`, a folder with an optional `Vocabulary.md`, so they never read your own folders
 (the unit tests need no models). Models come from the Models folder; download them with the app once.
+Commands that score clips (`--enginetest-hub`, `--enginetest-live`) read `--data DIR` (a folder with `manifest.jsonl`) or, without it, `$FLOW_BENCH/data`; set `FLOW_BENCH` to the FLEURS bench folder.
 
 | Command | What it does |
 |---|---|

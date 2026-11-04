@@ -454,7 +454,8 @@ enum LiveParity {
         func opt(_ k: String, _ d: String) -> String { args.firstIndex(of: k).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? d }
         let per = Int(opt("--per", "5")) ?? 5
         let cutEvery = Double(opt("--cut-every", "4")) ?? 4
-        let dataDir = URL(fileURLWithPath: opt("--data", ProcessInfo.processInfo.environment["FLOW_BENCH"].map { $0 + "/data" } ?? ""))
+        guard let dataPath = ModelHubCLI.benchDataDir(explicit: opt("--data", "")) else { return 2 }
+        let dataDir = URL(fileURLWithPath: dataPath)
         let mixedDir = URL(fileURLWithPath: opt("--mixed", ""))
 
         var clips: [ParityClip] = []

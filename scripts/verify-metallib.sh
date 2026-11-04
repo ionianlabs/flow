@@ -5,12 +5,12 @@
 # Steps: (a) license + Metal Toolchain (downloads the toolchain if missing), (b) build the metallib, (c) build the app and
 # compare the bundled metallib's sha256, (d) codesign --verify, (e) load Gemma and generate with the app's own binary and
 # its bundled metallib (under the shared model lock), (f) sizes. Stops at the first FAIL.
-# Env: LOCK_PY = the shared model lock wrapper (default: ~/_projects/ionian/native-bench/withlock.py; "none" to skip).
+# Env: LOCK_PY = an optional wrapper script that serialises model use with other jobs (run as `python3 $LOCK_PY cmd...`; default: none).
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/build/Ionian Flow.app"
 LIB="$ROOT/app/.build/mlx.metallib"
-LOCK_PY="${LOCK_PY:-$HOME/_projects/ionian/native-bench/withlock.py}"
+LOCK_PY="${LOCK_PY:-none}"
 
 pass() { echo "PASS  $*"; }
 fail() { echo "FAIL  $*" >&2; exit 1; }

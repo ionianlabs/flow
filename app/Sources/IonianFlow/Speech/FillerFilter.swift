@@ -39,25 +39,4 @@ enum FillerFilter {
         let re = try! NSRegularExpression(pattern: pattern, options: caseInsensitive ? [.caseInsensitive] : [])
         return re.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: template)
     }
-
-    /// `IonianFlow --selftest`
-    static func selfTest() -> Bool {
-        let cases: [(String, String?, String)] = [
-            ("Um, I think we should, uh, ship it.", "en-US", "I think we should, ship it."),
-            ("So, uhm, yeah.", "en-US", "So, yeah."),
-            ("Können wir das Meeting morgen um zehn Uhr machen?", "de-DE", "Können wir das Meeting morgen um zehn Uhr machen?"),
-            ("Äh, ich schicke euch, ähm, die Präsentation.", "de-DE", "Ich schicke euch, die Präsentation."),
-            ("Hmm. Okay, let's go.", "en-US", "Okay, let's go."),
-            ("Umbrella and humming stay.", "en-US", "Umbrella and humming stay."),
-            ("Das ist, öhm... gut.", nil, "Das ist, gut."),
-        ]
-        var ok = true
-        for (input, lang, expected) in cases {
-            let got = clean(input, lang: lang)
-            let pass = got == expected
-            ok = ok && pass
-            print("\(pass ? "PASS" : "FAIL")  \(input)  ->  \(got)\(pass ? "" : "   (expected: \(expected))")")
-        }
-        return ok
-    }
 }

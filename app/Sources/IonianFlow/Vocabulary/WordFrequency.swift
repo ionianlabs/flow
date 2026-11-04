@@ -33,7 +33,7 @@ final class WordFrequencyTable: WordFrequency {
         if let u = Bundle.main.url(forResource: "wordfreq", withExtension: "tsv") { candidates.append(u) }
         if let p = ProcessInfo.processInfo.environment["IONIAN_WORDFREQ"] { candidates.append(URL(fileURLWithPath: p)) }
         candidates.append(URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .appendingPathComponent("../../Resources/wordfreq.tsv").standardized)
+            .appendingPathComponent("../../../Resources/wordfreq.tsv").standardized)
         for url in candidates {
             if let data = try? Data(contentsOf: url) { return WordFrequencyTable(tsv: data) }
         }

@@ -4,7 +4,7 @@ import Foundation
 
 // Unit G tests. `selfTest()` is model-free and offline (URLProtocol stub, sparse files in a temp root);
 // `--enginetest-store gemma` is the one real end-to-end: a temp root holding a copy of the existing Gemma snapshot,
-// one Gemma load through ModelHub (MLX reading the metallib from that root when present).
+// one Gemma load through ModelHub (MLX using the compiled mlx.metallib, see ModelStore.metallibLocation).
 
 /// In-process HTTP server stand-in: serves `body` for any URL, honours `Range`, optionally slowly.
 final class StubServer: URLProtocol, @unchecked Sendable {
@@ -193,13 +193,9 @@ enum ModelStoreTests {
                 try fm.copyItem(at: snap.appendingPathComponent(f.name).resolvingSymlinksInPath(), to: ModelStore.gemmaDirectory.appendingPathComponent(f.name))
             }
         } catch { print("FAIL copy: \(error)"); return 1 }
-        if let m = ProcessInfo.processInfo.environment["IONIAN_FLOW_TEST_METALLIB"] {  // a metallib to place in the temp root
-            try? fm.createDirectory(at: ModelStore.metallibURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? fm.copyItem(at: URL(fileURLWithPath: m), to: ModelStore.metallibURL)
-        }
         print("temp root: \(tmp.path)")
         print(ModelStore.shared.isInstalled(.cleanup) ? "ok   cleanup installed in temp root" : "FAIL cleanup not installed")
-        print("metallib in root: \(fm.fileExists(atPath: ModelStore.metallibURL.path))")
+        print("metallib: \(ModelStore.metallibLocation()?.path ?? "none (build it: scripts/build-metallib.sh)")")
         var rc: Int32 = 1
         let done = DispatchSemaphore(value: 0)
         Task.detached {

@@ -1,15 +1,15 @@
 import Foundation
 
-/// Learns the vocabulary from a vault with VaultSweep (Swift, Gemma through ModelHub): right after a vault is connected,
-/// then whenever notes changed (checked at most every 30 min, and only while Ionian Flow is idle).
-/// The scan is paused (SweepControl) while you dictate or transcribe, so it never competes with live
-/// recognition for the GPU, and it runs at background task priority. The vault is only read.
 /// Weak handle that can cross into the detached scan without keeping the sweeper alive.
 private struct WeakRef: Sendable {
     weak var value: VaultSweeper?
     init(_ value: VaultSweeper) { self.value = value }
 }
 
+/// Learns the vocabulary from a vault with VaultSweep (Swift, Gemma through ModelHub): right after a vault is connected,
+/// then whenever notes changed (checked at most every 30 min, and only while Ionian Flow is idle).
+/// The scan is paused (SweepControl) while you dictate or transcribe, so it never competes with live
+/// recognition for the GPU, and it runs at background task priority. The vault is only read.
 // @unchecked Sendable: all state is read and written on the main thread only (the detached scan hops back to main to touch it).
 final class VaultSweeper: ObservableObject, @unchecked Sendable {
     struct Vault: Hashable {

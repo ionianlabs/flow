@@ -7,7 +7,7 @@ let package = Package(
     dependencies: [
         // Parakeet on the Neural Engine for transcription mode's final text (FinalPass.swift).
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.2"),
-        // Cleanup model (Gemma) in-process; pins match coexist-bench. Update deliberately.
+        // Cleanup model (Gemma) in-process; pins were validated in the Phase 0 coexistence test. Update deliberately.
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", exact: "3.32.3"),
         .package(url: "https://github.com/huggingface/swift-transformers", exact: "1.4.0"),
     ],

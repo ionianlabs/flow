@@ -59,8 +59,8 @@ enum SweepRank {
         return Array(a[min(a.count, i + (a.count == b.count ? 1 : 0))...]) == Array(b[min(b.count, i + 1)...])
     }
 
-    /// Drops a name one letter away from a much more frequent one of the same kind: "Tomaz" and "Tomes"
-    /// are typos of "Tomas". Two real people ("Jona", "Jonas") both stay frequent.
+    /// Drops a name one letter away from a much more frequent one of the same kind: "Pavez" and "Tomes"
+    /// are typos of "Pavel". Two real people ("Jona", "Jonas") both stay frequent.
     static func mergeVariants(_ ranked: [RankedTerm]) -> [RankedTerm] {
         var kept: [RankedTerm] = []
         for t in stableSort(ranked, by: { $0.count > $1.count }) {

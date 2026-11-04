@@ -9,12 +9,11 @@ import Tokenizers
 // Unit D (ModelHub). The single owner of every model in the process (24 GB machine, one process):
 // lazy loads, one serial lane for Parakeet/CTC/Gemma work, unload policy, memory sampling.
 // Callers: B (nemotron), C (parakeet), E and F (gemma, serial). Models live in ModelStore.root
-// (downloaded by ModelStore; IONIAN_FLOW_DEV_HF_CACHE=1 reads the Python tools' caches instead). Reference:
-// scripts/coexist-bench main.swift (Serial actor, loaders); the n-1 prefill rule lives with the caller, in Polisher.
+// (downloaded by ModelStore; IONIAN_FLOW_DEV_HF_CACHE=1 reads the Python tools' caches instead). The n-1 prefill rule lives with the caller, in Polisher.
 //
 // Contract:
 //  - Every loader is idempotent and concurrency-safe: concurrent callers share one load.
-//  - Models are returned warmed up (one second of silence through Nemotron/Parakeet, as in coexist-bench).
+//  - Models are returned warmed up (one second of silence through Nemotron/Parakeet, as validated in Phase 0).
 //  - The two Nemotron managers are NOT serialized: each belongs to one live stream and is fed by one task.
 //  - Parakeet, CTC and Gemma work must go through `serial`, so a final pass and a polish never overlap.
 //    `serial` is FIFO and NOT reentrant: a job that awaits other jobs on the same hub deadlocks.

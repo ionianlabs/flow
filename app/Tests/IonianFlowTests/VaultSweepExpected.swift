@@ -101,7 +101,7 @@ enum VaultSweepExpected {
   },
   {
    "stem": "2026-10-01",
-   "text": "Standup. Tomaz wrote the notes, Tomaz again. Tomas presented. API-based work, ETL jobs, DONE.\nDer Kunde wünscht eine Lösung. Frau Weber und Dr. Meier. Ionian Flow Log, ToP log.\n",
+   "text": "Standup. Pavez wrote the notes, Pavez again. Pavel presented. API-based work, ETL jobs, DONE.\nDer Kunde wünscht eine Lösung. Frau Weber und Dr. Meier. Ionian Flow Log, ToP log.\n",
    "terms": [
     {
      "term": "ETL",
@@ -110,7 +110,7 @@ enum VaultSweepExpected {
      "alias": false
     },
     {
-     "term": "Tomaz",
+     "term": "Pavez",
      "category": "Terms",
      "count": 1,
      "alias": false
@@ -341,18 +341,18 @@ enum VaultSweepExpected {
  ],
  "oneedit": [
   {
-   "a": "tomas",
-   "b": "tomaz",
+   "a": "pavel",
+   "b": "pavez",
    "ok": true
   },
   {
-   "a": "tomas",
-   "b": "tomass",
+   "a": "pavel",
+   "b": "pavell",
    "ok": true
   },
   {
-   "a": "tomas",
-   "b": "toma",
+   "a": "pavel",
+   "b": "pave",
    "ok": true
   },
   {
@@ -507,14 +507,14 @@ enum VaultSweepExpected {
       "lower": false
      },
      {
-      "term": "Tomas",
+      "term": "Pavel",
       "category": "People",
       "count": 9,
       "alias": false,
       "lower": false
      },
      {
-      "term": "Tomaz",
+      "term": "Pavez",
       "category": "People",
       "count": 2,
       "alias": false,
@@ -554,14 +554,14 @@ enum VaultSweepExpected {
       "lower": false
      },
      {
-      "term": "Tomas",
+      "term": "Pavel",
       "category": "People",
       "count": 4,
       "alias": false,
       "lower": false
      },
      {
-      "term": "Tomaz",
+      "term": "Pavez",
       "category": "People",
       "count": 1,
       "alias": false,
@@ -645,7 +645,7 @@ enum VaultSweepExpected {
   ],
   "ranked": [
    {
-    "term": "Tomas",
+    "term": "Pavel",
     "category": "People",
     "notes": 2,
     "count": 13,

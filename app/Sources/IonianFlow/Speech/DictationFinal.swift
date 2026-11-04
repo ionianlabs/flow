@@ -2,7 +2,7 @@ import FluidAudio
 import Foundation
 
 // Unit C (dictation final). Whole-utterance final for dictation: Parakeet Ultra re-reads the buffered utterance,
-// CTC vocabulary rescoring (library defaults, "ctc-default" in scripts/parakeet-bench), the common-word guard
+// CTC vocabulary rescoring (library defaults, "ctc-default" as measured in Phase 0), the common-word guard
 // (zipf 4.0, port of the former Python pk_post.py guard()), then VocabNormalizer. Models come from ModelHub.parakeet();
 // FinalPass (transcription mode) shares the same instance.
 

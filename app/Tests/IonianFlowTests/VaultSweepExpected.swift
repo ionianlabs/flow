@@ -1,0 +1,679 @@
+// Expected values for VaultSweepTests, produced once by the reference implementation before the Python engine was removed. Do not edit.
+enum VaultSweepExpected {
+    static let json = #"""
+{
+ "notes": [
+  {
+   "stem": "Quill Plan",
+   "text": "---\naliases: [QP, Quill Plan]\norg: acme\nowner: \"Marta Kessling\"\n---\n# Quill Plan: Roadmap\nKickoff with Marta Kessling and Tobias Vance about NimbusQL. The Harbor Team of Practice meets.\nSee [[Marta Kessling]] and [[tobias|Toby]] and https://example.com/Quill and `CodeThing`.\n```\nHiddenThing in a fence\n```\nTicket QFR-1042, color #A8B1B6, Oct 3, Level 2, CI/CD, Marco/Lena.\n- Bullet Starts Here and then Atlas Dashboard.\n",
+   "terms": [
+    {
+     "term": "QP",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": true
+    },
+    {
+     "term": "Quill Plan",
+     "category": "Terms",
+     "count": 4,
+     "alias": true
+    },
+    {
+     "term": "Marta Kessling",
+     "category": "Terms",
+     "count": 3,
+     "alias": false
+    },
+    {
+     "term": "Toby",
+     "category": "Terms",
+     "count": 2,
+     "alias": true
+    },
+    {
+     "term": "Quill",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "NimbusQL",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Tobias Vance",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Marta",
+     "category": "Terms",
+     "count": 2,
+     "alias": false
+    },
+    {
+     "term": "Kessling",
+     "category": "Terms",
+     "count": 2,
+     "alias": false
+    },
+    {
+     "term": "Vance",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "See Marta Kessling",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "CI/CD",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Atlas Dashboard",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Atlas",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Dashboard",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    }
+   ]
+  },
+  {
+   "stem": "2026-10-01",
+   "text": "Standup. Tomaz wrote the notes, Tomaz again. Tomas presented. API-based work, ETL jobs, DONE.\nDer Kunde wünscht eine Lösung. Frau Weber und Dr. Meier. Ionian Flow Log, ToP log.\n",
+   "terms": [
+    {
+     "term": "ETL",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Tomaz",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "ToP",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "Ionian Flow",
+     "category": "Terms",
+     "count": 1,
+     "alias": false
+    }
+   ]
+  },
+  {
+   "stem": "Daily Note",
+   "text": "Nothing but ordinary words here, plus iPhone and M365 and X200 and P1.\n\n## Heading Two\nLumAI is a Project\n",
+   "terms": [
+    {
+     "term": "Daily Note",
+     "category": "Terms",
+     "count": 1,
+     "alias": true
+    },
+    {
+     "term": "M365",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "X200",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "P1",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    },
+    {
+     "term": "LumAI",
+     "category": "Acronyms",
+     "count": 1,
+     "alias": false
+    }
+   ]
+  }
+ ],
+ "plausible": [
+  {
+   "term": "Product Owner",
+   "category": "People",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Marta Kessling",
+   "category": "People",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "May",
+   "category": "People",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "Level 1",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Expo 2026",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "DONE",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "ACME",
+   "category": "Acronyms",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "In Progress",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Night Owl",
+   "category": "Terms",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "Python",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "lumai",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Oct 3",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "PROJ-30092",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "UX Guild",
+   "category": "Terms",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "Data Garage",
+   "category": "Terms",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "report.pdf",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "release notes",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Thu",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "TO BE DELETED",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Lena",
+   "category": "People",
+   "lower": true,
+   "ok": false
+  },
+  {
+   "term": "Nemotron",
+   "category": "Products",
+   "lower": false,
+   "ok": true
+  },
+  {
+   "term": "P1",
+   "category": "Terms",
+   "lower": false,
+   "ok": false
+  },
+  {
+   "term": "Kubernetes",
+   "category": "Terms",
+   "lower": false,
+   "ok": true
+  }
+ ],
+ "chunks": {
+  "text": "First paragraph here.\n\nSecond paragraph is a bit longer than the first.\n\nThird.\n\n\n\nFourth one closes.",
+  "size": 40,
+  "default": [
+   "First paragraph here.\n\nSecond paragraph is a bit longer than the first.\n\nThird.\n\n\n\nFourth one closes.\n\n"
+  ],
+  "small": [
+   "First paragraph here.\n\n",
+   "Second paragraph is a bit longer than the first.\n\n",
+   "Third.\n\n\n\nFourth one closes.\n\n"
+  ]
+ },
+ "sumchunks": {
+  "text": "line one\nline two is longer\r\nthree\rfour\n\nfive and then a very long line that exceeds the size\nsix\n",
+  "size": 30,
+  "parts": [
+   "line one\nline two is longer\r\n",
+   "three\rfour\n\n",
+   "five and then a very long line that exceeds the size\n",
+   "six\n"
+  ]
+ },
+ "plain": [
+  {
+   "text": "---\naliases: [QP, Quill Plan]\norg: acme\nowner: \"Marta Kessling\"\n---\n# Quill Plan: Roadmap\nKickoff with Marta Kessling and Tobias Vance about NimbusQL. The Harbor Team of Practice meets.\nSee [[Marta Kessling]] and [[tobias|Toby]] and https://example.com/Quill and `CodeThing`.\n```\nHiddenThing in a fence\n```\nTicket QFR-1042, color #A8B1B6, Oct 3, Level 2, CI/CD, Marco/Lena.\n- Bullet Starts Here and then Atlas Dashboard.\n",
+   "body": "# Quill Plan: Roadmap\nKickoff with Marta Kessling and Tobias Vance about NimbusQL. The Harbor Team of Practice meets.\nSee Marta Kessling and Toby and   and  .\n \nTicket QFR-1042, color #A8B1B6, Oct 3, Level 2, CI/CD, Marco/Lena.\n- Bullet Starts Here and then Atlas Dashboard.\n",
+   "aliases": [
+    "QP",
+    "Quill Plan",
+    "Toby"
+   ]
+  }
+ ],
+ "oneedit": [
+  {
+   "a": "tomas",
+   "b": "tomaz",
+   "ok": true
+  },
+  {
+   "a": "tomas",
+   "b": "tomass",
+   "ok": true
+  },
+  {
+   "a": "tomas",
+   "b": "toma",
+   "ok": true
+  },
+  {
+   "a": "abc",
+   "b": "abc",
+   "ok": false
+  },
+  {
+   "a": "abc",
+   "b": "axc",
+   "ok": true
+  },
+  {
+   "a": "abc",
+   "b": "xbd",
+   "ok": false
+  },
+  {
+   "a": "ab",
+   "b": "ba",
+   "ok": false
+  },
+  {
+   "a": "",
+   "b": "a",
+   "ok": true
+  }
+ ],
+ "summaries": [
+  {
+   "raw": "Sure! {\"description\": \"  A call about the   rollout. \", \"tags\": [\"Roadmap Q3\", \"roadmap-q3\", \"A/B\", \"\"], \"keywords\": [\"Quillfeather\", \"NimbusQL\", \"invented\"], \"points\": [\"- one\", \"two\", \"two\", 3, null], \"decisions\": [\"Freeze on Friday\", \"Ship tomorrow\"], \"actions\": [{\"who\": \"You\", \"what\": \"write notes by Monday\"}, \"Them: send draft by Tuesday\"]} trailing",
+   "transcript": "We use Quillfeather. Freitag works, ship morgen. nimbusql is up.",
+   "clean": {
+    "description": "A call about the rollout.",
+    "tags": [
+     "roadmap-q3",
+     "a-b"
+    ],
+    "keywords": [
+     "Quillfeather",
+     "NimbusQL"
+    ],
+    "points": [
+     "one",
+     "two",
+     "3",
+     "None"
+    ],
+    "decisions": [
+     "Freeze on Friday",
+     "Ship tomorrow"
+    ],
+    "actions": []
+   }
+  },
+  {
+   "raw": "{\"description\": \"\", \"tags\": [], \"keywords\": [], \"points\": [], \"decisions\": [], \"actions\": []}",
+   "transcript": "x",
+   "clean": {}
+  },
+  {
+   "raw": "not json at all",
+   "transcript": "x",
+   "clean": {}
+  },
+  {
+   "raw": "{\"description\": \"Only a string list\", \"points\": \"single point\", \"tags\": \"a b\", \"keywords\": 5, \"decisions\": {\"a\": 1}, \"actions\": [[\"x\", \"y\"], true, 2.5, {\"k\": \"\"}]}",
+   "transcript": "nächste Woche is fine, Montag too",
+   "clean": {
+    "description": "Only a string list",
+    "tags": [
+     "a-b"
+    ],
+    "keywords": [],
+    "points": [
+     "single point"
+    ],
+    "decisions": [],
+    "actions": [
+     "['x', 'y']",
+     "True",
+     "2.5"
+    ]
+   }
+  },
+  {
+   "raw": "[\"a list\"]",
+   "transcript": "x",
+   "clean": {}
+  },
+  {
+   "raw": "{\"description\": \"D\", \"decisions\": [\"Meet next week\", \"Meet nächste Woche\", \"On Dienstag\", \"Am Mittwoch\"]}",
+   "transcript": "Mittwoch and next week",
+   "clean": {
+    "description": "D",
+    "tags": [],
+    "keywords": [],
+    "points": [],
+    "decisions": [
+     "Meet next week",
+     "Meet nächste Woche",
+     "Am Mittwoch"
+    ],
+    "actions": []
+   }
+  },
+  {
+   "raw": "{\"description\": \"Unicode \\u00e4 \\ud83d\\ude00 end\", \"points\": [\"  • star * \", \"a\" ]}",
+   "transcript": "x",
+   "clean": {
+    "description": "Unicode ä 😀 end",
+    "tags": [],
+    "keywords": [],
+    "points": [
+     "star",
+     "a"
+    ],
+    "decisions": [],
+    "actions": []
+   }
+  },
+  {
+   "raw": "{\"description\": \"dup\", \"description\": \"last wins\", \"points\": []}",
+   "transcript": "x",
+   "clean": {
+    "description": "last wins",
+    "tags": [],
+    "keywords": [],
+    "points": [],
+    "decisions": [],
+    "actions": []
+   }
+  }
+ ],
+ "hashes": {
+  "summary": "f7df35f68e87d3dcf6019eb3f1e4b89b16db5d3443c1fe38c586a2a1489397de",
+  "notes": "a07254566f0a39a6bf7d0a6964b170626fa24e1fa1452152b16ada4aac191780",
+  "extract": "98052b86941901a608081eadcdfce95719a99cf3d53dba1ef974f93bb4f8b10a",
+  "domain": "bf2b86362d70cfe7621d2f60efd5a68c22b06321fda66e5b4aa2342955116a5d"
+ },
+ "rank": {
+  "now": 1000000000.0,
+  "notes": [
+   {
+    "mtime": 999913600.0,
+    "terms": [
+     {
+      "term": "Nimbus",
+      "category": "Products",
+      "count": 3,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Tomas",
+      "category": "People",
+      "count": 9,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Tomaz",
+      "category": "People",
+      "count": 2,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Tomes",
+      "category": "People",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "QP",
+      "category": "Acronyms",
+      "count": 1,
+      "alias": true,
+      "lower": false
+     },
+     {
+      "term": "Atlas",
+      "category": "Projects",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     }
+    ]
+   },
+   {
+    "mtime": 996544000.0,
+    "terms": [
+     {
+      "term": "NIMBUS",
+      "category": "Products",
+      "count": 2,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Tomas",
+      "category": "People",
+      "count": 4,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Tomaz",
+      "category": "People",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Atlas",
+      "category": "Terms",
+      "count": 2,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Product Owner",
+      "category": "People",
+      "count": 5,
+      "alias": false,
+      "lower": true
+     }
+    ]
+   },
+   {
+    "mtime": 965440000.0,
+    "terms": [
+     {
+      "term": "Nimbus",
+      "category": "Terms",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Atlas",
+      "category": "Projects",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Jona",
+      "category": "People",
+      "count": 3,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Jonas",
+      "category": "People",
+      "count": 3,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Zeta Corp",
+      "category": "Organizations",
+      "count": 2,
+      "alias": false,
+      "lower": false
+     }
+    ]
+   },
+   {
+    "mtime": 999740800.0,
+    "terms": [
+     {
+      "term": "Zeta Corp",
+      "category": "Organizations",
+      "count": 4,
+      "alias": false,
+      "lower": false
+     },
+     {
+      "term": "Jona",
+      "category": "People",
+      "count": 1,
+      "alias": false,
+      "lower": false
+     }
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "term": "Tomas",
+    "category": "People",
+    "notes": 2,
+    "count": 13,
+    "score": 7.478284669
+   },
+   {
+    "term": "Nimbus",
+    "category": "Products",
+    "notes": 3,
+    "count": 6,
+    "score": 7.258788223
+   },
+   {
+    "term": "Zeta Corp",
+    "category": "Organizations",
+    "notes": 2,
+    "count": 6,
+    "score": 5.7536097
+   },
+   {
+    "term": "Jona",
+    "category": "People",
+    "notes": 2,
+    "count": 4,
+    "score": 4.917976113
+   }
+  ]
+ }
+}
+"""#
+}

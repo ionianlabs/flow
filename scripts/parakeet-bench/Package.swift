@@ -1,5 +1,5 @@
 // swift-tools-version: 6.0
-// Parakeet (FluidAudio, Core ML on the Neural Engine) over the asr/bench_wer.py test set.
+// Parakeet (FluidAudio, Core ML on the Neural Engine) over the the former Python bench_wer.py test set.
 import PackageDescription
 
 let package = Package(

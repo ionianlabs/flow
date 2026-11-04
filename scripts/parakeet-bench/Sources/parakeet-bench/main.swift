@@ -1,10 +1,18 @@
 // swift run -c release parakeet-bench DIR [ultra|v3]
-// Reads DIR/manifest.jsonl (asr/bench_wer.py prepare), appends DIR/hyp-parakeet-<version>.jsonl.
+// Phase 0 option B (Parakeet Ultra + CTC vocabulary rescoring), see ctc.swift:
+//   parakeet-bench vocab DIR            DIR = native-bench/vocab, writes hyp-parakeet-<label>.jsonl
+//   parakeet-bench dict MANIFEST OUT VOCAB.md [datasets,comma]   bench/data set, rescoring on
+//   parakeet-bench latency MANIFEST VOCAB.md [N]                 per-call time + peak RSS
+// Reads DIR/manifest.jsonl (the former Python bench_wer.py prepare), appends DIR/hyp-parakeet-<version>.jsonl.
 // "ms" is the transcribe call on a warm model: what a final pass would add after a segment ends.
 import FluidAudio
 import Foundation
 
 let args = CommandLine.arguments
+if args.count >= 2, ["vocab", "dict", "latency"].contains(args[1]) {
+    try await runCtcMode(args)
+    exit(0)
+}
 guard args.count >= 2 else {
     FileHandle.standardError.write("usage: parakeet-bench DIR [ultra|v3]\n".data(using: .utf8)!)
     exit(2)

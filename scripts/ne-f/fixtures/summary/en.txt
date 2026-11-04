@@ -1,0 +1,11 @@
+**You** (00:00:03): Thanks for joining. I wanted to go over the Quillfeather rollout before the review on Thursday.
+**Them** (00:00:11): Sure. Tobias finished the NimbusQL gateway last week, so the reports should be reachable from the staging cluster now.
+**You** (00:00:24): Good. Is the nightly Data Orchard export stable? Last time it failed twice.
+**Them** (00:00:35): It failed because of a schema change. Ines fixed the mapping and it has been green for five days.
+**You** (00:00:49): Then I suggest we freeze the schema until the pilot ends. Are we agreed?
+**Them** (00:00:58): Agreed. We freeze the schema until the pilot ends, and nobody changes the export without telling the Harbor Team.
+**You** (00:01:12): What about the budget? Brightwell Logistics wants a number for the second quarter.
+**Them** (00:01:25): I would say we ask for the same amount as this quarter. I will send you a draft by Tuesday.
+**You** (00:01:37): Perfect. I will write up the roadmap and share it with Marta before the review.
+**Them** (00:01:46): One more thing: support tickets about the dashboards doubled. Someone should look at the slow queries.
+**You** (00:01:58): I will ask Tobias to profile them next week.

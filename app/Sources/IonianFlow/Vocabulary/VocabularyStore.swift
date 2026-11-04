@@ -1,0 +1,215 @@
+import Foundation
+
+/// The vocabulary file: names, acronyms and jargon the recognizer should get right. The format and
+/// the Python parser are in the former Python vocab.py; the shared Swift parser is VocabularyParser.swift. Edits rewrite single lines, so
+/// free text and anything else in the file stays as it was. The ASR server re-reads the file on
+/// its own when it changes.
+final class VocabularyStore: ObservableObject {
+    struct Entry: Identifiable, Hashable {
+        enum Source { case mine, vault }
+        var id: String { text.lowercased() }
+        let text: String
+        let category: String
+        let source: Source
+        let aliases: [String]
+        fileprivate let line: Int
+    }
+
+    static let categories = ["People", "Organizations", "Projects", "Products", "Acronyms", "Terms"]
+    private static let start = VocabularyParser.start, end = VocabularyParser.end
+    private static func isStart(_ s: String) -> Bool { VocabularyParser.isStart(s) }
+    private static func isEnd(_ s: String) -> Bool { VocabularyParser.isEnd(s) }
+    private static let template = VocabularyFile.template
+
+    let url: URL
+    @Published private(set) var entries: [Entry] = []
+    @Published private(set) var domain = ""
+    @Published private(set) var ignored: [String] = []
+    private var lines: [String] = []
+    private var domainLine: Int?
+    private var watcher: DispatchSourceFileSystemObject?
+    private var pendingReload: DispatchWorkItem?
+    private static let reviewedKey = "vocabularyReviewed"
+
+    init(url: URL = Settings.vocabularyFile, watch: Bool = true) {
+        self.url = url
+        reload()
+        if watch { self.watch() }
+    }
+
+    // MARK: Reading
+
+    func reload() {
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        lines = text.isEmpty ? [] : text.components(separatedBy: "\n")
+        let parsed = Self.parse(lines)
+        domain = parsed.domain ?? ""
+        domainLine = parsed.domainLine
+        entries = parsed.entries
+        ignored = parsed.ignored
+        pruneReviewed()
+    }
+
+    private static func parse(_ lines: [String]) -> (domain: String?, domainLine: Int?, entries: [Entry], ignored: [String]) {
+        let p = VocabularyParser.parse(lines: lines)
+        let entries = p.terms.map {
+            Entry(text: $0.text, category: $0.category, source: $0.isVault ? .vault : .mine, aliases: $0.aliases, line: $0.line)
+        }
+        return (p.domainLine == nil ? nil : p.domain, p.domainLine, entries, p.ignored)
+    }
+
+    // MARK: Review
+
+    /// Vault terms you haven't looked at yet (tracked by the app, not in the file).
+    var unreviewed: [Entry] {
+        let reviewed = Self.reviewed
+        return entries.filter { $0.source == .vault && !reviewed.contains($0.id) }
+    }
+
+    func isNew(_ entry: Entry) -> Bool { entry.source == .vault && !Self.reviewed.contains(entry.id) }
+
+    /// Ends a review: `remove` go to Ignore, everything else from the review stays.
+    func finishReview(of reviewed: [Entry], removing remove: Set<String>) {
+        Self.reviewed.formUnion(reviewed.map(\.id))
+        self.remove(reviewed.filter { remove.contains($0.id) })
+        objectWillChange.send()
+    }
+
+    /// Reject all: every one of these goes to Ignore, so the next scan doesn't bring them back.
+    func ignoreAll(_ rejected: [Entry]) { finishReview(of: rejected, removing: Set(rejected.map(\.id))) }
+
+    private static var reviewed: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: reviewedKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: reviewedKey) }
+    }
+
+    /// A term that left the file and comes back later counts as new again. Only for the real file:
+    /// the unit tests' and demos' temporary files would otherwise clear the list.
+    private func pruneReviewed() {
+        guard url.standardizedFileURL == Settings.vocabularyFile.standardizedFileURL else { return }
+        let ids = Set(entries.map(\.id))
+        let kept = Self.reviewed.intersection(ids)
+        if kept.count != Self.reviewed.count { Self.reviewed = kept }
+    }
+
+    // MARK: Editing
+
+    /// Adds one of your own terms, e.g. "Jana Weber" under People. Un-ignores it if it was ignored.
+    func add(_ text: String, category: String = "Terms") {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !entries.contains(where: { $0.id == text.lowercased() && $0.source == .mine }) else { return }
+        ensureFile()
+        removeBullets(text, inSection: "Ignore")
+        insertBullet(text, inSection: category)
+        save()
+    }
+
+    /// Your own terms are deleted; vault terms go to Ignore, so the next scan doesn't bring them back.
+    func remove(_ entry: Entry) { remove([entry]) }
+
+    func remove(_ entries: [Entry]) {
+        let valid = entries.filter { lines.indices.contains($0.line) }
+        guard !valid.isEmpty else { return }
+        for e in valid.sorted(by: { $0.line > $1.line }) { lines.remove(at: e.line) }  // bottom up: indices stay valid
+        for e in valid where e.source == .vault { insertBullet(e.text, inSection: "Ignore") }
+        save()
+    }
+
+    func setDomain(_ text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text != domain else { return }
+        ensureFile()
+        let line = text.isEmpty ? "Domain:" : "Domain: \(text)"
+        if let i = domainLine, lines.indices.contains(i) {
+            lines[i] = line
+        } else {
+            let title = lines.firstIndex { $0.hasPrefix("# ") }.map { $0 + 1 } ?? 0
+            lines.insert(contentsOf: ["", line], at: title)
+        }
+        save()
+    }
+
+    func ensureFile() {
+        guard !FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Self.template.write(to: url, atomically: true, encoding: .utf8)
+        reload()
+    }
+
+    /// Your sections end where the next heading or the vault block starts.
+    private func manualSection(_ name: String) -> (header: Int, end: Int)? {
+        var inBlock = false
+        for (i, raw) in lines.enumerated() {
+            let s = raw.trimmingCharacters(in: .whitespaces)
+            if Self.isStart(s) { inBlock = true } else if Self.isEnd(s) { inBlock = false }
+            guard !inBlock, s.hasPrefix("## "), s.dropFirst(3).trimmingCharacters(in: .whitespaces).lowercased() == name.lowercased() else { continue }
+            var end = i + 1
+            while end < lines.count {
+                let t = lines[end].trimmingCharacters(in: .whitespaces)
+                if t.hasPrefix("#") || Self.isStart(t) { break }
+                end += 1
+            }
+            return (i, end)
+        }
+        return nil
+    }
+
+    private func insertBullet(_ text: String, inSection name: String) {
+        if let (header, end) = manualSection(name) {
+            // After the section's last bullet, before trailing blank lines.
+            var at = end
+            while at > header + 1, lines[at - 1].trimmingCharacters(in: .whitespaces).isEmpty { at -= 1 }
+            lines.insert("- \(text)", at: at)
+            return
+        }
+        // A new section goes before Ignore (which stays last of yours), else before the vault block.
+        let before = manualSection("Ignore").map(\.header) ?? lines.firstIndex { Self.isStart($0) }
+        let block = ["## \(name)", "- \(text)", ""]
+        if let before, name.lowercased() != "ignore" {
+            lines.insert(contentsOf: block, at: before)
+        } else if let start = lines.firstIndex(where: { Self.isStart($0) }) {
+            lines.insert(contentsOf: block, at: start)
+        } else {
+            if let last = lines.last, !last.isEmpty { lines.append("") }
+            lines.append(contentsOf: block)
+        }
+    }
+
+    private func removeBullets(_ text: String, inSection name: String) {
+        guard let (header, end) = manualSection(name) else { return }
+        for i in stride(from: end - 1, to: header, by: -1) {
+            let s = lines[i].trimmingCharacters(in: .whitespaces)
+            if (s.hasPrefix("- ") || s.hasPrefix("* ")), s.dropFirst(2).trimmingCharacters(in: .whitespaces).lowercased() == text.lowercased() {
+                lines.remove(at: i)
+            }
+        }
+    }
+
+    private func save() {
+        do {
+            try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("Ionian Flow: vocabulary save failed: %@", error.localizedDescription)
+        }
+        reload()
+    }
+
+    /// The sweep and your editor replace the file atomically, so the folder is what changes.
+    private func watch() {
+        let dir = url.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.pendingReload?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.reload() }
+            self.pendingReload = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        watcher = source
+    }
+}

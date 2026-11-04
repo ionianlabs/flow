@@ -11,7 +11,7 @@ Ionian Flow is dictation and meeting transcripts for the Mac, in German and Engl
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/dictation-dark.png">
-  <img src="docs/images/dictation.png" alt="The dictation pill showing a German sentence as it is spoken" width="100%">
+  <img src="docs/images/dictation.png" alt="The dictation pill over two lines, showing a German and English sentence as it is spoken" width="100%">
 </picture>
 
 ## What you get.
@@ -39,13 +39,14 @@ The first launch opens a setup guide.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup-guide-dark.png">
-  <img src="docs/images/setup-guide.png" alt="The setup guide on its first step" width="50%">
+  <img src="docs/images/setup-guide.png" alt="The setup guide on its welcome step" width="50%">
 </picture>
 
 1. **Permissions**, one at a time, each with its reason. Microphone hears you, Accessibility pastes, Input Monitoring reads the key. System Audio is optional, for meetings.
 2. **Your key.** Right ⌥ unless you pick another.
 3. **Your words.** Connect an Obsidian vault or a folder of Markdown notes, or skip it.
-4. **Try it** in a text field.
+4. **Models.** The speech model is required, the cleanup model is optional. Progress shows here.
+5. **Try it** in a text field.
 
 You can reopen the guide in Settings, on the General page.
 
@@ -87,7 +88,7 @@ Choose Settings in the menu bar, or press ⌘, for the Ionian Flow window. It ha
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/window-general-dark.png">
-  <img src="docs/images/window-general.png" alt="The General page of the Ionian Flow window" width="50%">
+  <img src="docs/images/window-general.png" alt="The General page of the Ionian Flow window, with totals, app options and the two models" width="60%">
 </picture>
 
 ## Keep it private.

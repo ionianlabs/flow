@@ -197,13 +197,15 @@ extension AppModel.Page {
 private struct Sidebar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var sweeper: VaultSweeper
-    private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    @Environment(\.ionianOffscreen) private var offscreen  // the live sidebar material can't be drawn offscreen
+    private let version = UserDefaults.standard.string(forKey: "renderVersion")  // set by --render only
+        ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
 
     var body: some View {
         List(selection: Binding(get: { model.page }, set: { if let page = $0 { model.page = page } })) {
             ForEach(AppModel.Page.allCases) { page in
                 HStack {
-                    Label { Text(page.rawValue).ionianText(IonianType.small) } icon: { Image(systemName: page.symbol) }
+                    Label { Text(page.rawValue).ionianText(IonianType.small) } icon: { Image(systemName: page.symbol).foregroundStyle(offscreen ? Color.muted : Color.secondary) }
                     if page == .vocabulary && sweeper.running {
                         Spacer()
                         ProgressView().controlSize(.mini)
@@ -214,6 +216,8 @@ private struct Sidebar: View {
         }
         .listStyle(.sidebar)
         .tint(Color.btnBg)
+        .scrollContentBackground(offscreen ? .hidden : .automatic)
+        .background(offscreen ? Color.surface : Color.clear)
         .safeAreaInset(edge: .top, spacing: 0) {
             Lockup().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 8)
         }
@@ -238,6 +242,9 @@ private struct Sidebar: View {
 
 /// The pure parts of the General page: the totals line and when the how-to shows.
 enum GeneralLayout {
+    /// The renderer pins this to en_US so the sample reads "2,545" on every Mac.
+    nonisolated(unsafe) static var numberLocale = Locale.autoupdatingCurrent
+
     struct Total: Equatable {
         var value: String
         var label: String
@@ -245,7 +252,7 @@ enum GeneralLayout {
 
     /// "2,545 words", "23 min of meetings", "≈ 46 min saved": value in mono, label muted.
     static func totals(words: Int, transcribedSeconds: Int, savedSeconds: Int) -> [Total] {
-        [Total(value: words.formatted(), label: words == 1 ? "word" : "words"),
+        [Total(value: words.formatted(.number.locale(numberLocale)), label: words == 1 ? "word" : "words"),
          Total(value: duration(transcribedSeconds), label: "of meetings"),
          Total(value: (savedSeconds >= 60 ? "≈ " : "") + duration(savedSeconds), label: "saved")]
     }

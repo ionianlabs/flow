@@ -16,9 +16,11 @@ import SwiftUI
         "hud": hud(text: "Das Meeting ist um zehn, can you send the deck?"),
         "hud-long": hud(text: "Hallo Team, ich schicke euch die Präsentation heute Nachmittag. Für morgen haben wir drei Themen, "
             + "erstens das Budget, zweitens die Roadmap und drittens das Hiring, can you confirm the numbers by noon?"),
+        "hud-two-lines": hud(text: "Das Meeting ist um zehn, can you send the deck? Ich bringe die Zahlen mit."),
         "hud-empty": hud(text: ""),
         "hud-handsfree": hud(text: "", locked: true),
         "settings-general": generalSurface(.normal, width: 820),
+        "settings-general-shot": generalSurface(.normal, width: 820, height: 540),
         "settings-general-fresh": generalSurface(.fresh, width: 820),
         "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
         "settings-general-min": generalSurface(.normal, width: 700),
@@ -32,6 +34,7 @@ import SwiftUI
         "models-downloading": onboarding(4, models: .downloading), "models-error": onboarding(4, models: .error),
         "models-skipped": onboarding(4, models: .skipped), "models-done": onboarding(4, models: .done),
         "vocabulary": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularySample())) }),
+        "vocabulary-shot": Surface(size: CGSize(width: 820, height: 760), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularySample())) }),
         "vocabulary-large": Surface(size: CGSize(width: 820, height: 900), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge())) }),
         "vocabulary-large-category": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), category: "People")) }),
         "vocabulary-search": Surface(size: CGSize(width: 820, height: 700), make: { AnyView(mainViewForRender(page: .vocabulary, vocabulary: vocabularyLarge(), query: "ar")) }),
@@ -59,8 +62,8 @@ import SwiftUI
     ]
 
     /// General in a known state: neutral sample totals (2,545 words, 23 min of meetings) unless fresh.
-    private static func generalSurface(_ state: RenderState, width: CGFloat) -> Surface {
-        Surface(size: CGSize(width: width, height: 1000), make: {
+    private static func generalSurface(_ state: RenderState, width: CGFloat, height: CGFloat = 1000) -> Surface {
+        Surface(size: CGSize(width: width, height: height), make: {
             var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
             domain["statsWords"] = state == .fresh ? 0 : 2545
             domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
@@ -169,9 +172,10 @@ import SwiftUI
         IonianFont.register()
         // Highest-priority defaults, in memory only: renders never show or change this Mac's real settings.
         UserDefaults.standard.setVolatileDomain([
-            "vault": "/tmp/Northwind Notes", "lastVaultScan": Date().addingTimeInterval(-3600), "dictationKey": "rightOption",
+            "renderVersion": "0.1.0", "vault": "/tmp/Northwind Notes", "lastVaultScan": Date().addingTimeInterval(-3600), "dictationKey": "rightOption",
             "vocabularyReviewed": ["jana weber", "lena", "qa"],
         ], forName: UserDefaults.argumentDomain)
+        GeneralLayout.numberLocale = Locale(identifier: "en_US")
         let dark = args.contains("--dark")
         let names = args.filter { !$0.hasPrefix("--") }
         guard names.count == 2 else {

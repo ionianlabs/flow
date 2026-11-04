@@ -18,7 +18,12 @@ import SwiftUI
             + "erstens das Budget, zweitens die Roadmap und drittens das Hiring, can you confirm the numbers by noon?"),
         "hud-empty": hud(text: ""),
         "hud-handsfree": hud(text: "", locked: true),
-        "settings-general": Surface(size: CGSize(width: 820, height: 1120), make: { AnyView(mainViewForRender(page: .general)) }),
+        "settings-general": generalSurface(.normal, width: 820),
+        "settings-general-fresh": generalSurface(.fresh, width: 820),
+        "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
+        "settings-general-min": generalSurface(.normal, width: 700),
+        "settings-general-fresh-min": generalSurface(.fresh, width: 700),
+        "settings-general-cleanup-off-min": generalSurface(.cleanupOff, width: 700),
         "settings-shortcuts": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .shortcuts)) }),
         "settings-dictation": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .dictation)) }),
         "settings-transcription": Surface(size: CGSize(width: 820, height: 640), make: { AnyView(mainViewForRender(page: .transcription)) }),
@@ -52,6 +57,17 @@ import SwiftUI
             AnyView(transcriptPreview().frame(width: 400, height: 640))
         }),
     ]
+
+    /// General in a known state: neutral sample totals (2,545 words, 23 min of meetings) unless fresh.
+    private static func generalSurface(_ state: RenderState, width: CGFloat) -> Surface {
+        Surface(size: CGSize(width: width, height: 1000), make: {
+            var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            domain["statsWords"] = state == .fresh ? 0 : 2545
+            domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
+            UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+            return AnyView(mainViewForRender(page: .general, state: state))
+        })
+    }
 
     private static func hud(text: String, locked: Bool = false) -> Surface {
         Surface(size: CGSize(width: 720, height: 220), backdrop: true, make: {

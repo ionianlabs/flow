@@ -15,18 +15,6 @@ if let i = CommandLine.arguments.firstIndex(of: "--wordfreq-zipf"), CommandLine.
     exit(VocabNormalizer.zipfFile(CommandLine.arguments[i + 1]) ? 0 : 1)
 }
 
-if CommandLine.arguments.contains("--selftest") {
-    let fillers = FillerFilter.selfTest()
-    let formatting = TextFormatter.selfTest()
-    let echo = Transcriber.echoSelfTest()
-    let vocabulary = VocabularyStore.selfTest()
-    let normalizer = VocabNormalizer.selfTest()
-    let fake = EngineFake.selfTest()
-    let engine = EngineSelfTests.all()
-    let segmenter = Segmenter.selfTest()
-    exit(fillers && formatting && echo && vocabulary && normalizer && fake && engine && segmenter ? 0 : 1)
-}
-
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     /// recording: key held (or locked hands-free). tapPending: a short tap that may become a double-tap.
     /// transcribing: transcription mode (double-tap); dictation is off until it stops.

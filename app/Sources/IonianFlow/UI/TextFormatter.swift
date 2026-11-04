@@ -137,31 +137,4 @@ enum TextFormatter {
     private static func regex(_ p: String, caseInsensitive: Bool = false) -> NSRegularExpression {
         try! NSRegularExpression(pattern: p, options: caseInsensitive ? [.caseInsensitive] : [])
     }
-
-    /// Part of `IonianFlow --selftest`.
-    static func selfTest() -> Bool {
-        let cases: [(String, String)] = [
-            ("Wir haben drei Themen, erstens das Budget, zweitens die Roadmap und drittens das Hiring.",
-             "Wir haben drei Themen:\n1. Das Budget\n2. Die Roadmap\n3. Das Hiring."),
-            ("First, update the docs. Second, ship the release. Third, tell the team. Thanks everyone.",
-             "1. Update the docs.\n2. Ship the release.\n3. Tell the team.\n\nThanks everyone."),
-            ("Punkt eins Kaffee, Punkt zwei Milch", "1. Kaffee\n2. Milch"),
-            ("The first time I tried it, it worked.", "The first time I tried it, it worked."),
-            ("First, let me check that.", "First, let me check that."),
-            ("Give me a second, first I need coffee.", "Give me a second, first I need coffee."),
-            ("Hallo Team. Neue Zeile. Wie geht's?", "Hallo Team.\nWie geht's?"),
-            ("Thanks, new paragraph, best regards", "Thanks\n\nBest regards"),
-            ("Erstens, wir starten morgen", "Erstens, wir starten morgen"),  // live partial: no list yet
-            ("Erstens, wir starten morgen, zweitens", "1. Wir starten morgen\n2. "),
-        ]
-        var ok = true
-        for (input, expected) in cases {
-            let got = format(input)
-            let pass = got == expected
-            ok = ok && pass
-            func show(_ s: String) -> String { s.replacingOccurrences(of: "\n", with: "⏎") }
-            print("\(pass ? "PASS" : "FAIL")  \(show(input))  ->  \(show(got))\(pass ? "" : "   (expected: \(show(expected)))")")
-        }
-        return ok
-    }
 }

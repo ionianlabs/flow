@@ -1,16 +1,15 @@
 import Foundation
+import Testing
+@testable import IonianFlow
 
-// Unit E. Model-free checks for the Polisher guards and glossary; called from EngineSelfTests.all().
+// Unit E. Model-free checks for the Polisher guards and glossary; run by `swift test`.
 // Expected values were produced by calling the former Python polish.py's functions (messages, finish, grounded, ...) once.
 
-enum PolisherSelfTest {
-    static func run() -> Bool {
-        var failures = 0
+extension IonianFlowTests {
+@Suite struct PolisherRules {
+    @Test func rules() {
         func check<T: Equatable>(_ name: String, _ got: T, _ want: T) {
-            if got != want {
-                failures += 1
-                FileHandle.standardError.write(Data("polisher selftest FAIL \(name): got \(got), want \(want)\n".utf8))
-            }
+            #expect(got == want, "\(name)")
         }
         typealias R = PolishRules
 
@@ -112,7 +111,6 @@ enum PolisherSelfTest {
               "Context (never output this):\nPrevious segment: prev\nSegment: Hallo\nOutput:")
         check("messages system", R.messages("x").system.hasPrefix("You clean up one segment") && R.messages("x").system.hasSuffix("I think."), true)
         check("max_tokens", [R.maxTokens("abcde"), R.maxTokens("äö")], [42, 41])
-
-        return failures == 0
     }
+}
 }

@@ -84,7 +84,7 @@ final class VocabularyStore: ObservableObject {
     }
 
     /// A term that left the file and comes back later counts as new again. Only for the real file:
-    /// the selftest's and demos' temporary files would otherwise clear the list.
+    /// the unit tests' and demos' temporary files would otherwise clear the list.
     private func pruneReviewed() {
         guard url.standardizedFileURL == Settings.vocabularyFile.standardizedFileURL else { return }
         let ids = Set(entries.map(\.id))
@@ -211,36 +211,5 @@ final class VocabularyStore: ObservableObject {
         source.setCancelHandler { close(fd) }
         source.resume()
         watcher = source
-    }
-
-    // MARK: Self-test
-
-    /// Leaves its file at /tmp/ionian-flow-vocab-selftest.md, so the former Python vocab.py can be checked against it.
-    static func selfTest() -> Bool {
-        let url = URL(fileURLWithPath: "/tmp/ionian-flow-vocab-selftest.md")
-        let sample = template.replacingOccurrences(of: "## Terms\n", with: "## Terms\n- ACME\n- pull request (heard as: pool request)\n")
-            + "\n\(start) x -->\n## From vault: Notes\n\n### People\n- Jana Weber\n- Lena\n\n### Products\n- Gemma\n\(end)\n"
-        try? sample.write(to: url, atomically: true, encoding: .utf8)
-        let store = VocabularyStore(url: url, watch: false)
-        var ok = true
-        func check(_ cond: Bool, _ what: String) {
-            if !cond { ok = false; print("FAIL vocabulary: \(what)") }
-        }
-        check(store.entries.map(\.text) == ["ACME", "pull request", "Jana Weber", "Lena", "Gemma"], "parse \(store.entries.map(\.text))")
-        check(store.entries[1].aliases == ["pool request"], "aliases")
-        store.remove(store.entries.first { $0.text == "Lena" }!)  // vault term: goes to Ignore
-        check(store.ignored == ["Lena"] && !store.entries.contains { $0.text == "Lena" }, "remove vault term")
-        store.add("Lena", category: "People")  // yours now: no longer ignored
-        check(store.ignored.isEmpty && store.entries.contains { $0.text == "Lena" && $0.source == .mine }, "re-add")
-        store.add("Data Garage", category: "Projects")  // new section
-        check(store.entries.contains { $0.text == "Data Garage" && $0.category == "Projects" }, "new section")
-        store.remove(store.entries.first { $0.text == "ACME" }!)
-        check(!store.entries.contains { $0.text == "ACME" } && store.ignored.isEmpty, "remove own term")
-        store.setDomain("logistics IT")
-        check(store.domain == "logistics IT", "domain")
-        let reread = VocabularyStore(url: url, watch: false)
-        check(reread.entries.map(\.text) == store.entries.map(\.text), "round trip")
-        print(ok ? "vocabulary ok" : "vocabulary FAILED")
-        return ok
     }
 }

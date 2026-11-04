@@ -15,6 +15,16 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 cp "$ROOT/app/.build/release/IonianFlow" "$APP/Contents/MacOS/IonianFlow"
+# Swift 6.2 back-deployment library: macOS 26 has it in /usr/lib/swift, macOS 15 does not, and the binary would
+# otherwise only find it in the Xcode toolchain rpath (absent on a user's Mac). Ship it next to the binary.
+if otool -L "$APP/Contents/MacOS/IonianFlow" | grep -q "@rpath/libswiftCompatibilitySpan.dylib"; then
+  SPAN="$(dirname "$(xcrun --find swift)")/../lib/swift-6.2/macosx/libswiftCompatibilitySpan.dylib"
+  [ -f "$SPAN" ] || SPAN="$(dirname "$(xcrun --find swift)")/../lib/swift/macosx/libswiftCompatibilitySpan.dylib"
+  mkdir -p "$APP/Contents/Frameworks"
+  cp "$SPAN" "$APP/Contents/Frameworks/libswiftCompatibilitySpan.dylib"
+  install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/IonianFlow"
+  codesign --force --sign - "$APP/Contents/Frameworks/libswiftCompatibilitySpan.dylib" >/dev/null 2>&1 || true
+fi
 cp "$ROOT/app/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp -R "$ROOT/app/Resources/Fonts" "$APP/Contents/Resources/Fonts"
 cp -R "$ROOT/app/Resources/Chrome" "$APP/Contents/Resources/Chrome"

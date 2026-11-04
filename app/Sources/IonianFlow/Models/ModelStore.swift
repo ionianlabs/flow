@@ -201,10 +201,16 @@ final class ModelStore: @unchecked Sendable {
     static var ctcDirectory: URL {
         speechDirectory.appendingPathComponent(CtcModels.defaultCacheDirectory(for: .ctc110m).lastPathComponent)
     }
-    /// Silero VAD for transcription segments: VadManager's base directory (it adds Models/silero-vad-coreml).
+    /// Silero VAD for transcription segments: VadManager's base directory (it adds Models/<repo folder>/<model>).
     static var vadDirectory: URL { speechDirectory.appendingPathComponent("vad", isDirectory: true) }
-    static var vadModelDirectory: URL {
-        vadDirectory.appendingPathComponent("Models/silero-vad-coreml/\(ModelNames.VAD.sileroVadFile)", isDirectory: true)
+    /// The downloaded VAD model bundle, wherever FluidAudio put it below Models/. The repo folder is "silero-vad" in
+    /// FluidAudio 0.18.2, not the "silero-vad-coreml" of its Repo name: a hard-coded path never matched, so
+    /// isInstalled(.speech) stayed false after a complete first-launch download. nil while it is not on disk.
+    static var vadModelDirectory: URL? {
+        let models = vadDirectory.appendingPathComponent("Models", isDirectory: true)
+        let subs = (try? FileManager.default.contentsOfDirectory(at: models, includingPropertiesForKeys: nil)) ?? []
+        return subs.map { $0.appendingPathComponent(ModelNames.VAD.sileroVadFile, isDirectory: true) }
+            .first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("weights/weight.bin").path) }
     }
     static var gemmaDirectory: URL { root.appendingPathComponent("gemma-4-e2b-it-4bit", isDirectory: true) }
 
@@ -263,7 +269,7 @@ final class ModelStore: @unchecked Sendable {
         return nemotronInstalled()
             && AsrModels.modelsExist(at: parakeetDirectory, version: .ultra)
             && CtcModels.modelsExist(at: ctcDirectory)
-            && FileManager.default.fileExists(atPath: vadModelDirectory.path)
+            && vadModelDirectory != nil
             && !hasPartial(speechDirectory)
     }
 

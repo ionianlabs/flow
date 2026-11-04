@@ -1,4 +1,5 @@
 import CryptoKit
+import FluidAudio
 import Foundation
 import Testing
 @testable import IonianFlow
@@ -65,6 +66,13 @@ extension IonianFlowTests {
         // isInstalled / remove / approximateBytes (sparse files stand in for the 3.5 GB weights)
         check(ModelStore.root.path.hasSuffix("root"), "IONIAN_FLOW_MODELS overrides the root")
         check(!store.isInstalled(.cleanup), "cleanup not installed on an empty root")
+        check(ModelStore.vadModelDirectory == nil, "no VAD model on an empty root")
+        // The layout FluidAudio 0.18.2 really writes (found by the first-launch acceptance download).
+        let vadBundle = ModelStore.vadDirectory.appendingPathComponent("Models/silero-vad/\(ModelNames.VAD.sileroVadFile)/weights")
+        try? fm.createDirectory(at: vadBundle, withIntermediateDirectories: true)
+        fm.createFile(atPath: vadBundle.appendingPathComponent("weight.bin").path, contents: Data([1]))
+        check(ModelStore.vadModelDirectory != nil, "VAD model found in the folder FluidAudio really writes")
+        try? fm.removeItem(at: ModelStore.vadDirectory)
         let dir = ModelStore.gemmaDirectory
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         for f in ModelStore.gemmaFiles {

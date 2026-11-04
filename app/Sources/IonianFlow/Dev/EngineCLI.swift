@@ -9,11 +9,11 @@ enum EngineCLI {
         let routes: [(String, ([String]) -> Int32)] = [
             ("--enginetest-live", NativeLive.cli),            // B
             ("--enginetest-dictation", DictationFinal.cli),   // C
-            ("--enginetest-hub", ModelHubTests.cli),          // D
+            ("--enginetest-hub", ModelHubCLI.cli),          // D
             ("--enginetest-polish", PolisherCLI.cli),         // E
             ("--enginetest-summary", SummarizerCLI.cli),      // F
             ("--enginetest-sweep", VaultSweep.cli),           // F
-            ("--enginetest-store", ModelStoreTests.cli),      // G
+            ("--enginetest-store", ModelStoreCLI.cli),      // G
             ("--e2e-engine", E2E.cli),                        // integration
             ("--score-dictation", WERScore.scoreDictationCLI),
             ("--compare-transcribe", WERScore.compareTranscribeCLI),

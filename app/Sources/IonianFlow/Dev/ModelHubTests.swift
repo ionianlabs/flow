@@ -81,9 +81,9 @@ enum ModelHubTests {
 
     private static func defaultDataDir(_ file: String = #filePath) -> String {
         if let b = ProcessInfo.processInfo.environment["FLOW_BENCH"] { return b + "/data" }
-        // <repo>/app/Sources/IonianFlow/ModelHubTests.swift -> <repo>/../flow-bench/bench/data
+        // <repo>/app/Sources/IonianFlow/Dev/ModelHubTests.swift -> <repo>/../flow-bench/bench/data
         var u = URL(fileURLWithPath: file)
-        for _ in 0..<4 { u.deleteLastPathComponent() }
+        for _ in 0..<5 { u.deleteLastPathComponent() }
         return u.deletingLastPathComponent().appendingPathComponent("flow-bench/bench/data").path
     }
 }

@@ -206,7 +206,7 @@ Images in this repo come only from the app's offscreen renderer or from headless
 | Command | What it does |
 |---|---|
 | `swift test --package-path app` | Model-free unit tests (`app/Tests/IonianFlowTests`, Swift Testing): filler filter, formatter, and every engine unit (live cuts, finalizer guard, hub, polish, summary, sweep, model store, vocabulary, WER scoring) |
-| `IONIAN_FLOW_MODEL_TESTS=1 python3 <native-bench>/withlock.py swift test --package-path app` | The same plus the tests that need downloaded models (the Silero VAD segmenter cases); run them under the model lock |
+| `IONIAN_FLOW_MODEL_TESTS=1 swift test --package-path app` | The same plus the tests that need downloaded models (the Silero VAD segmenter cases) |
 | `... --enginetest-live [--per N] [--data DIR] [--mixed DIR] [--cut-every S] [--vocab FILE]` | Clips through the live decoder: WER, language tags, segment counts |
 | `... --enginetest-dictation vocab DIR`, `dict MANIFEST VOCAB.md OUTDIR`, `latency MANIFEST VOCAB.md` | The dictation final pass on a clip set (hypotheses as JSON lines), and release-to-text latency |
 | `... --enginetest-hub`, `--enginetest-polish`, `--enginetest-summary`, `--enginetest-sweep --vault DIR --out FILE [--no-llm]` | Model hub, cleanup (JSON lines on stdin), summaries on fixtures, vocabulary sweep |

@@ -1,0 +1,164 @@
+import Foundation
+
+/// How common a word is in ordinary German or English text, on wordfreq's Zipf scale (a word
+/// at 4.0 is one in 100,000). Behind a protocol so the source can change.
+///
+/// The table is app/Resources/wordfreq.tsv, committed as data (wordfreq's data, CC BY-SA 4.0, see
+/// ThirdPartyNotices.md). One line per word: `word<TAB>de<TAB>en`, Zipf frequency times 100 as an integer,
+/// empty where the word is below 3.0 in that language. Words are tokenized like `tokens` below (lowercase,
+/// "ß" as "ss", digit runs as zeros). To use another source, write a file in the same format.
+protocol WordFrequency {
+    /// Zipf frequency of `word` (one or more tokens) in "de" or "en"; 0 when unknown or below the table's 3.0.
+    func zipf(_ word: String, lang: WordFrequencyLanguage) -> Double
+}
+
+enum WordFrequencyLanguage { case de, en }
+
+extension WordFrequency {
+    /// vocab.common(): a word you'd find in ordinary German or English text (at 3.0: also less frequent ones, "Gamma").
+    func common(_ word: String, zipf threshold: Double = 4.0) -> Bool {
+        let w = word.lowercased()
+        return max(zipf(w, lang: .de), zipf(w, lang: .en)) >= threshold
+    }
+}
+
+/// The generated table: `word<TAB>de<TAB>en`, Zipf times 100, empty below 3.0.
+final class WordFrequencyTable: WordFrequency {
+    private var de: [String: Int16] = [:], en: [String: Int16] = [:]
+    let isEmpty: Bool
+
+    /// The app bundle's copy, else $IONIAN_WORDFREQ, else the repo's (for `swift build` runs).
+    static let shared: WordFrequencyTable = {
+        var candidates: [URL] = []
+        if let u = Bundle.main.url(forResource: "wordfreq", withExtension: "tsv") { candidates.append(u) }
+        if let p = ProcessInfo.processInfo.environment["IONIAN_WORDFREQ"] { candidates.append(URL(fileURLWithPath: p)) }
+        candidates.append(URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../../Resources/wordfreq.tsv").standardized)
+        for url in candidates {
+            if let data = try? Data(contentsOf: url) { return WordFrequencyTable(tsv: data) }
+        }
+        NSLog("Ionian Flow: wordfreq.tsv not found; every word counts as uncommon")
+        return WordFrequencyTable(tsv: Data())
+    }()
+
+    init(tsv: Data) {
+        let rows = tsv.split(separator: UInt8(ascii: "\n"))
+        de.reserveCapacity(rows.count); en.reserveCapacity(rows.count)
+        for row in rows {
+            let cols = row.split(separator: UInt8(ascii: "\t"), omittingEmptySubsequences: false)
+            guard cols.count == 3, let word = String(data: Data(cols[0]), encoding: .utf8) else { continue }
+            if let v = Int16(String(decoding: cols[1], as: UTF8.self)) { de[word] = v }
+            if let v = Int16(String(decoding: cols[2], as: UTF8.self)) { en[word] = v }
+        }
+        isEmpty = rows.isEmpty
+    }
+
+    func zipf(_ word: String, lang: WordFrequencyLanguage) -> Double {
+        let table = lang == .de ? de : en
+        let tokens = Self.tokens(word)
+        if tokens.isEmpty { return 0 }
+        var oneOver = 0.0
+        for token in tokens {
+            let smashed = Self.smashNumbers(token)
+            guard let z = table[smashed] else { return 0 }  // any token missing: unknown
+            var freq = pow(10, Double(z) / 100 - 9)
+            if smashed != token { freq *= Self.digitFreq(token) }
+            oneOver += 1 / freq
+        }
+        if tokens.count == 1, tokens[0] == Self.smashNumbers(tokens[0]) { return Double(table[tokens[0]]!) / 100 }
+        return (log10(1 / oneOver) + 9).rounded(toPlaces: 2)
+    }
+
+    // MARK: wordfreq's tokenizer, roughly: lowercase and "ß" as "ss" (casefold), words are runs of
+    // letters and digits, joined across a single ' or ’ or . between letters ("don't", "node.js").
+
+    static func tokens(_ text: String) -> [String] {
+        let folded = Array(text.lowercased().replacingOccurrences(of: "ß", with: "ss").unicodeScalars)
+        func wordy(_ u: Unicode.Scalar) -> Bool {
+            switch u.properties.generalCategory {
+            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+                 .nonspacingMark, .spacingMark, .enclosingMark,
+                 .decimalNumber, .letterNumber, .otherNumber, .connectorPunctuation: return true
+            default: return false
+            }
+        }
+        func letter(_ u: Unicode.Scalar) -> Bool { u.properties.isAlphabetic }
+        func digit(_ u: Unicode.Scalar) -> Bool { u.properties.generalCategory == .decimalNumber }
+        var out: [String] = [], cur = String.UnicodeScalarView()
+        var i = 0
+        func flush() {
+            let t = String(cur).trimmingCharacters(in: CharacterSet(charactersIn: "'"))
+            if !t.isEmpty { out.append(t) }
+            cur = .init()
+        }
+        while i < folded.count {
+            let u = folded[i]
+            if wordy(u) {
+                cur.append(u)
+            } else if "'’.,".unicodeScalars.contains(u), !cur.isEmpty, i + 1 < folded.count {
+                let prev = folded[i - 1], next = folded[i + 1]
+                if (letter(prev) && letter(next) && u != ",") || (digit(prev) && digit(next) && u != "’" && u != "'") {
+                    cur.append(u == "’" ? "'" : u)
+                } else { flush() }
+            } else { flush() }
+            i += 1
+        }
+        flush()
+        return out
+    }
+
+    /// Digit sequences of two or more are looked up as zeros, and told apart by wordfreq's Benford/year estimate.
+    static func smashNumbers(_ t: String) -> String {
+        var out = String.UnicodeScalarView(), run = String.UnicodeScalarView()
+        func flush() {
+            if run.count >= 2 {
+                out.append(contentsOf: run.map { $0.properties.generalCategory == .decimalNumber ? "0" : $0 })
+            } else { out.append(contentsOf: run) }
+            run = .init()
+        }
+        for u in t.unicodeScalars {
+            if u.properties.generalCategory == .decimalNumber || (!run.isEmpty && (u == "." || u == ",")) { run.append(u) } else { flush(); out.append(u) }
+        }
+        flush()
+        return String(out)
+    }
+
+    private static let digitFreqs = [0.009, 0.300, 0.175, 0.124, 0.096, 0.078, 0.066, 0.057, 0.050, 0.045]
+
+    private static func digitFreq(_ t: String) -> Double {
+        var freq = 1.0, run = ""
+        func flush() {
+            if run.count == 4 { freq *= yearFreq(Int(run)!) } else if !run.isEmpty { freq *= digitFreqs[Int(String(run.first!))!] / pow(10, Double(run.count - 1)) }
+            run = ""
+        }
+        // MULTI_DIGIT_RE: \d[\d.,]+ ; then PURE_DIGIT_RE inside each match.
+        let u = Array(t.unicodeScalars)
+        var i = 0
+        while i < u.count {
+            if u[i].properties.generalCategory == .decimalNumber, i + 1 < u.count, u[i + 1].properties.generalCategory == .decimalNumber || u[i + 1] == "." || u[i + 1] == "," {
+                var j = i
+                while j < u.count, u[j].properties.generalCategory == .decimalNumber || u[j] == "." || u[j] == "," {
+                    if u[j].properties.generalCategory == .decimalNumber { run.unicodeScalars.append(u[j]) } else { flush() }
+                    j += 1
+                }
+                flush()
+                i = j
+            } else { i += 1 }
+        }
+        return freq
+    }
+
+    private static func yearFreq(_ year: Int) -> Double {
+        let peak = -1.9185, ref = 2019
+        let logFreq: Double
+        if year <= ref { logFreq = peak - 0.0083 * Double(ref - year) }
+        else if year <= ref + 20 { logFreq = peak }
+        else { logFreq = peak - 0.2 * Double(year - (ref + 20)) }
+        let s = String(format: "%04d", year)
+        return pow(10, logFreq) + 0.1 * digitFreqs[Int(String(s.first!))!] / 1000
+    }
+}
+
+private extension Double {
+    func rounded(toPlaces n: Int) -> Double { let m = Foundation.pow(10, Double(n)); return (self * m).rounded() / m }
+}

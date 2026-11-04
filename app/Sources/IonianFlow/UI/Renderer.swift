@@ -178,38 +178,55 @@ import SwiftUI
     @discardableResult
     static func render(_ name: String, dark: Bool, to url: URL) -> Bool {
         guard let surface = surfaces[name] else { print("unknown surface \(name)"); return false }
-        let size = surface.size
-        let content = ZStack {
-            if surface.backdrop { ChromeStill(name: "breeze").frame(width: size.width, height: size.height) }
-            surface.make()
-        }
-        .environment(\.ionianOffscreen, true)
-        .frame(width: size.width, height: size.height)
-
-        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        let host = NSHostingView(rootView: content)
-        host.sizingOptions = []
-        host.appearance = appearance
-        host.frame = CGRect(origin: .zero, size: size)
-        // Never ordered in: the window only gives the hosting view somewhere to live, far off screen.
-        let window = NSWindow(contentRect: CGRect(x: -20000, y: -20000, width: size.width, height: size.height),
-                              styleMask: .borderless, backing: .buffered, defer: false)
-        window.appearance = appearance
-        window.isReleasedWhenClosed = false
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
+        let canvas = Canvas(surface, dark: dark)
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))  // let SwiftUI finish its first pass
-        host.layoutSubtreeIfNeeded()
-
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2), bitsPerSample: 8,
-            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        else { return false }
-        rep.size = size  // 2 pixels per point
-        host.cacheDisplay(in: host.bounds, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
-        try? png.write(to: url)
+        guard canvas.snapshot(to: url) else { return false }
         print("wrote \(url.path)")
         return true
+    }
+
+    /// One surface in an offscreen host, kept alive so a script can change its model and take frames over time.
+    @MainActor final class Canvas {
+        let host: NSHostingView<AnyView>
+        private let window: NSWindow
+        let size: CGSize
+
+        init(_ surface: Surface, dark: Bool) {
+            size = surface.size
+            let size = surface.size
+            let content = ZStack {
+                if surface.backdrop { ChromeStill(name: "breeze").frame(width: size.width, height: size.height) }
+                surface.make()
+            }
+            .environment(\.ionianOffscreen, true)
+            .frame(width: size.width, height: size.height)
+
+            let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+            host = NSHostingView(rootView: AnyView(content))
+            host.sizingOptions = []
+            host.appearance = appearance
+            host.frame = CGRect(origin: .zero, size: size)
+            // Never ordered in: the window only gives the hosting view somewhere to live, far off screen.
+            window = NSWindow(contentRect: CGRect(x: -20000, y: -20000, width: size.width, height: size.height),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+            window.appearance = appearance
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+        }
+
+        /// The current state as a PNG, 2 pixels per point.
+        @discardableResult
+        func snapshot(to url: URL) -> Bool {
+            host.layoutSubtreeIfNeeded()
+            guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2), bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+            else { return false }
+            rep.size = size
+            host.cacheDisplay(in: host.bounds, to: rep)
+            guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+            return (try? png.write(to: url)) != nil
+        }
     }
 }

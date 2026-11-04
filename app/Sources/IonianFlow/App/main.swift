@@ -651,6 +651,15 @@ if CommandLine.arguments.contains("--systemaudiotest") {
     exit(0)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--overlay-record") {
+    exit(OverlayReplay.record(Array(CommandLine.arguments.dropFirst(i + 1))))
+}
+
+if let i = CommandLine.arguments.firstIndex(of: "--overlay-replay") {
+    _ = NSApplication.shared
+    exit(MainActor.assumeIsolated { OverlayReplay.replay(Array(CommandLine.arguments.dropFirst(i + 1))) })
+}
+
 if let i = CommandLine.arguments.firstIndex(of: "--render") {
     _ = NSApplication.shared
     exit(MainActor.assumeIsolated { Renderer.run(Array(CommandLine.arguments.dropFirst(i + 1))) })

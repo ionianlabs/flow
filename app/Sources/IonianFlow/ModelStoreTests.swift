@@ -291,7 +291,7 @@ enum ModelStoreTests {
             for c in changed { print("     changed: \(c.key) \(c.value) -> \(inv2[c.key].map(String.init) ?? "gone")") }
             let partialBytes = inv1.filter { $0.key.hasSuffix(".partial") }
             print("     partials at cancel: \(partialBytes.map { "\($0.key) \(mb($0.value))" })")
-            for (k, v) in partialBytes { let f = String(k.dropLast(8)); print("     partial \(f): final size \(inv2[f].map(mb) ?? "missing")") }
+            for (k, _) in partialBytes { let f = String(k.dropLast(8)); print("     partial \(f): final size \(inv2[f].map(mb) ?? "missing")") }
             check(changed.isEmpty, "\(completed.count) files complete at cancel kept their size (\(mb(completed.values.reduce(0, +)))); remaining to fetch \(mb(total - completed.values.reduce(0, +)))")
             // Load and transcribe from the temp root.
             do {

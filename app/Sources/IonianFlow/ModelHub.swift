@@ -67,7 +67,7 @@ actor ModelHub {
             _ = try await m.process(samples: [Float](repeating: 0, count: 16000))
             _ = try await m.finish()
             await m.reset()
-            await self.record(which, t0)
+            self.record(which, t0)
             return m
         }
         nemotronTasks[channel] = t
@@ -85,7 +85,7 @@ actor ModelHub {
             var warm = TdtDecoderState.make()
             _ = try await asr.transcribe([Float](repeating: 0, count: 16000), decoderState: &warm)
             let ctc = try await CtcModels.downloadAndLoad(to: ModelStore.devCaches ? nil : ModelStore.ctcDirectory, variant: .ctc110m)
-            await self.record(.parakeet, t0)
+            self.record(.parakeet, t0)
             return ParakeetModels(asr: asr, ctc: ctc)
         }
         parakeetTask = t
@@ -116,7 +116,7 @@ actor ModelHub {
             let t0 = Date()
             ModelStore.activateMetallib()
             let c = try await LLMModelFactory.shared.loadContainer(from: dir, using: #huggingFaceTokenizerLoader())
-            await self.record(.gemma, t0)
+            self.record(.gemma, t0)
             return c
         }
         gemmaTask = t

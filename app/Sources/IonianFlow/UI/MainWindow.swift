@@ -236,6 +236,34 @@ private struct Sidebar: View {
     }
 }
 
+/// The pure parts of the General page: the totals line and when the how-to shows.
+enum GeneralLayout {
+    struct Total: Equatable {
+        var value: String
+        var label: String
+    }
+
+    /// "2,545 words", "23 min of meetings", "≈ 46 min saved": value in mono, label muted.
+    static func totals(words: Int, transcribedSeconds: Int, savedSeconds: Int) -> [Total] {
+        [Total(value: words.formatted(), label: words == 1 ? "word" : "words"),
+         Total(value: duration(transcribedSeconds), label: "of meetings"),
+         Total(value: (savedSeconds >= 60 ? "≈ " : "") + duration(savedSeconds), label: "saved")]
+    }
+
+    /// "2,545 words · 23 min of meetings · ≈ 46 min saved".
+    static func line(_ totals: [Total]) -> String { totals.map { "\($0.value) \($0.label)" }.joined(separator: " · ") }
+
+    /// The how-to is for the first run: it goes once something has been dictated or transcribed.
+    static func showHowTo(words: Int, transcribedSeconds: Int) -> Bool { words == 0 && transcribedSeconds == 0 }
+
+    /// "0 min", "42 min", "3 h", "6 h 40 min".
+    static func duration(_ seconds: Int) -> String {
+        let minutes = seconds / 60, h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(minutes) min" }
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    }
+}
+
 private struct GeneralPage: View {
     @ObservedObject var model: AppModel
     var actions: AppActions
@@ -243,27 +271,13 @@ private struct GeneralPage: View {
     @State private var login = SMAppService.mainApp.status == .enabled
 
     var body: some View {
+        let _ = model.statsRevision
+        let _ = model.shortcutsRevision
         SettingsPage(.general) {
             StatsSection(model: model)
-            HowToSection(model: model, actions: actions)
-            SettingsSection("Speech model") {
-                SettingRow("Recognizer", "NVIDIA Nemotron, on this Mac's GPU. Nothing goes to the cloud.") {
-                    HStack(spacing: Space.s4) {
-                        StatusDot(state: model.recognizerStatus.state, word: model.recognizerStatus.word, wordColor: Color.muted)
-                        Button("Reload ›", action: actions.reloadEngine)
-                    }
-                    .buttonStyle(.monoLink)
-                }
-            }
-            SettingsSection("Models", note: "Models live in Application Support and work offline. Removing the cleanup model turns cleanup, summaries and LLM extraction off.") {
-                SpeechModelRow(models: actions.models)
-                CleanupModelRow(models: actions.models)
-                if ThirdPartyNoticesRow.url != nil { ThirdPartyNoticesRow() }
-            }
+            if !model.hotkeyActive { PermissionsNotice(actions: actions) }
+            if GeneralLayout.showHowTo(words: Stats.words, transcribedSeconds: Stats.transcribedSeconds) { HowToSection() }
             SettingsSection("App") {
-                SettingRow("Setup guide", "Permissions, your dictation key and a field to try it.") {
-                    Button("Open ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
-                }
                 SettingToggle("Sounds", "A short sound when dictation starts and ends.", isOn: $sounds)
                     .onChange(of: sounds) { Settings.sounds = sounds }
                 SettingToggle("Launch at login", isOn: $login)
@@ -275,12 +289,20 @@ private struct GeneralPage: View {
                             login = SMAppService.mainApp.status == .enabled
                         }
                     }
+                SettingRow("Setup guide", "Permissions, your dictation key and a field to try it.") {
+                    Button("Open ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
+                }
             }
+            SettingsSection("Models") {
+                SpeechModelRow(models: actions.models, recognizer: model.recognizerStatus, reload: actions.reloadEngine)
+                CleanupModelRow(models: actions.models)
+            }
+            ThirdPartyNoticesRow()
         }
     }
 }
 
-/// What Flow has done for you so far: words dictated, meetings transcribed, typing time saved.
+/// What Flow has done for you so far: words dictated, meetings transcribed, typing time saved, on one line.
 private struct StatsSection: View {
     @ObservedObject var model: AppModel
     @State private var confirmReset = false
@@ -288,14 +310,21 @@ private struct StatsSection: View {
     var body: some View {
         let _ = model.statsRevision
         let empty = Stats.words == 0 && Stats.transcribedSeconds == 0
+        let totals = GeneralLayout.totals(words: Stats.words, transcribedSeconds: Stats.transcribedSeconds, savedSeconds: Stats.savedSeconds)
         SettingsSection("So far", accessory: {
             if !empty { Button("Reset ›") { confirmReset = true }.buttonStyle(.monoLink) }
         }, footer: {
             if empty { SettingsNote("Your first dictation starts the count. Flow keeps only the totals, never the text.") }
         }) {
-            stat("Words dictated", Stats.words.formatted())
-            stat("Meetings transcribed", Self.duration(Stats.transcribedSeconds))
-            stat("Saved over typing", (Stats.savedSeconds >= 60 ? "≈ " : "") + Self.duration(Stats.savedSeconds))
+            // One line; at a narrow width the three totals stack instead of breaking mid-phrase.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s2) { items(totals) }
+                VStack(alignment: .leading, spacing: 0) { ForEach(totals, id: \.label) { total($0) } }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: Space.s6)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(GeneralLayout.line(totals))
         }
         .confirmationDialog("Reset the totals to zero.", isPresented: $confirmReset) {
             Button("Reset") {
@@ -305,30 +334,31 @@ private struct StatsSection: View {
         }
     }
 
-    private func stat(_ title: String, _ value: String) -> some View {
-        SettingRow(title) { Text(value).ionianText(IonianType.code).foregroundStyle(Color.muted) }
+    @ViewBuilder private func items(_ totals: [GeneralLayout.Total]) -> some View {
+        ForEach(Array(totals.enumerated()), id: \.offset) { i, t in
+            if i > 0 { Text("·").ionianText(IonianType.small).foregroundStyle(Color.muted) }
+            total(t)
+        }
     }
 
-    /// "0 min", "42 min", "3 h", "6 h 40 min".
-    static func duration(_ seconds: Int) -> String {
-        let minutes = seconds / 60, h = minutes / 60, m = minutes % 60
-        if h == 0 { return "\(minutes) min" }
-        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    private func total(_ t: GeneralLayout.Total) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
+            Text(t.value).ionianText(IonianType.code).foregroundStyle(Color.ink)
+            Text(t.label).ionianText(IonianType.small).foregroundStyle(Color.muted)
+        }
+        .fixedSize()
     }
 }
 
-/// How it works, in three steps: hold your key, talk, let go. The other two keys sit below.
+/// How it works, in three steps: hold your key, talk, let go. Shown until the first dictation; the other keys
+/// live on the Shortcuts page.
 private struct HowToSection: View {
-    @ObservedObject var model: AppModel
-    var actions: AppActions
     /// The wave visual is 52 pt tall, the pill's wave is 30.
     private static let waveScale: CGFloat = 52 / 30
     private static let visualHeight: CGFloat = 64
 
     var body: some View {
-        let _ = model.shortcutsRevision
         let key = Settings.dictationKey
-        if !model.hotkeyActive { PermissionsNotice(actions: actions) }
         SettingsSection("How it works") {
             HStack(alignment: .top, spacing: Space.s5) {
                 step("Hold the key", "Hold \(key.name) wherever you can type.") {
@@ -346,10 +376,6 @@ private struct HowToSection: View {
                 }
             }
             .padding(.vertical, Space.s2)
-            SettingRow("Transcribe a meeting") {
-                KeyChip(Settings.transcriptionShortcut?.display ?? "Double-tap \(key.name)")
-            }
-            SettingRow("Cancel while dictating") { KeyChip(Settings.cancelShortcut.display) }
         }
     }
 

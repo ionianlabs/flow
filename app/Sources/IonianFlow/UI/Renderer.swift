@@ -155,7 +155,7 @@ import SwiftUI
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ionian-flow-render-vocabulary-large.md")
         func block(_ name: String, _ items: [String]) -> String { "### \(name)\n" + items.map { "- \($0)" }.joined(separator: "\n") + "\n\n" }
         let people = ["Lena", "Marco", "Jana Weber", "Tobias Keller", "Sofia Marin", "Henrik Voss", "Amara Okafor", "Pavel Novak", "Ines Duarte", "Kai Lindner",
-                      "Mira Sandoval", "Oskar Brandt", "Yuki Tanaka", "Elena Rossi"]
+                      "Mira Sandoval", "Lena Hartwig", "Yuki Tanaka", "Elena Rossi"]
         let projects = ["Harbor Bridge", "Northwind Logistics", "Project Lantern", "Blue Heron", "Cedar Yard", "Mill Street Depot", "Quarry Line", "Tidewater"]
         let acronyms = ["QA", "RFI", "SLA", "ETA", "BIM", "KPI", "OKR", "SOP"]
         let products = ["Gemma", "Parakeet", "Obsidian", "Figma", "Linear", "Notion"]

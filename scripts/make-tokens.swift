@@ -1,4 +1,4 @@
-// Generates app/Sources/IonianFlow/IonianTokens.swift from the brand's dist/tokens.flat.json.
+// Generates app/Sources/IonianFlow/UI/IonianTokens.swift from the brand's dist/tokens.flat.json.
 // Usage (from the repo root): IONIAN_BRAND=/path/to/brand swift scripts/make-tokens.swift [tokens.flat.json]
 // Defaults to ${IONIAN_BRAND:-../brand}/dist/tokens.flat.json.
 import Foundation
@@ -6,7 +6,7 @@ import Foundation
 let root = FileManager.default.currentDirectoryPath
 let brand = ProcessInfo.processInfo.environment["IONIAN_BRAND"] ?? "../brand"
 let inPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "\(brand)/dist/tokens.flat.json"
-let outPath = "\(root)/app/Sources/IonianFlow/IonianTokens.swift"
+let outPath = "\(root)/app/Sources/IonianFlow/UI/IonianTokens.swift"
 
 guard let data = FileManager.default.contents(atPath: inPath),
       let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],

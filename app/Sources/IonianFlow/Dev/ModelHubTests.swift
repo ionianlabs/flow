@@ -3,63 +3,14 @@ import Foundation
 import MLX
 import MLXLMCommon
 
-// Unit D. Model-free checks (serial ordering, no overlap) for --selftest, and the heavy hub test
+// Unit D. The heavy hub test
 // (--enginetest-hub: loads every model, samples memory, exercises unload).
 //
 //   --enginetest-hub [--minutes N] [--data DIR]      (run under: flock /tmp/ionian-ne-models.lock ...)
 // --data defaults to $FLOW_BENCH/data or ../flow-bench/bench/data next to the repo checkout (from #filePath).
 
 enum ModelHubTests {
-    /// Cheap, no model loads: the serial gate is FIFO and never runs two jobs at once.
-    static func selfTest() -> Bool {
-        final class State: @unchecked Sendable {
-            let lock = NSLock(); var order: [Int] = []; var running = 0; var overlap = false
-        }
-        let hub = ModelHub()
-        let st = State()
-        let done = DispatchSemaphore(value: 0)
-        Task {
-            // Job 0 holds the gate; jobs 1..<8 queue behind it in submission order.
-            let first = Task { await hub.serial { () -> Void in
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                st.lock.withLock { st.order.append(0) }
-            } }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-            var tasks: [Task<Void, Never>] = []
-            for i in 1..<8 {
-                tasks.append(Task { await hub.serial { () -> Void in
-                    st.lock.withLock { st.running += 1; if st.running > 1 { st.overlap = true }; st.order.append(i) }
-                    try? await Task.sleep(nanoseconds: 5_000_000)
-                    st.lock.withLock { st.running -= 1 }
-                } })
-                try? await Task.sleep(nanoseconds: 5_000_000)  // fixes submission order
-            }
-            await first.value
-            for t in tasks { await t.value }
-            done.signal()
-        }
-        guard done.wait(timeout: .now() + 10) == .success else { return false }
-        return st.order == Array(0..<8) && !st.overlap && hub.footprintMB() > 0 && prioritySelfTest()
-    }
 
-    /// A `.low` job that queued first runs after a `.high` job that queued later; same-priority order stays FIFO.
-    private static func prioritySelfTest() -> Bool {
-        final class Order: @unchecked Sendable { let lock = NSLock(); var v: [String] = [] }
-        let hub = ModelHub(), o = Order(), done = DispatchSemaphore(value: 0)
-        Task {
-            let holder = Task { await hub.serial { try? await Task.sleep(nanoseconds: 80_000_000) } }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-            var jobs: [Task<Void, Never>] = []
-            for (name, p) in [("low1", LanePriority.low), ("low2", .low), ("high1", .high), ("high2", .high)] {
-                jobs.append(Task { await hub.serial(p) { o.lock.withLock { o.v.append(name) } } })
-                try? await Task.sleep(nanoseconds: 5_000_000)
-            }
-            await holder.value
-            for j in jobs { await j.value }
-            done.signal()
-        }
-        return done.wait(timeout: .now() + 10) == .success && o.v == ["high1", "high2", "low1", "low2"]
-    }
 
     /// `--enginetest-hub ...`. Return the process exit code.
     static func cli(_ args: [String]) -> Int32 {

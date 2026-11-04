@@ -13,7 +13,7 @@ enum IonianResources {
     static func url(_ folder: String, _ name: String, _ ext: String) -> URL? {
         if let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: folder) { return url }
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .appendingPathComponent("../../Resources/\(folder)/\(name).\(ext)").standardized
+            .appendingPathComponent("../../../Resources/\(folder)/\(name).\(ext)").standardized
         return FileManager.default.fileExists(atPath: source.path) ? source : nil
     }
 

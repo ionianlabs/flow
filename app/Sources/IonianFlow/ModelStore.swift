@@ -154,6 +154,22 @@ final class ResumableFetch: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     }
 }
 
+/// Forwards progress only when it grew by 0.1 % or more (never backwards), and always the final 1.
+final class Monotonic: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = -1.0
+    private let sink: @Sendable (Double) -> Void
+    init(_ sink: @escaping @Sendable (Double) -> Void) { self.sink = sink }
+    func report(_ p: Double) {
+        let v = min(1, max(0, p))
+        lock.lock()
+        let emit = v >= 1 ? last < 1 : v >= last + 0.001
+        if emit { last = v }
+        lock.unlock()
+        if emit { sink(v) }
+    }
+}
+
 final class ModelStore: @unchecked Sendable {
     static let shared = ModelStore()
 
@@ -185,6 +201,11 @@ final class ModelStore: @unchecked Sendable {
     static var ctcDirectory: URL {
         speechDirectory.appendingPathComponent(CtcModels.defaultCacheDirectory(for: .ctc110m).lastPathComponent)
     }
+    /// Silero VAD for transcription segments: VadManager's base directory (it adds Models/silero-vad-coreml).
+    static var vadDirectory: URL { speechDirectory.appendingPathComponent("vad", isDirectory: true) }
+    static var vadModelDirectory: URL {
+        vadDirectory.appendingPathComponent("Models/silero-vad-coreml/\(ModelNames.VAD.sileroVadFile)", isDirectory: true)
+    }
     static var gemmaDirectory: URL { root.appendingPathComponent("gemma-4-e2b-it-4bit", isDirectory: true) }
 
     /// mlx-community/gemma-4-e2b-it-4bit at a pinned revision (Gemma terms; see ThirdPartyNotices.md).
@@ -206,7 +227,7 @@ final class ModelStore: @unchecked Sendable {
     }()
 
     /// Approximate sizes of FluidAudio's downloads (measured on disk): Nemotron de/560 ms, Parakeet Ultra, CTC 110m.
-    private static let speechParts: [Int64] = [611_000_000, 632_000_000, 103_000_000]
+    private static let speechParts: [Int64] = [611_000_000, 632_000_000, 103_000_000, 2_000_000]
 
     private let lock = NSLock()
     private var flags: [ModelItem: CancelFlag] = [:]
@@ -229,14 +250,20 @@ final class ModelStore: @unchecked Sendable {
         }
     }
 
-    private static func speechInstalled() -> Bool {
+    /// Every Nemotron bundle with its weights, plus tokenizer and metadata.
+    private static func nemotronInstalled() -> Bool {
         let fm = FileManager.default
         let v = nemotronVariantDirectory
-        let nemotron = ["preprocessor.mlmodelc", "encoder.mlmodelc", "decoder.mlmodelc", "joint.mlmodelc", "tokenizer.json", "metadata.json"]
-            .allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).path) }
-        return nemotron
+        return ["preprocessor.mlmodelc", "encoder.mlmodelc", "decoder.mlmodelc", "joint.mlmodelc"]
+            .allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).appendingPathComponent("weights/weight.bin").path) }
+            && ["tokenizer.json", "metadata.json"].allSatisfy { fm.fileExists(atPath: v.appendingPathComponent($0).path) }
+    }
+
+    private static func speechInstalled() -> Bool {
+        return nemotronInstalled()
             && AsrModels.modelsExist(at: parakeetDirectory, version: .ultra)
             && CtcModels.modelsExist(at: ctcDirectory)
+            && FileManager.default.fileExists(atPath: vadModelDirectory.path)
             && !hasPartial(speechDirectory)
     }
 
@@ -259,8 +286,8 @@ final class ModelStore: @unchecked Sendable {
     func download(_ item: ModelItem, progress: @escaping @Sendable (Double) -> Void) async throws {
         if isInstalled(item) { progress(1); return }
         let flag = CancelFlag()
-        lock.lock(); flags[item] = flag; lock.unlock()
-        defer { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
+        register(item, flag)
+        defer { unregister(item, flag) }
         do {
             switch item {
             case .speech: try await downloadSpeech(flag, progress)
@@ -273,6 +300,9 @@ final class ModelStore: @unchecked Sendable {
         }
         progress(1)
     }
+
+    private func register(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); flags[item] = flag; lock.unlock() }
+    private func unregister(_ item: ModelItem, _ flag: CancelFlag) { lock.lock(); if flags[item] === flag { flags[item] = nil }; lock.unlock() }
 
     /// Stops a running download of the item; partial files stay for the next resume.
     func cancel(_ item: ModelItem) {
@@ -311,6 +341,14 @@ final class ModelStore: @unchecked Sendable {
     /// Stages are weighted by approximate size; FluidAudio reports per-stage fractions.
     private func downloadSpeech(_ flag: CancelFlag, _ progress: @escaping @Sendable (Double) -> Void) async throws {
         let parts = Self.speechParts.map(Double.init), total = parts.reduce(0, +)
+        // FluidAudio treats a Nemotron variant as cached as soon as metadata.json exists, and it downloads that file
+        // before the large weights. After a cancel the variant is incomplete but looks cached: drop the marker so the
+        // next call re-enters the (resumable, per-file) download. Finished files and .partial files stay.
+        if !Self.nemotronInstalled() {
+            try? FileManager.default.removeItem(at: Self.nemotronVariantDirectory.appendingPathComponent("metadata.json"))
+        }
+        let meter = Monotonic(progress)
+        let progress: @Sendable (Double) -> Void = { meter.report($0) }
         func stage(_ i: Int) -> @Sendable (DownloadProgress) -> Void {
             let base = parts[..<i].reduce(0, +), part = parts[i]
             return { p in progress(min(1, (base + p.fractionCompleted * part) / total)) }
@@ -321,6 +359,7 @@ final class ModelStore: @unchecked Sendable {
                 to: Self.speechDirectory, progressHandler: stage(0))
             _ = try await AsrModels.download(to: Self.parakeetDirectory, version: .ultra, progressHandler: stage(1))
             _ = try await CtcModels.download(to: Self.ctcDirectory, variant: .ctc110m)
+            _ = try await VadManager(modelDirectory: Self.vadDirectory)  // downloads (about 2 MB) and loads once
         }
         flag.setOnCancel { work.cancel() }
         defer { flag.setOnCancel(nil) }

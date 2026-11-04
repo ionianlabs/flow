@@ -38,6 +38,7 @@ actor ModelHub {
     private var nemotronTasks: [Channel: Task<StreamingNemotronMultilingualAsrManager, Error>] = [:]
     private var parakeetTask: Task<ParakeetModels, Error>?
     private var gemmaTask: Task<ModelContainer, Error>?
+    private var vadManager: VadManager?
     private var loadedSet: Set<HubModel> = []
     /// How many times each model really loaded (test hook: must stay at 1 without an unload in between).
     private(set) var loadCounts: [HubModel: Int] = [:]
@@ -89,6 +90,22 @@ actor ModelHub {
         }
         parakeetTask = t
         do { return try await t.value } catch { parakeetTask = nil; throw error }
+    }
+
+    /// Silero VAD for the transcription segmenter, loaded lazily and shared by both channels (each keeps its own
+    /// stream state). Small (a few MB); `nil` if it can't be loaded: the segmenter then uses its energy gate.
+    func vad() async -> VadManager? {
+        if let m = vadManager { return m }
+        do {
+            let m = ModelStore.devCaches
+                ? try await VadManager(config: VadConfig(defaultThreshold: 0.5))
+                : try await VadManager(config: VadConfig(defaultThreshold: 0.5), modelDirectory: ModelStore.vadDirectory)
+            vadManager = m
+            return m
+        } catch {
+            NSLog("Ionian Flow: VAD unavailable, segmenting by energy: %@", error.localizedDescription)
+            return nil
+        }
     }
 
     /// Gemma 4 E2B (4 bit), loaded lazily. Throws .modelMissing("gemma") when not downloaded.

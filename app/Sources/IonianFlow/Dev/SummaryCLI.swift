@@ -2,7 +2,7 @@ import Foundation
 
 // Unit F: `--enginetest-summary` and the model-free summary checks (clean_summary, chunks, prompts).
 
-enum SummaryTests {
+enum SummaryCLI {
 
     /// `--enginetest-summary --fixtures DIR --out DIR [--model-dir DIR]`: one <name>.swift.json per <name>.txt.
     static func cli(_ args: [String]) -> Int32 {

@@ -9,7 +9,7 @@ import MLXLMCommon
 //   --enginetest-hub [--minutes N] [--data DIR]      (run under: flock /tmp/ionian-ne-models.lock ...)
 // --data defaults to $FLOW_BENCH/data or ../flow-bench/bench/data next to the repo checkout (from #filePath).
 
-enum ModelHubTests {
+enum ModelHubCLI {
 
 
     /// `--enginetest-hub ...`. Return the process exit code.
@@ -32,7 +32,7 @@ enum ModelHubTests {
 
     private static func defaultDataDir(_ file: String = #filePath) -> String {
         if let b = ProcessInfo.processInfo.environment["FLOW_BENCH"] { return b + "/data" }
-        // <repo>/app/Sources/IonianFlow/Dev/ModelHubTests.swift -> <repo>/../flow-bench/bench/data
+        // <repo>/app/Sources/IonianFlow/Dev/ModelHubCLI.swift -> <repo>/../flow-bench/bench/data
         var u = URL(fileURLWithPath: file)
         for _ in 0..<5 { u.deleteLastPathComponent() }
         return u.deletingLastPathComponent().appendingPathComponent("flow-bench/bench/data").path

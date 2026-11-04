@@ -158,5 +158,5 @@ decided, who agreed to do what, and the names and technical terms mentioned. Kee
 
 enum SummarizerCLI {
     /// `--enginetest-summary`: summaries on fixture transcripts. Return the process exit code.
-    static func cli(_ args: [String]) -> Int32 { SummaryTests.cli(args) }
+    static func cli(_ args: [String]) -> Int32 { SummaryCLI.cli(args) }
 }

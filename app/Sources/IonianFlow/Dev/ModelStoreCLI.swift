@@ -7,7 +7,7 @@ import Foundation
 // one Gemma load through ModelHub (MLX using the compiled mlx.metallib, see ModelStore.metallibLocation).
 
 
-enum ModelStoreTests {
+enum ModelStoreCLI {
     private static func sha(_ d: Data) -> String { SHA256.hash(data: d).map { String(format: "%02x", $0) }.joined() }
 
 

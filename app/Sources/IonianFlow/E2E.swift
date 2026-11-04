@@ -35,6 +35,7 @@ enum E2E {
     private static func say(_ s: String) { print(s); fflush(stdout) }
 
     private static func mem() -> String {
+        ModelStore.activateMetallib()  // MLX's first use may be this read; without it the bundled metallib is not found
         let a = Double(MLX.Memory.activeMemory) / 1_048_576, c = Double(MLX.Memory.cacheMemory) / 1_048_576
         return String(format: "mlx active %.0f MB cache %.0f MB, footprint %.0f MB", a, c, ModelHub.shared.footprintMB())
     }

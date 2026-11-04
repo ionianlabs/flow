@@ -492,19 +492,29 @@ private struct TranscriptionPage: View {
     }
 }
 
+/// The states `--render settings-general*` can show: the totals, the models and the permissions differ.
+enum RenderState { case normal, fresh, cleanupOff }
+
 /// The window's content for the offscreen renderer (`--render settings-general`): a running app, no ASR.
-@MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil, query: String = "", category: String? = nil) -> some View {
+@MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil, query: String = "", category: String? = nil,
+                                  state: RenderState = .normal) -> some View {
     Settings.registerDefaults()
     let model = AppModel()
     model.page = page
-    model.status = "ASR: ready"
-    model.hotkeyActive = true
+    model.status = state == .fresh ? "ASR: downloading models" : "ASR: ready"
+    model.hotkeyActive = state != .fresh
+    let fake = FakeModelStore(installed: state == .normal ? [.speech, .cleanup] : state == .cleanupOff ? [.speech] : [])
+    let models = ModelSetupModel(store: fake)
+    if state == .fresh {
+        models.start(.speech)  // sits at 40 % (the fake holds it)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+    }
     let sweeper = VaultSweeper()
     let store = VocabularyStore(url: file ?? URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ionian-flow-render.md"), watch: false)
     let actions = AppActions(
         toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
-        models: ModelSetupModel(store: FakeModelStore(installed: [.speech])),
+        models: models,
         vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }))
     return MainView(model: model, store: store, sweeper: sweeper, actions: actions, query: query, category: category)
 }

@@ -23,7 +23,8 @@ if CommandLine.arguments.contains("--selftest") {
     let normalizer = VocabNormalizer.selfTest()
     let fake = EngineFake.selfTest()
     let engine = EngineSelfTests.all()
-    exit(fillers && formatting && echo && vocabulary && normalizer && fake && engine ? 0 : 1)
+    let segmenter = Segmenter.selfTest()
+    exit(fillers && formatting && echo && vocabulary && normalizer && fake && engine && segmenter ? 0 : 1)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {

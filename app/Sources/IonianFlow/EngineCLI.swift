@@ -17,6 +17,7 @@ enum EngineCLI {
             ("--e2e-engine", E2E.cli),                        // integration
             ("--score-dictation", WERScore.scoreDictationCLI),
             ("--compare-transcribe", WERScore.compareTranscribeCLI),
+            ("--segment-replay", { SegmenterReplay.cli($0) }),
             ("--make-two-speaker", WERScore.makeTwoSpeakerCLI),
         ]
         for (flag, handler) in routes {

@@ -47,7 +47,13 @@ func runTranscribeTest(_ args: [String]) {
         log.record(event, since: started)
         if case .ready = event, !launched {
             launched = true
-            if args.contains("--no-parakeet") { go() } else { t.finalPass.prepare { _ in go() } }
+            Task {
+                await Segmenter.prepare()
+                print(Segmenter.shared == nil ? "segmenter: energy gate" : "segmenter: Silero VAD")
+                DispatchQueue.main.async {
+                    if args.contains("--no-parakeet") { go() } else { t.finalPass.prepare { _ in go() } }
+                }
+            }
         } else {
             _ = t.handleMain(event)
         }

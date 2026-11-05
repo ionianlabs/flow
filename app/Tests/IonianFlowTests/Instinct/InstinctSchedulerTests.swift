@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import IonianFlow
 
 final class Flag: @unchecked Sendable {
@@ -8,25 +9,25 @@ final class Flag: @unchecked Sendable {
     func set() { lock.lock(); v = true; lock.unlock() }
 }
 
-final class InstinctGateTests: XCTestCase {
-    func testCheckpointReturnsAtOnceWhenNotHeld() async {
+@Suite struct InstinctGateTests {
+    @Test func checkpointReturnsAtOnceWhenNotHeld() async {
         let gate = InstinctGate()
         await gate.checkpoint()
     }
 
-    func testHeldGateSuspendsCheckpointUntilRelease() async throws {
+    @Test func heldGateSuspendsCheckpointUntilRelease() async throws {
         let gate = InstinctGate()
         let passed = Flag()
         gate.hold()
         let t = Task { await gate.checkpoint(); passed.set() }
         try await Task.sleep(nanoseconds: 100_000_000)
-        XCTAssertFalse(passed.value)
+        #expect(!passed.value)
         gate.release()
         await t.value
-        XCTAssertTrue(passed.value)
+        #expect(passed.value)
     }
 
-    func testHoldReturnsImmediatelyAndReleaseWithoutHoldIsHarmless() {
+    @Test func holdReturnsImmediatelyAndReleaseWithoutHoldIsHarmless() {
         let gate = InstinctGate()
         gate.release()
         gate.hold()
@@ -46,8 +47,14 @@ final class FakeSweeper: InstinctSweeping, @unchecked Sendable {
     var blocking = false
     var runs: [InstinctSweepRequest] { lock.lock(); defer { lock.unlock() }; return _runs }
 
+    private func record(_ r: InstinctSweepRequest) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        _runs.append(r)
+        return blocking
+    }
+
     func run(_ request: InstinctSweepRequest, gate: InstinctGate) async -> InstinctSweepOutcome {
-        lock.lock(); _runs.append(request); let block = blocking; lock.unlock()
+        let block = record(request)
         if !block { return outcome }
         return await withCheckedContinuation { c in lock.lock(); pending = c; lock.unlock() }
     }
@@ -93,169 +100,168 @@ final class SchedulerEnv {
     }
 }
 
-@MainActor
-final class InstinctSchedulerTests: XCTestCase {
+@MainActor @Suite struct InstinctSchedulerTests {
     // F1.9: lastSweep 09:00, interval 3
-    func testSweepStartsAtTwelveAndNotAtElevenFiftyNine() async {
+    @Test func sweepStartsAtTwelveAndNotAtElevenFiftyNine() async {
         let e = SchedulerEnv()
         e.now = SchedulerEnv.date(2026, 11, 5, 11, 59)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
         e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
-    func testDoneSetsLastSweepSoMissedSweepRunsOnlyOnce() async {
+    @Test func doneSetsLastSweepSoMissedSweepRunsOnlyOnce() async {
         let e = SchedulerEnv()
         e.now = SchedulerEnv.date(2026, 11, 5, 20, 0) // slept for 11 hours
         e.scheduler.launch()
         await e.settle()
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
-        XCTAssertEqual(e.state.lastSweep, e.now)
-        XCTAssertEqual(e.state.enabledAt, SchedulerEnv.date(2026, 11, 1, 8, 0))
+        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.state.lastSweep == e.now)
+        #expect(e.state.enabledAt == SchedulerEnv.date(2026, 11, 1, 8, 0))
     }
 
-    func testNoLastSweepIsDue() async {
+    @Test func noLastSweepIsDue() async {
         let e = SchedulerEnv()
         e.state.lastSweep = nil
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
-    func testFailedSweepKeepsLastSweep() async {
+    @Test func failedSweepKeepsLastSweep() async {
         let e = SchedulerEnv()
         e.sweeper.outcome = .failed
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.state.lastSweep, SchedulerEnv.date(2026, 11, 5, 9, 0))
+        #expect(e.state.lastSweep == SchedulerEnv.date(2026, 11, 5, 9, 0))
     }
 
     // F1.10
-    func testBatteryBelowThirtySkipsDueSweepAndLaterCheckRunsIt() async {
+    @Test func batteryBelowThirtySkipsDueSweepAndLaterCheckRunsIt() async {
         let e = SchedulerEnv()
         e.power = InstinctPower(onBattery: true, percent: 29)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
         e.power = InstinctPower(onBattery: true, percent: 30)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
-    func testChargerConnectedRunsDueSweepAtLowPercent() async {
+    @Test func chargerConnectedRunsDueSweepAtLowPercent() async {
         let e = SchedulerEnv()
         e.power = InstinctPower(onBattery: false, percent: 10)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
     // F1.4
-    func testPausedUntilInTheFutureBlocksSweeps() async {
+    @Test func pausedUntilInTheFutureBlocksSweeps() async {
         let e = SchedulerEnv()
         e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
         e.now = SchedulerEnv.date(2026, 11, 5, 13, 0)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
     // F1.31
-    func testNoBrainOrNoModelBlocksSweepAndSetsStatus() async {
+    @Test func noBrainOrNoModelBlocksSweepAndSetsStatus() async {
         let e = SchedulerEnv()
-        XCTAssertNil(e.scheduler.status)
+        #expect(e.scheduler.status == nil)
         e.brain = false
         e.model = false
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
-        XCTAssertEqual(e.scheduler.status, "Instinct: no brain connected")
+        #expect(e.sweeper.runs == [])
+        #expect(e.scheduler.status == "Instinct: no brain connected")
         e.brain = true
-        XCTAssertEqual(e.scheduler.status, "Instinct: model not downloaded")
+        #expect(e.scheduler.status == "Instinct: model not downloaded")
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
         e.model = true
-        XCTAssertNil(e.scheduler.status)
+        #expect(e.scheduler.status == nil)
     }
 
     // F1.28
-    func testCapReachedStatusUntilMidnightAndScheduledSweepsStillRun() async {
+    @Test func capReachedStatusUntilMidnightAndScheduledSweepsStillRun() async {
         let e = SchedulerEnv()
         e.sweeper.outcome = .done(capReached: true)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.scheduler.status, "Instinct: daily cap reached")
+        #expect(e.scheduler.status == "Instinct: daily cap reached")
         e.now = SchedulerEnv.date(2026, 11, 5, 23, 59)
-        XCTAssertEqual(e.scheduler.status, "Instinct: daily cap reached")
+        #expect(e.scheduler.status == "Instinct: daily cap reached")
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs.count, 2)
+        #expect(e.sweeper.runs.count == 2)
         e.now = SchedulerEnv.date(2026, 11, 6, 0, 0)
-        XCTAssertNil(e.scheduler.status)
+        #expect(e.scheduler.status == nil)
     }
 
     private let m1 = URL(fileURLWithPath: "/tmp/fixture-a.md")
     private let m2 = URL(fileURLWithPath: "/tmp/fixture-b.md")
 
     // F1.11
-    func testBusyHoldsGateAtOnceAndBusyEndedReleasesIt() async {
+    @Test func busyHoldsGateAtOnceAndBusyEndedReleasesIt() async {
         let e = SchedulerEnv()
         let passed = Flag()
         e.scheduler.busyStarted()
         e.busy = true
         let t = Task.detached { [gate = e.gate] in await gate.checkpoint(); passed.set() }
         try? await Task.sleep(nanoseconds: 100_000_000)
-        XCTAssertFalse(passed.value)
+        #expect(!passed.value)
         e.busy = false
         e.scheduler.busyEnded()
         await t.value
-        XCTAssertTrue(passed.value)
+        #expect(passed.value)
     }
 
-    func testDueSweepDoesNotStartWhileBusy() async {
+    @Test func dueSweepDoesNotStartWhileBusy() async {
         let e = SchedulerEnv()
         e.busy = true
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
     }
 
     // F1.36
-    func testMeetingEndedWhenIdleStartsAtOnceEvenIfScheduledNotDue() async {
+    @Test func meetingEndedWhenIdleStartsAtOnceEvenIfScheduledNotDue() async {
         let e = SchedulerEnv()
         e.now = SchedulerEnv.date(2026, 11, 5, 10, 45)
         e.scheduler.meetingEnded(m1)
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.meeting(m1)])
-        XCTAssertEqual(e.state.lastSweep, SchedulerEnv.date(2026, 11, 5, 9, 0))
+        #expect(e.sweeper.runs == [.meeting(m1)])
+        #expect(e.state.lastSweep == SchedulerEnv.date(2026, 11, 5, 9, 0))
     }
 
-    func testMeetingEndedWhileBusyStartsWhenBusyEnds() async {
+    @Test func meetingEndedWhileBusyStartsWhenBusyEnds() async {
         let e = SchedulerEnv()
         e.busy = true
         e.scheduler.busyStarted()
         e.scheduler.meetingEnded(m1)
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
         e.busy = false
         e.scheduler.busyEnded()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.meeting(m1)])
+        #expect(e.sweeper.runs == [.meeting(m1)])
     }
 
     // F1.36 with F1.10
-    func testMeetingOnLowBatteryIsDroppedNotQueued() async {
+    @Test func meetingOnLowBatteryIsDroppedNotQueued() async {
         let e = SchedulerEnv()
         e.power = InstinctPower(onBattery: true, percent: 20)
         e.scheduler.meetingEnded(m1)
@@ -264,10 +270,10 @@ final class InstinctSchedulerTests: XCTestCase {
         e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
         e.scheduler.tick()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
     }
 
-    func testMeetingIsDroppedWhilePausedOrWithoutBrain() async {
+    @Test func meetingIsDroppedWhilePausedOrWithoutBrain() async {
         let e = SchedulerEnv()
         e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
         e.scheduler.meetingEnded(m1)
@@ -277,11 +283,11 @@ final class InstinctSchedulerTests: XCTestCase {
         e.brain = true
         e.scheduler.busyEnded()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
     }
 
     // F1.37
-    func testMeetingDuringScheduledSweepQueuesInOrderWithoutDuplicates() async {
+    @Test func meetingDuringScheduledSweepQueuesInOrderWithoutDuplicates() async {
         let e = SchedulerEnv()
         e.sweeper.blocking = true
         e.scheduler.tick()
@@ -289,31 +295,31 @@ final class InstinctSchedulerTests: XCTestCase {
         e.scheduler.meetingEnded(m1)
         e.scheduler.meetingEnded(m2)
         e.scheduler.meetingEnded(m1)
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        #expect(e.sweeper.runs == [.scheduled])
         e.sweeper.finish()
         await e.waitUntil { e.sweeper.runs.count == 2 }
-        XCTAssertEqual(e.sweeper.runs, [.scheduled, .meeting(m1)])
+        #expect(e.sweeper.runs == [.scheduled, .meeting(m1)])
         e.sweeper.finish()
         await e.waitUntil { e.sweeper.runs.count == 3 }
-        XCTAssertEqual(e.sweeper.runs, [.scheduled, .meeting(m1), .meeting(m2)])
+        #expect(e.sweeper.runs == [.scheduled, .meeting(m1), .meeting(m2)])
         e.sweeper.blocking = false
         e.sweeper.finish()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs.count, 3)
+        #expect(e.sweeper.runs.count == 3)
     }
 
     // Interfaces: Sweep now
-    func testSweepNowIgnoresIntervalAndBatteryAndResetsLastSweep() async {
+    @Test func sweepNowIgnoresIntervalAndBatteryAndResetsLastSweep() async {
         let e = SchedulerEnv()
         e.now = SchedulerEnv.date(2026, 11, 5, 9, 30)
         e.power = InstinctPower(onBattery: true, percent: 5)
         e.scheduler.sweepNow()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [.scheduled])
-        XCTAssertEqual(e.state.lastSweep, e.now)
+        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.state.lastSweep == e.now)
     }
 
-    func testSweepNowHonoursPauseBrainModelAndBusy() async {
+    @Test func sweepNowHonoursPauseBrainModelAndBusy() async {
         let e = SchedulerEnv()
         e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
         e.scheduler.sweepNow()
@@ -327,6 +333,6 @@ final class InstinctSchedulerTests: XCTestCase {
         e.busy = true
         e.scheduler.sweepNow()
         await e.settle()
-        XCTAssertEqual(e.sweeper.runs, [])
+        #expect(e.sweeper.runs == [])
     }
 }

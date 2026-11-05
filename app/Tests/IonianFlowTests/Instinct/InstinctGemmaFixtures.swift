@@ -107,24 +107,39 @@ enum InstinctGemmaFixtures {
     /// Plant: (position fraction 0..1, speaker, text).
     typealias Plant = (Double, InstinctSpeaker, String)
 
-    static let meeting1Plants: [Plant] = [
-        (0.06, .them, "Can you share the migration checklist with the platform team by Friday?"),
-        (0.15, .you, "Okay, so we go with the weekly release train, that's settled."),
-        (0.27, .them, "The beta opens on the eighteenth of January, that date is fixed now."),
-        (0.38, .you, "I need to update the runbook before the freeze starts."),
-        (0.50, .them, "We are not renewing the Hartmann licence, that is the final call."),
-        (0.62, .them, "Don't forget to ask Jonas about the staging certificate."),
-        (0.74, .you, "The reporting service is now called Orchid, the old name is retired."),
-        (0.86, .them, "Could you book the review room for next Monday, ten o'clock?"),
+    /// A planted item with its label: what a perfect sweep would write. `project` nil means "none" (a to-do for nobody's project).
+    struct Label {
+        var frac: Double
+        var speaker: InstinctSpeaker
+        var text: String
+        var category: InstinctCategory
+        var project: String?
+        var due: String?
+        /// The gate drops decisions and facts without a project, so those can only be found with one.
+        var reachable: Bool { category == .todo || project != nil }
+        var plant: Plant { (frac, speaker, text) }
+    }
+
+    static let meeting1Labels: [Label] = [
+        Label(frac: 0.06, speaker: .them, text: "Can you share the migration checklist with the platform team by Friday?", category: .todo, project: "alpha", due: "2026-11-06"),
+        Label(frac: 0.15, speaker: .you, text: "Okay, so we go with the weekly release train for the migration, that's settled.", category: .decision, project: "alpha", due: nil),
+        Label(frac: 0.27, speaker: .them, text: "The reporting beta opens on the eighteenth of January, that date is fixed now.", category: .fact, project: "orchid", due: nil),
+        Label(frac: 0.38, speaker: .you, text: "I need to update the runbook before the freeze starts.", category: .todo, project: nil, due: nil),
+        Label(frac: 0.50, speaker: .them, text: "We are not renewing the Hartmann licence for the old reporting tool, that is the final call.", category: .decision, project: "orchid", due: nil),
+        Label(frac: 0.62, speaker: .them, text: "Don't forget to ask Jonas about the staging certificate.", category: .todo, project: nil, due: nil),
+        Label(frac: 0.74, speaker: .you, text: "The reporting service is now called Orchid, the old name is retired.", category: .fact, project: "orchid", due: nil),
+        Label(frac: 0.86, speaker: .them, text: "Could you book the review room for next Monday, ten o'clock?", category: .todo, project: nil, due: "2026-11-09"),
     ]
-    static let meeting2Plants: [Plant] = [
-        (0.20, .them, "Please send Marta the signed contract by Wednesday."),
-        (0.55, .you, "Right, we will use Postgres for the ledger, no more discussion on that."),
-        (0.80, .them, "The nightly sync now handles about forty thousand records."),
+    static let meeting2Labels: [Label] = [
+        Label(frac: 0.20, speaker: .them, text: "Please send Marta the signed contract by Wednesday.", category: .todo, project: nil, due: "2026-11-11"),
+        Label(frac: 0.55, speaker: .you, text: "Right, we will use Postgres for the migrated ledger, no more discussion on that.", category: .decision, project: "alpha", due: nil),
+        Label(frac: 0.80, speaker: .them, text: "The nightly sync now handles about forty thousand records.", category: .fact, project: "alpha", due: nil),
     ]
+    static var meeting1Plants: [Plant] { meeting1Labels.map(\.plant) }
+    static var meeting2Plants: [Plant] { meeting2Labels.map(\.plant) }
 
     /// A meeting of about `minutes` of speech (130 words a minute) on Wednesday 2026-11-04 with the plants inserted.
-    static func meeting(file: String, minutes: Int, seed: UInt64, plants: [Plant]) -> [InstinctSource] {
+    static func meeting(file: String, minutes: Int, seed: UInt64, plants: [Plant], talk: [String] = InstinctGemmaFixtures.talk, fillers: [String] = InstinctGemmaFixtures.fillers) -> [InstinctSource] {
         var rng = SplitMix(s: seed)
         let day = instinctTestDate(2026, 11, 4, 9, 0)
         var turns: [(InstinctSpeaker, String)] = []
@@ -143,6 +158,15 @@ enum InstinctGemmaFixtures {
             InstinctSource(id: "\(file)#\(i)", kind: .transcript(fileName: file), time: day.addingTimeInterval(Double(i) * Double(minutes) * 60 / Double(turns.count)), speaker: t.0, text: t.1)
         }
     }
+
+    /// Labels of the five dictations worth keeping, by text.
+    static let dictationLabels: [Label] = [
+        Label(frac: 0, speaker: .you, text: "Remind me to renew the vendor contract by Friday.", category: .todo, project: nil, due: "2026-11-06"),
+        Label(frac: 0, speaker: .you, text: "Note to self: rotate the staging key every month.", category: .todo, project: nil, due: nil),
+        Label(frac: 0, speaker: .you, text: "For the record, the audit is on the third of March.", category: .fact, project: nil, due: "2027-03-03"),
+        Label(frac: 0, speaker: .you, text: "We decided to use Postgres for the ledger.", category: .decision, project: "alpha", due: nil),
+        Label(frac: 0, speaker: .you, text: "Don't forget to send Marta the invoice on Monday.", category: .todo, project: nil, due: "2026-11-09"),
+    ]
 
     static let projects = [
         InstinctProjectHint(slug: "alpha", description: "Rewrite of the export job and the legacy export", focus: "Drop the legacy export and ship the new one in Q1"),

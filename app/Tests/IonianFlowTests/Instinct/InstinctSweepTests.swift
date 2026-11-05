@@ -267,6 +267,14 @@ import Testing
         #expect(f.model.verifyCalls.isEmpty)
     }
 
+    @Test func dueWithoutYearRollsToNextYear() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to file the report by the third of March")
+        f.model.items = { s in [Self.item(.todo, "File the report", quote: "file the report by the third of March", source: s[0].id, due: "2026-03-03")] }
+        _ = await f.run()
+        #expect(f.dayText().contains("(due: 2027-03-03)"))
+    }
+
     // F1.22, F1.25, F1.26 inside a sweep: duplicates of the brain and of earlier items are counted, conflicts are marked.
     @Test func duplicatesAreDroppedAndConflictsMarked() async throws {
         let f = try Fixture()

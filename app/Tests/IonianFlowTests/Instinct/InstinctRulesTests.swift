@@ -156,5 +156,20 @@ extension IonianFlowTests {
         let ties = InstinctRules.keepHighestConfidence(["a", "b", "c"], limit: 2, confidence: { _ in 0.8 })
         #expect(ties.kept == ["a", "b"] && ties.cut == 1)
     }
+
+    // Due-date year rollover: a date before the source's day that was said as month and day only moves one year ahead.
+    @Test func dueBeforeTheSourceWithAMonthAndDayMovesAYearAhead() {
+        let src = instinctTestDate(2026, 11, 5)
+        func roll(_ due: String?, _ quote: String) -> String? { InstinctRules.rolledDue(due, quote: quote, sourceTime: src) }
+        #expect(roll("2026-03-03", "Please send it by the third of March") == "2027-03-03")
+        #expect(roll("2026-01-15", "deadline is Jan 15") == "2027-01-15")
+        #expect(roll("2026-03-03", "Please send it by 3 March 2026") == "2026-03-03")   // the year was said
+        #expect(roll("2026-11-04", "I needed it by yesterday") == "2026-11-04")          // no month said
+        #expect(roll("2026-11-05", "by the fifth of November") == "2026-11-05")          // today is not before today
+        #expect(roll("2026-12-01", "by the first of December") == "2026-12-01")
+        #expect(roll(nil, "by the first of March") == nil)
+        #expect(roll("soon", "by the first of March") == "soon")
+        #expect(roll("2026-02-28", "by the 28th of February") == "2027-02-28")
+    }
 }
 }

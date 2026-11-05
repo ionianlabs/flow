@@ -99,6 +99,28 @@ enum InstinctRules {
         return (top, duplicate)
     }
 
+    // MARK: due date year (the model only sees weekdays and months)
+
+    private static let monthWords: Set<String> = [
+        "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december",
+        "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "may",
+        "januar", "februar", "märz", "mai", "juni", "juli", "oktober", "dezember",
+    ]
+
+    /// A due date before the day of its source, said as month and day with no year, is meant for the next year:
+    /// it moves one year ahead. Anything else stays as it is.
+    static func rolledDue(_ due: String?, quote: String, sourceTime: Date, calendar: Calendar = .current) -> String? {
+        guard let due else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd"
+        guard let date = f.date(from: due), date < calendar.startOfDay(for: sourceTime) else { return due }
+        let words = cueTokens(quote)
+        guard words.contains(where: { monthWords.contains($0) }),
+              !words.contains(where: { $0.count == 4 && $0.allSatisfy(\.isNumber) && $0.hasPrefix("20") }),
+              let next = calendar.date(byAdding: .year, value: 1, to: date) else { return due }
+        return f.string(from: next)
+    }
+
     // MARK: chunks (the parts the model reads)
 
     /// A small model keeps its focus on short parts: at most this many characters and sources per model call.

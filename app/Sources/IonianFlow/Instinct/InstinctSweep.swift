@@ -74,6 +74,16 @@ struct InstinctSweep {
                     if reason == .noProject { report.dropped.noProject += 1 } else { report.dropped.lowConfidence += 1 }
                     continue
                 }
+                // Verification: a strict second look. An error keeps nothing and counts as low confidence.
+                await checkpoint()
+                guard let check = try? await model.verify(item, speaker: source.speaker, project: hints.first { $0.slug == item.project }),
+                      check.holds else { report.dropped.lowConfidence += 1; continue }
+                if !check.belongsToProject, item.project != "none" {
+                    item.project = "none"
+                    if InstinctRules.gate(kind: item.category.rawValue, project: item.project, confidence: item.confidence) != nil {
+                        report.dropped.noProject += 1; continue
+                    }
+                }
                 await checkpoint()
                 switch await dedup.check(item, against: brainLines, earlier: entries.map(\.item)) {
                 case .duplicate: report.dropped.duplicate += 1

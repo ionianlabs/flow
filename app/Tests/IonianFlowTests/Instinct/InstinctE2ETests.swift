@@ -10,9 +10,21 @@ import Testing
 private typealias F = InstinctGemmaFixtures
 private let heldOutEnabled = ProcessInfo.processInfo.environment["IONIAN_FLOW_HELDOUT"] == "1"
 
+/// Prints every answer of the model when IONIAN_FLOW_INSTINCT_DEBUG=1.
+private struct DebugLLM: VaultLLM {
+    let base: VaultLLM
+    func chat(_ messages: [ChatMsg], maxTokens: Int) async throws -> String {
+        let a = try await base.chat(messages, maxTokens: maxTokens)
+        if ProcessInfo.processInfo.environment["IONIAN_FLOW_INSTINCT_DEBUG"] == "1" {
+            print("ASK: \((messages.last?.content ?? "").suffix(maxTokens > 100 ? 0 : 300).replacingOccurrences(of: "\n", with: " | "))\nRAW: \(a)")
+        }
+        return a
+    }
+}
+
 extension IonianFlowTests {
 @Suite(.serialized) struct InstinctE2ETests {
-    let model = GemmaInstinctModel(llm: GemmaVaultLLM(hub: .shared, control: nil))
+    let model = GemmaInstinctModel(llm: DebugLLM(base: GemmaVaultLLM(hub: .shared, control: nil)))
 
     private func warmUp() async {
         _ = try? await model.judge(InstinctItem(category: .todo, text: "warm up", owner: nil, due: nil, quote: "q", sourceID: "s", project: "none", confidence: 0.9, conflicts: nil), against: ["x"])

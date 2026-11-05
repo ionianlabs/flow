@@ -217,7 +217,54 @@ import Testing
         _ = await f.sweep.run(kind: .scheduled, transcript: nil, checkpoint: { log.events.append("checkpoint") })
         let events = log.events
         #expect(events.contains("extract"))
-        for (i, e) in events.enumerated() where e == "extract" || e == "judge" { #expect(i > 0 && events[i - 1] == "checkpoint") }
+        for (i, e) in events.enumerated() where e == "extract" || e == "judge" || e == "verify" { #expect(i > 0 && events[i - 1] == "checkpoint") }
+    }
+
+    // The verification call: after the gate and before the duplicate check; a "no" or an error drops the candidate
+    // (counted as low confidence); a wrong project turns the project into none, which the gate then applies again.
+    @Test func verifyDropsCandidatesThatDoNotHold() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract and the sky is nice")
+        f.model.items = { s in [
+            Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id),
+            Self.item(.fact, "The sky is nice", quote: "the sky is nice", source: s[0].id, conf: 0.9),
+        ] }
+        f.model.verification = { InstinctVerification(holds: $0.category == .todo, belongsToProject: true) }
+        let r = await f.run()
+        #expect(r.written == 1 && r.dropped.lowConfidence == 1)
+        #expect(f.model.verifyCalls.count == 2)
+        #expect(f.model.verifyCalls[0].project?.slug == "alpha")
+    }
+
+    @Test func verifyErrorKeepsNothing() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract")
+        f.model.items = { s in [Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id)] }
+        f.model.verifyThrows = true
+        let r = await f.run()
+        #expect(r.written == 0 && r.dropped.lowConfidence == 1)
+    }
+
+    @Test func verifyMovesWrongProjectToNoneAndTheGateAppliesAgain() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract and we decided to drop the legacy export")
+        f.model.items = { s in [
+            Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id, project: "alpha"),
+            Self.item(.decision, "Drop the legacy export", quote: "drop the legacy export", source: s[0].id, project: "alpha", conf: 0.9),
+        ] }
+        f.model.verification = { _ in InstinctVerification(holds: true, belongsToProject: false) }
+        let r = await f.run()
+        #expect(r.written == 1 && r.dropped.noProject == 1)
+        #expect(f.dayText().contains("todo: Renew the vendor contract → none >"))
+        #expect(f.model.verifyCalls.count == 2)
+    }
+
+    @Test func noVerifyForCandidatesTheGateDropped() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract")
+        f.model.items = { s in [Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id, conf: 0.3)] }
+        _ = await f.run()
+        #expect(f.model.verifyCalls.isEmpty)
     }
 
     // F1.22, F1.25, F1.26 inside a sweep: duplicates of the brain and of earlier items are counted, conflicts are marked.

@@ -77,5 +77,5 @@ enum InstinctApp {
     // MARK: General page copy
 
     static let toggleTitle = "Instinct"
-    static let toggleDetail = "Looks through your dictations and meetings for to-dos and decisions, and proposes them to your brain's inbox."
+    static let toggleDetail = "Looks through your dictations and meetings for to-dos, decisions and facts, and proposes them to your brain's inbox."
 }

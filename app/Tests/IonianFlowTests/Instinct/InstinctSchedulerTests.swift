@@ -135,4 +135,73 @@ final class InstinctSchedulerTests: XCTestCase {
         await e.settle()
         XCTAssertEqual(e.state.lastSweep, SchedulerEnv.date(2026, 11, 5, 9, 0))
     }
+
+    // F1.10
+    func testBatteryBelowThirtySkipsDueSweepAndLaterCheckRunsIt() async {
+        let e = SchedulerEnv()
+        e.power = InstinctPower(onBattery: true, percent: 29)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        e.power = InstinctPower(onBattery: true, percent: 30)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    func testChargerConnectedRunsDueSweepAtLowPercent() async {
+        let e = SchedulerEnv()
+        e.power = InstinctPower(onBattery: false, percent: 10)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    // F1.4
+    func testPausedUntilInTheFutureBlocksSweeps() async {
+        let e = SchedulerEnv()
+        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        e.now = SchedulerEnv.date(2026, 11, 5, 13, 0)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    // F1.31
+    func testNoBrainOrNoModelBlocksSweepAndSetsStatus() async {
+        let e = SchedulerEnv()
+        XCTAssertNil(e.scheduler.status)
+        e.brain = false
+        e.model = false
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        XCTAssertEqual(e.scheduler.status, "Instinct: no brain connected")
+        e.brain = true
+        XCTAssertEqual(e.scheduler.status, "Instinct: model not downloaded")
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        e.model = true
+        XCTAssertNil(e.scheduler.status)
+    }
+
+    // F1.28
+    func testCapReachedStatusUntilMidnightAndScheduledSweepsStillRun() async {
+        let e = SchedulerEnv()
+        e.sweeper.outcome = .done(capReached: true)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.scheduler.status, "Instinct: daily cap reached")
+        e.now = SchedulerEnv.date(2026, 11, 5, 23, 59)
+        XCTAssertEqual(e.scheduler.status, "Instinct: daily cap reached")
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs.count, 2)
+        e.now = SchedulerEnv.date(2026, 11, 6, 0, 0)
+        XCTAssertNil(e.scheduler.status)
+    }
 }

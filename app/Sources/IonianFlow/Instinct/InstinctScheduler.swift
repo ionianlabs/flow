@@ -64,10 +64,23 @@ final class InstinctScheduler {
         self.loadState = loadState; self.saveState = saveState
     }
 
+    private var capDay: Date?
+
+    /// The menu line; nil when nothing is wrong (F1.28, F1.31).
+    var status: String? {
+        if !brainReady() { return "Instinct: no brain connected" }
+        if !modelReady() { return "Instinct: model not downloaded" }
+        if let d = capDay, d == Calendar.current.startOfDay(for: clock()) { return "Instinct: daily cap reached" }
+        return nil
+    }
+
+    private var isPaused: Bool { pausedUntil().map { $0 > clock() } ?? false }
+    private var lowPower: Bool { let p = power(); return p.onBattery && p.percent < 30 }
+
     func launch() { tick() }
 
     func tick() {
-        guard !isBusy(), isDue() else { return }
+        guard !isBusy(), !isPaused, brainReady(), modelReady(), !lowPower, isDue() else { return }
         start(.scheduled)
     }
 
@@ -87,6 +100,7 @@ final class InstinctScheduler {
 
     private func finished(_ request: InstinctSweepRequest, _ outcome: InstinctSweepOutcome) {
         running = nil
+        if case .done(capReached: true) = outcome { capDay = Calendar.current.startOfDay(for: clock()) }
         if request == .scheduled, case .done = outcome {
             var s = loadState()
             s.lastSweep = clock()

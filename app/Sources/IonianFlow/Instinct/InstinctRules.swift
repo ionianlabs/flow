@@ -54,6 +54,45 @@ enum InstinctRules {
             .split(whereSeparator: { !($0.isLetter || $0.isNumber || $0 == "'") }).map(String.init)
     }
 
+    // MARK: evidence in the quote (the mechanical test of the extract prompt, applied in code)
+
+    private static let numberWords: Set<String> = [
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty",
+        "ninety", "hundred", "thousand", "million", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth",
+        "tenth", "twelfth", "twentieth", "thirtieth",
+    ]
+    private static let weekdayWords: Set<String> = [
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "tomorrow",
+        "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag", "morgen",
+    ]
+    private static let changePhrases = [
+        "now called", "is now", "are now", "has moved", "moved to", "renamed", "retired", "no longer", "replaced by",
+        "switched to", "umbenannt", "jetzt", "nicht mehr", "ersetzt",
+    ]
+    private static let settlePhrases = [
+        "decided", "decision", "settled", "final", "we go with", "going with", "we will", "we'll", "we are not", "we're not",
+        "we won't", "we are going to", "agreed", "no more discussion", "entschieden", "beschlossen", "festgelegt", "wir nehmen",
+    ]
+
+    /// A fact needs a concrete detail (a number, a date, a weekday, or a change of name or status), a decision a settling
+    /// phrase. A to-do passes: its wording varies too much. Whole words or phrases, ignoring case.
+    static func hasEvidence(kind: String, quote: String) -> Bool {
+        switch kind.lowercased() {
+        case "fact":
+            let words = cueTokens(quote)
+            if words.contains(where: { w in w.contains(where: \.isNumber) || numberWords.contains(w) || monthWords.contains(w) && w != "may" || weekdayWords.contains(w) }) { return true }
+            return containsPhrase(quote, changePhrases)
+        case "decision": return containsPhrase(quote, settlePhrases)
+        default: return true
+        }
+    }
+
+    private static func containsPhrase(_ text: String, _ phrases: [String]) -> Bool {
+        let hay = " " + cueTokens(text).joined(separator: " ") + " "
+        return phrases.contains { hay.contains(" " + cueTokens($0).joined(separator: " ") + " ") }
+    }
+
     // MARK: relevance gate (F1.20, F1.21)
 
     static let todoFloor = 0.5
@@ -126,6 +165,7 @@ enum InstinctRules {
     /// A small model keeps its focus on short parts: at most this many characters and sources per model call.
     static let chunkLimit = 1_500
     static let chunkMaxSources = 12
+    static let dictationMaxSources = 1
 
     /// Groups sources, in order and never split, into parts of at most `limit` characters of text and `maxSources` sources.
     static func chunks(_ sources: [InstinctSource], limit: Int = chunkLimit, maxSources: Int = chunkMaxSources) -> [[InstinctSource]] {

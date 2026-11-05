@@ -75,6 +75,8 @@ struct InstinctSweep {
                     if reason == .noProject { report.dropped.noProject += 1 } else { report.dropped.lowConfidence += 1 }
                     continue
                 }
+                // Evidence in the quote itself: the mechanical test of the extract prompt, applied in code.
+                guard InstinctRules.hasEvidence(kind: item.category.rawValue, quote: item.quote) else { report.dropped.byRules += 1; continue }
                 // Verification: a strict second look. An error keeps nothing and counts as low confidence.
                 await checkpoint()
                 guard let check = try? await model.verify(item, speaker: source.speaker, project: hints.first { $0.slug == item.project }),
@@ -116,6 +118,11 @@ struct InstinctSweep {
         return report
     }
 
-    /// The parts the model reads: `InstinctRules.chunkLimit` characters and `chunkMaxSources` sources at most; a source is never split.
-    static func chunks(_ sources: [InstinctSource]) -> [[InstinctSource]] { InstinctRules.chunks(sources) }
+    /// The parts the model reads. Meeting blocks come first in parts of `InstinctRules.chunkLimit` characters and
+    /// `chunkMaxSources` sources at most; a dictation is its own part (a small model skips items when it reads several unrelated snippets at once).
+    static func chunks(_ sources: [InstinctSource]) -> [[InstinctSource]] {
+        func isDictation(_ s: InstinctSource) -> Bool { if case .dictation = s.kind { return true } else { return false } }
+        return InstinctRules.chunks(sources.filter { !isDictation($0) })
+            + InstinctRules.chunks(sources.filter(isDictation), maxSources: InstinctRules.dictationMaxSources)
+    }
 }

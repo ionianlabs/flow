@@ -212,12 +212,14 @@ struct GemmaInstinctModel: InstinctModel {
     - a concrete to-do for the user (a request made to the user, or something the user says they will do),
     - a decision that was settled (said as final, not an opinion, a proposal or a maybe),
     - a lasting, specific fact: a concrete date, number, name or status change that someone would later want to look up.
-    Otherwise "no". That includes opinions, impressions, assessments, complaints, descriptions of how something works or what happened, small observations, hypotheticals ("we could", "maybe", "I would not want to"), questions, remarks about the conversation, and things already done.
+    Otherwise "no". That includes opinions, impressions, assessments, complaints, descriptions of how something works or what happened, small observations, hypotheticals ("we could", "maybe", "I would not want to"), questions, remarks about the conversation, and things already done. The quote must carry the content by itself: an agreement or reaction such as "sounds good" or "let's do that" does not say what was decided, so it is "no". A routine act of the conversation itself (confirming that something arrived, asking to repeat, saying thanks) is "no".
     "project" is "yes" only if the quote is about the project shown with it (its description or focus). It is "no" if the quote is about something else, or about nothing in particular. With no project shown, answer "no".
 
     Examples:
     "The shed roof looks a bit tired, to be honest." -> {"keep":"no","project":"no"}
     "Could you call the plumber on Monday?" -> {"keep":"yes","project":"no"}
+    "Great, let's do that then." -> {"keep":"no","project":"no"}
+    "Could you please confirm that you got my last email?" -> {"keep":"no","project":"no"}
     "The recipe book grew over the years, so nobody knows who wrote half of the pages." -> {"keep":"no","project":"no"}
     "The water meter is read on the first of every month." (project: garden, Planning of the community garden) -> {"keep":"yes","project":"yes"}
     "I would not want to promise anything about the fence right now." (project: garden, Planning of the community garden) -> {"keep":"no","project":"yes"}

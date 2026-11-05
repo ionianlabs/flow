@@ -35,6 +35,7 @@ struct AppActions {
     var showSetupGuide: () -> Void
     var models: ModelSetupModel
     var vocabulary: VocabularyActions
+    var setInstinct: (Bool) -> Void = { _ in }
 }
 
 /// The Ionian Flow window: settings and the vocabulary, one page each, in Ionian Flow's brand skin (see
@@ -276,6 +277,7 @@ private struct GeneralPage: View {
     var actions: AppActions
     @State private var sounds = Settings.sounds
     @State private var login = SMAppService.mainApp.status == .enabled
+    @State private var instinct = Settings.instinct
 
     var body: some View {
         let _ = model.statsRevision
@@ -299,6 +301,10 @@ private struct GeneralPage: View {
                 SettingRow("Setup guide", "Permissions, your dictation key and a field to try it.") {
                     Button("Open ›", action: actions.showSetupGuide).buttonStyle(.monoLink)
                 }
+            }
+            SettingsSection("Brain") {
+                SettingToggle(InstinctApp.toggleTitle, InstinctApp.toggleDetail, isOn: $instinct)
+                    .onChange(of: instinct) { actions.setInstinct(instinct) }
             }
             SettingsSection("Models") {
                 SpeechModelRow(models: actions.models, recognizer: model.recognizerStatus, reload: actions.reloadEngine)

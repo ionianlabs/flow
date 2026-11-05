@@ -15,6 +15,9 @@ enum Settings {
             "useVocabulary": true,
             "parakeetFinals": true,
             "summarizeTranscripts": true,
+            "instinct": false,
+            "instinctExcludedApps": InstinctRules.defaultExcludedApps,
+            "instinctIntervalHours": 3,
         ])
     }
 
@@ -74,6 +77,34 @@ enum Settings {
     static var transcriptsFolder: URL {
         get { d.string(forKey: "transcriptsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) } ?? defaultTranscriptsFolder }
         set { d.set(newValue.path, forKey: "transcriptsFolder") }
+    }
+
+    /// Instinct: propose to-dos, decisions and facts from dictations and meetings to the brain's inbox.
+    static var instinct: Bool {
+        get { d.bool(forKey: "instinct") }
+        set { d.set(newValue, forKey: "instinct") }
+    }
+
+    /// Dictations from these apps (bundle ids) are never stored for Instinct.
+    static var instinctExcludedApps: [String] {
+        get { d.stringArray(forKey: "instinctExcludedApps") ?? InstinctRules.defaultExcludedApps }
+        set { d.set(newValue, forKey: "instinctExcludedApps") }
+    }
+
+    static var instinctIntervalHours: Int {
+        get { max(d.integer(forKey: "instinctIntervalHours"), 1) }
+        set { d.set(newValue, forKey: "instinctIntervalHours") }
+    }
+
+    /// "Pause Instinct for 1 hour": nothing is stored and no sweep runs until then.
+    static var instinctPausedUntil: Date? {
+        get { d.object(forKey: "instinctPausedUntil") as? Date }
+        set { d.set(newValue, forKey: "instinctPausedUntil") }
+    }
+
+    /// Buffer, state and nothing else of Instinct's own; the proposals go to the brain.
+    static var instinctFolder: URL {
+        InstinctApp.folder(testDir: testDir, home: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     /// Names, acronyms and jargon the recognizer should get right (format: see VocabularyParser.swift).

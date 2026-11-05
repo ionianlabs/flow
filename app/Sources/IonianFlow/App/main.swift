@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import ServiceManagement
 import UserNotifications
@@ -18,7 +19,10 @@ if let i = CommandLine.arguments.firstIndex(of: "--wordfreq-zipf"), CommandLine.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     /// recording: key held (or locked hands-free). tapPending: a short tap that may become a double-tap.
     /// transcribing: transcription mode (double-tap); dictation is off until it stops.
-    private enum State { case idle, recording(Date, locked: Bool), tapPending, finishing, transcribing }
+    private enum State {
+        case idle, recording(Date, locked: Bool), tapPending, finishing, transcribing
+        var isIdle: Bool { if case .idle = self { return true } else { return false } }
+    }
 
     private let engine: SpeechEngine = NativeEngine(finalizer: ParakeetFinalizer())
     private let hotkey = HotkeyMonitor()
@@ -51,7 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             disconnect: { [weak self] in self?.sweeper.disconnect() },
             rescan: { [weak self] in self?.sweeper.scan(requested: true) },
             setUseVocabulary: { [weak self] in self?.setUseVocabulary($0) }
-        )
+        ),
+        setInstinct: { [weak self] in self?.setInstinct($0) }
     ))
     private var scanWatch: AnyCancellable?
     private var onboardingStep = 0
@@ -68,9 +73,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private var state = State.idle {
         didSet {
             if case .idle = state { sweeper.resume() } else { sweeper.pause() }
+            if oldValue.isIdle, !state.isIdle { MainActor.assumeIsolated { instinct?.busyStarted() } }
+            if !oldValue.isIdle, state.isIdle { MainActor.assumeIsolated { instinct?.busyEnded() } }
             if case .transcribing = state { appModel.transcribing = true } else { appModel.transcribing = false }
         }
     }
+    /// Instinct: built while the setting is on; its tick runs every 10 minutes.
+    private var instinct: InstinctScheduler?
+    private var instinctTimer: Timer?
     private var session = 0
     /// Engine session of the current dictation; events from older sessions are ignored.
     private var dictation = DictationFlow()
@@ -123,6 +133,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         sweeper.onFinished = { [weak self] in self?.notifyScanned($0) }
         transcriber.onFinished = { [weak self] in self?.countTranscript() }
+        transcriber.onFileFinal = { [weak self] url in MainActor.assumeIsolated { self?.instinct?.meetingEnded(url) } }
+        instinctTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.instinct?.tick() }
+        }
+        if Settings.instinct { startInstinct() }
         sweeper.start()
         // The menu bar icon shows a dot while a scan runs.
         scanWatch = sweeper.$running.receive(on: DispatchQueue.main).sink { [weak self] running in
@@ -386,7 +401,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         Stats.addDictation(text)
         appModel.statsRevision += 1
         paste(text)
+        captureForInstinct(text)
     }
+
+    /// F1.1 to F1.4: the delivered text goes to Instinct's buffer unless the app, secure input or the pause says no.
+    private func captureForInstinct(_ text: String) {
+        guard Settings.instinct else { return }
+        let app = NSWorkspace.shared.frontmostApplication
+        InstinctApp.capture(
+            text: text, front: app?.bundleIdentifier.map { (name: app?.localizedName ?? $0, bundle: $0) },
+            excluded: Settings.instinctExcludedApps, secureInput: IsSecureEventInputEnabled(),
+            pausedUntil: Settings.instinctPausedUntil, now: Date(), buffer: CaptureBuffer(folder: Settings.instinctFolder))
+    }
+
+    private func startInstinct() {
+        guard instinct == nil else { return }
+        let scheduler = MainActor.assumeIsolated { InstinctScheduler(
+            sweeper: InstinctSweepAdapter(build: { InstinctApp.liveSweep($0) }), gate: InstinctGate(),
+            isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
+            brainReady: { Settings.vault.map(BrainLines.isBrain) ?? false },
+            modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && InstinctApp.makeModel != nil },
+            intervalHours: { Settings.instinctIntervalHours }, pausedUntil: { Settings.instinctPausedUntil },
+            loadState: { InstinctState.load(from: Settings.instinctFolder) },
+            saveState: { try? $0.save(to: Settings.instinctFolder) }) }
+        instinct = scheduler
+        MainActor.assumeIsolated { scheduler.launch() }
+    }
+
+    private func setInstinct(_ on: Bool) {
+        Settings.instinct = on
+        if on {
+            InstinctApp.enable(folder: Settings.instinctFolder, now: Date())
+            startInstinct()
+        } else {
+            instinct = nil
+        }
+    }
+
+    @objc private func sweepInstinctNow() { MainActor.assumeIsolated { instinct?.sweepNow() } }
+
+    @objc private func pauseInstinct() { Settings.instinctPausedUntil = InstinctApp.pauseEnd(from: Date()) }
 
     private func paste(_ text: String) {
         let needsSpace = Settings.trailingSpace && !(text.last?.isWhitespace ?? true)
@@ -433,6 +487,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             menu.addItem(item("Hands-free dictation", #selector(startHandsFree)))
         }
         menu.addItem(.separator())
+
+        if Settings.instinct {
+            let lines = InstinctApp.menuLines(status: MainActor.assumeIsolated { instinct?.status })
+            if let line = lines.status {
+                let status = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+                status.isEnabled = false
+                menu.addItem(status)
+            }
+            menu.addItem(item(lines.actions[0], #selector(sweepInstinctNow)))
+            menu.addItem(item(lines.actions[1], #selector(pauseInstinct)))
+            menu.addItem(.separator())
+        }
 
         let last = item("Paste last dictation", #selector(pasteHistory(_:)))
         last.tag = 0

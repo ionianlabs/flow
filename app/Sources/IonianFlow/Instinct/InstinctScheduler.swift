@@ -33,3 +33,64 @@ final class InstinctGate: @unchecked Sendable {
         }
     }
 }
+
+/// Decides when a sweep runs; never sweeps itself. The app calls `tick()` every 10 minutes.
+@MainActor
+final class InstinctScheduler {
+    private let sweeper: InstinctSweeping
+    private let gate: InstinctGate
+    private let clock: () -> Date
+    private let isBusy: () -> Bool
+    private let power: () -> InstinctPower
+    private let brainReady: () -> Bool
+    private let modelReady: () -> Bool
+    private let intervalHours: () -> Int
+    private let pausedUntil: () -> Date?
+    private let loadState: () -> InstinctState
+    private let saveState: (InstinctState) -> Void
+
+    private(set) var running: Task<Void, Never>?
+
+    init(sweeper: InstinctSweeping, gate: InstinctGate,
+         clock: @escaping () -> Date = Date.init,
+         isBusy: @escaping () -> Bool,
+         power: @escaping () -> InstinctPower = InstinctPower.current,
+         brainReady: @escaping () -> Bool, modelReady: @escaping () -> Bool,
+         intervalHours: @escaping () -> Int, pausedUntil: @escaping () -> Date?,
+         loadState: @escaping () -> InstinctState, saveState: @escaping (InstinctState) -> Void) {
+        self.sweeper = sweeper; self.gate = gate; self.clock = clock; self.isBusy = isBusy
+        self.power = power; self.brainReady = brainReady; self.modelReady = modelReady
+        self.intervalHours = intervalHours; self.pausedUntil = pausedUntil
+        self.loadState = loadState; self.saveState = saveState
+    }
+
+    func launch() { tick() }
+
+    func tick() {
+        guard !isBusy(), isDue() else { return }
+        start(.scheduled)
+    }
+
+    private func isDue() -> Bool {
+        guard let last = loadState().lastSweep else { return true }
+        return clock().timeIntervalSince(last) >= Double(max(intervalHours(), 1)) * 3600
+    }
+
+    private func start(_ request: InstinctSweepRequest) {
+        guard running == nil else { return }
+        let sweeper = self.sweeper, gate = self.gate
+        running = Task(priority: .background) { [weak self] in
+            let outcome = await sweeper.run(request, gate: gate)
+            self?.finished(request, outcome)
+        }
+    }
+
+    private func finished(_ request: InstinctSweepRequest, _ outcome: InstinctSweepOutcome) {
+        running = nil
+        if request == .scheduled, case .done = outcome {
+            var s = loadState()
+            s.lastSweep = clock()
+            saveState(s)
+        }
+    }
+}

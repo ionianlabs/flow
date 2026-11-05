@@ -34,3 +34,105 @@ final class InstinctGateTests: XCTestCase {
         gate.release()
     }
 }
+
+// MARK: - Scheduler
+
+final class FakeSweeper: InstinctSweeping, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _runs: [InstinctSweepRequest] = []
+    private var pending: CheckedContinuation<InstinctSweepOutcome, Never>?
+    var outcome: InstinctSweepOutcome = .done(capReached: false)
+    /// When true a run suspends until `finish` is called.
+    var blocking = false
+    var runs: [InstinctSweepRequest] { lock.lock(); defer { lock.unlock() }; return _runs }
+
+    func run(_ request: InstinctSweepRequest, gate: InstinctGate) async -> InstinctSweepOutcome {
+        lock.lock(); _runs.append(request); let block = blocking; lock.unlock()
+        if !block { return outcome }
+        return await withCheckedContinuation { c in lock.lock(); pending = c; lock.unlock() }
+    }
+
+    func finish(_ o: InstinctSweepOutcome = .done(capReached: false)) {
+        lock.lock(); let c = pending; pending = nil; lock.unlock()
+        c?.resume(returning: o)
+    }
+}
+
+@MainActor
+final class SchedulerEnv {
+    var now = SchedulerEnv.date(2026, 11, 5, 12, 0)
+    var busy = false
+    var power = InstinctPower(onBattery: false, percent: 100)
+    var brain = true
+    var model = true
+    var hours = 3
+    var pausedUntil: Date?
+    var state = InstinctState(enabledAt: SchedulerEnv.date(2026, 11, 1, 8, 0), swept: [], lastSweep: SchedulerEnv.date(2026, 11, 5, 9, 0))
+    let sweeper = FakeSweeper()
+    let gate = InstinctGate()
+    lazy var scheduler = InstinctScheduler(
+        sweeper: sweeper, gate: gate,
+        clock: { [unowned self] in MainActor.assumeIsolated { self.now } },
+        isBusy: { [unowned self] in MainActor.assumeIsolated { self.busy } },
+        power: { [unowned self] in MainActor.assumeIsolated { self.power } },
+        brainReady: { [unowned self] in MainActor.assumeIsolated { self.brain } },
+        modelReady: { [unowned self] in MainActor.assumeIsolated { self.model } },
+        intervalHours: { [unowned self] in MainActor.assumeIsolated { self.hours } },
+        pausedUntil: { [unowned self] in MainActor.assumeIsolated { self.pausedUntil } },
+        loadState: { [unowned self] in MainActor.assumeIsolated { self.state } },
+        saveState: { [unowned self] s in MainActor.assumeIsolated { self.state = s } })
+
+    static func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+
+    /// Waits for the running sweep task to end.
+    func settle() async { await scheduler.running?.value }
+    func waitUntil(_ cond: () -> Bool) async {
+        for _ in 0..<200 where !cond() { try? await Task.sleep(nanoseconds: 10_000_000) }
+    }
+}
+
+@MainActor
+final class InstinctSchedulerTests: XCTestCase {
+    // F1.9: lastSweep 09:00, interval 3
+    func testSweepStartsAtTwelveAndNotAtElevenFiftyNine() async {
+        let e = SchedulerEnv()
+        e.now = SchedulerEnv.date(2026, 11, 5, 11, 59)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    func testDoneSetsLastSweepSoMissedSweepRunsOnlyOnce() async {
+        let e = SchedulerEnv()
+        e.now = SchedulerEnv.date(2026, 11, 5, 20, 0) // slept for 11 hours
+        e.scheduler.launch()
+        await e.settle()
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        XCTAssertEqual(e.state.lastSweep, e.now)
+        XCTAssertEqual(e.state.enabledAt, SchedulerEnv.date(2026, 11, 1, 8, 0))
+    }
+
+    func testNoLastSweepIsDue() async {
+        let e = SchedulerEnv()
+        e.state.lastSweep = nil
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    func testFailedSweepKeepsLastSweep() async {
+        let e = SchedulerEnv()
+        e.sweeper.outcome = .failed
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.state.lastSweep, SchedulerEnv.date(2026, 11, 5, 9, 0))
+    }
+}

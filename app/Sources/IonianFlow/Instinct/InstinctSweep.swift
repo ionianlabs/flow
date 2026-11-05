@@ -105,15 +105,6 @@ struct InstinctSweep {
         return report
     }
 
-    /// Groups sources into chunks of at most `Summarizer.chunkSize` characters; a source is never split.
-    static func chunks(_ sources: [InstinctSource]) -> [[InstinctSource]] {
-        var out: [[InstinctSource]] = []
-        var size = 0
-        for s in sources {
-            if out.isEmpty || size + s.text.count > Summarizer.chunkSize { out.append([]); size = 0 }
-            out[out.count - 1].append(s)
-            size += s.text.count
-        }
-        return out
-    }
+    /// The parts the model reads: `InstinctRules.chunkLimit` characters and `chunkMaxSources` sources at most; a source is never split.
+    static func chunks(_ sources: [InstinctSource]) -> [[InstinctSource]] { InstinctRules.chunks(sources) }
 }

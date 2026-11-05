@@ -20,9 +20,8 @@ struct InstinctSweepAdapter: InstinctSweeping, @unchecked Sendable {
 /// App glue for Instinct that has rules worth testing: where the files live, when a dictation is captured,
 /// what happens when the setting flips, the pause and the menu lines.
 enum InstinctApp {
-    /// PLUG-IN POINT: replace this line with the Gemma model, e.g.
-    /// `{ control in GemmaInstinctModel(hub: ModelHub.shared, control: control) }`. While nil, Instinct reports "model not downloaded".
-    nonisolated(unsafe) static var makeModel: ((SweepControl) -> InstinctModel)? = nil
+    /// The model of a sweep: Gemma, paused through the sweep's control. Nil (tests) is reported as "model not downloaded".
+    nonisolated(unsafe) static var makeModel: ((SweepControl) -> InstinctModel)? = { GemmaInstinctModel(control: $0) }
 
     /// The sweep of the running app: the connected brain, the transcripts folder, the Instinct folder.
     static func liveSweep(_ control: SweepControl) -> InstinctSweep? {

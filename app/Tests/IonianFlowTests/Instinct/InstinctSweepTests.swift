@@ -62,6 +62,16 @@ import Testing
         #expect(InstinctState.load(from: f.instinct).swept == [name])
     }
 
+    // The sweep groups sources into the small parts the model was tuned on: at most 12 sources, 1,500 characters.
+    @Test func sweepChunksAreTheModelsSmallParts() {
+        let sources = (0..<30).map { InstinctGemmaFixtures.source("s\($0)", .you, String(repeating: "x", count: 200)) }
+        let parts = InstinctSweep.chunks(sources)
+        #expect(parts.allSatisfy { $0.count <= InstinctRules.chunkMaxSources && $0.reduce(0) { $0 + $1.text.count } <= InstinctRules.chunkLimit })
+        #expect(parts.flatMap { $0 }.map(\.id) == sources.map(\.id))
+        #expect(parts.count == 5)   // 7 per part by size
+        #expect(GemmaInstinctModel.chunks(sources) == parts)
+    }
+
     static func lineCount(_ text: String) -> Int { text.components(separatedBy: "\n").filter { $0.hasPrefix("- [ ] ") }.count }
 
     /// An extract that finds items by source text.
@@ -184,7 +194,7 @@ import Testing
         f.model.extractFailures = 2   // both attempts on the first chunk
         var r = await f.run()
         #expect(f.model.extractCalls.count == 3)
-        #expect(f.model.extractCalls.allSatisfy { $0.reduce(0) { $0 + $1.text.count } <= Summarizer.chunkSize })
+        #expect(f.model.extractCalls.allSatisfy { $0.reduce(0) { $0 + $1.text.count } <= max(InstinctRules.chunkLimit, $0[0].text.count) && $0.count <= InstinctRules.chunkMaxSources })
         #expect(r.dropped.unreadable == 1)
         #expect(r.written == 1)
 

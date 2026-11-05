@@ -99,6 +99,23 @@ enum InstinctRules {
         return (top, duplicate)
     }
 
+    // MARK: chunks (the parts the model reads)
+
+    /// A small model keeps its focus on short parts: at most this many characters and sources per model call.
+    static let chunkLimit = 1_500
+    static let chunkMaxSources = 12
+
+    /// Groups sources, in order and never split, into parts of at most `limit` characters of text and `maxSources` sources.
+    static func chunks(_ sources: [InstinctSource], limit: Int = chunkLimit, maxSources: Int = chunkMaxSources) -> [[InstinctSource]] {
+        var parts: [[InstinctSource]] = [], cur: [InstinctSource] = [], size = 0
+        for s in sources {
+            if !cur.isEmpty && (size + s.text.count > limit || cur.count >= maxSources) { parts.append(cur); cur = []; size = 0 }
+            cur.append(s); size += s.text.count
+        }
+        if !cur.isEmpty { parts.append(cur) }
+        return parts
+    }
+
     // MARK: caps (F1.27)
 
     static let perSweepCap = 10

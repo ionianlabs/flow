@@ -216,18 +216,10 @@ struct GemmaInstinctModel: InstinctModel {
 }
 
 extension GemmaInstinctModel {
-    /// Groups sources, in order and never split, into parts of at most `limit` characters of text and `maxSources` sources (a small model keeps its focus on short parts; `Summarizer.chunks` does the same for summaries).
-    static let defaultChunkLimit = 1_500
+    static let defaultChunkLimit = InstinctRules.chunkLimit
+    static let defaultMaxSources = InstinctRules.chunkMaxSources
 
-    static let defaultMaxSources = 12
-
-    static func chunks(_ sources: [InstinctSource], limit: Int = GemmaInstinctModel.defaultChunkLimit, maxSources: Int = GemmaInstinctModel.defaultMaxSources) -> [[InstinctSource]] {
-        var parts: [[InstinctSource]] = [], cur: [InstinctSource] = [], size = 0
-        for s in sources {
-            if !cur.isEmpty && (size + s.text.count > limit || cur.count >= maxSources) { parts.append(cur); cur = []; size = 0 }
-            cur.append(s); size += s.text.count
-        }
-        if !cur.isEmpty { parts.append(cur) }
-        return parts
+    static func chunks(_ sources: [InstinctSource], limit: Int = InstinctRules.chunkLimit, maxSources: Int = InstinctRules.chunkMaxSources) -> [[InstinctSource]] {
+        InstinctRules.chunks(sources, limit: limit, maxSources: maxSources)
     }
 }

@@ -22,6 +22,12 @@ extension IonianFlowTests {
         #expect(!GeneralLayout.showHowTo(words: 0, transcribedSeconds: 90))
     }
 
+    @Test func instinctToggleCopy() {
+        #expect(InstinctApp.toggleTitle == "Instinct")
+        #expect(InstinctApp.toggleDetail.hasSuffix("."))
+        #expect(!InstinctApp.toggleDetail.contains("\n") && !InstinctApp.toggleDetail.contains("!") && !InstinctApp.toggleDetail.contains("\u{2014}"))
+    }
+
     @Test func speechRowStatus() {
         let ready: (state: StatusState, word: String) = (.ready, "Ready")
         #expect(SpeechModelRow.status(phase: .installed, recognizer: ready).word == "Ready")

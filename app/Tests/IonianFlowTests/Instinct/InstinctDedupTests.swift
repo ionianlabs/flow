@@ -59,7 +59,7 @@ import Testing
     @Test func newIsKept() async {
         let model = FakeInstinctModel(); model.verdict = .new
         let item = Self.item("Renew the vendor contract")
-        let r = await InstinctDedup(model: model).check(item, against: [Self.line("Renew the vendor contract soon please")], earlier: [])
+        let r = await InstinctDedup(model: model).check(item, against: [Self.line("Renew the contract with the landlord next year")], earlier: [])
         #expect(r == .keep(item))
         #expect(model.judgeCalls.count == 1)
     }
@@ -85,7 +85,7 @@ import Testing
     @Test func judgeErrorKeepsItem() async {
         let model = FakeInstinctModel(); model.judgeThrows = true
         let item = Self.item("Renew the vendor contract")
-        let r = await InstinctDedup(model: model).check(item, against: [Self.line("Renew the vendor contract soon please")], earlier: [])
+        let r = await InstinctDedup(model: model).check(item, against: [Self.line("Renew the contract with the landlord next year")], earlier: [])
         #expect(r == .keep(item))
     }
 }

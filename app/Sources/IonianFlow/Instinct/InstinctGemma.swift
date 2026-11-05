@@ -7,6 +7,7 @@ enum InstinctModelError: Error { case unparsable(String) }
 struct GemmaInstinctModel: InstinctModel {
     static let extractMaxTokens = 800
     static let judgeMaxTokens = 60
+    static let verifyMaxTokens = 30
     static let judgeLineLimit = 20
 
     let llm: VaultLLM
@@ -42,6 +43,12 @@ struct GemmaInstinctModel: InstinctModel {
             let key = Self.plain(said)
             if let own = lines.first(where: { $0 == said }) ?? lines.first(where: { Self.plain($0) == key }) { return .conflicts(own) }
         }
+        return v
+    }
+
+    func verify(_ item: InstinctItem, speaker: InstinctSpeaker?, project: InstinctProjectHint?) async throws -> InstinctVerification {
+        let answer = try await llm.chat(Self.verifyMessages(item, speaker: speaker, project: project), maxTokens: Self.verifyMaxTokens)
+        guard let v = InstinctParsing.verification(answer) else { throw InstinctModelError.unparsable(answer) }
         return v
     }
 
@@ -198,6 +205,34 @@ struct GemmaInstinctModel: InstinctModel {
             + "\n\nNew note: \(item.text)\n\nIs the new note already covered by one of the lines? Answer with the JSON object."
     }
 
+    static let verifySystem = """
+    You make the final check on one candidate note that was picked out of a conversation. Be strict: most candidates are not worth keeping. Answer with only one JSON object: {"keep":"yes","project":"yes"}, with "yes" or "no" for each key.
+
+    "keep" is "yes" only if the quote itself holds one of these:
+    - a concrete to-do for the user (a request made to the user, or something the user says they will do),
+    - a decision that was settled (said as final, not an opinion, a proposal or a maybe),
+    - a lasting, specific fact: a concrete date, number, name or status change that someone would later want to look up.
+    Otherwise "no". That includes opinions, impressions, assessments, complaints, descriptions of how something works or what happened, small observations, hypotheticals ("we could", "maybe", "I would not want to"), questions, remarks about the conversation, and things already done. The quote must carry the content by itself: an agreement or reaction such as "sounds good" or "let's do that" does not say what was decided, so it is "no". A routine act of the conversation itself (confirming that something arrived, asking to repeat, saying thanks) is "no".
+    "project" is "yes" only if the quote is about the project shown with it (its description or focus). It is "no" if the quote is about something else, or about nothing in particular. With no project shown, answer "no".
+
+    Examples:
+    "The shed roof looks a bit tired, to be honest." -> {"keep":"no","project":"no"}
+    "Could you call the plumber on Monday?" -> {"keep":"yes","project":"no"}
+    "Great, let's do that then." -> {"keep":"no","project":"no"}
+    "Could you please confirm that you got my last email?" -> {"keep":"no","project":"no"}
+    "The recipe book grew over the years, so nobody knows who wrote half of the pages." -> {"keep":"no","project":"no"}
+    "The water meter is read on the first of every month." (project: garden, Planning of the community garden) -> {"keep":"yes","project":"yes"}
+    "I would not want to promise anything about the fence right now." (project: garden, Planning of the community garden) -> {"keep":"no","project":"yes"}
+    "Okay, the market stall opens on the 12th, that is final." (project: garden, Planning of the community garden) -> {"keep":"yes","project":"no"}
+    """
+
+    static func verifyMessages(_ item: InstinctItem, speaker: InstinctSpeaker?, project: InstinctProjectHint?) -> [ChatMsg] {
+        var user = "Quote\(speaker.map { " (said by \($0.rawValue))" } ?? ""): \"\(item.quote)\"\nCandidate note (\(item.category.rawValue)): \(item.text)\n"
+        if let p = project { user += "Project \(p.slug): \(p.description); \(p.focus)\n" } else { user += "Project: none\n" }
+        user += "\nAnswer with the JSON object."
+        return [ChatMsg(role: "system", content: verifySystem), ChatMsg(role: "user", content: user)]
+    }
+
     private static var cal: Calendar { Calendar.current }
 
     private static let dayFormatter: DateFormatter = {
@@ -216,18 +251,10 @@ struct GemmaInstinctModel: InstinctModel {
 }
 
 extension GemmaInstinctModel {
-    /// Groups sources, in order and never split, into parts of at most `limit` characters of text and `maxSources` sources (a small model keeps its focus on short parts; `Summarizer.chunks` does the same for summaries).
-    static let defaultChunkLimit = 1_500
+    static let defaultChunkLimit = InstinctRules.chunkLimit
+    static let defaultMaxSources = InstinctRules.chunkMaxSources
 
-    static let defaultMaxSources = 12
-
-    static func chunks(_ sources: [InstinctSource], limit: Int = GemmaInstinctModel.defaultChunkLimit, maxSources: Int = GemmaInstinctModel.defaultMaxSources) -> [[InstinctSource]] {
-        var parts: [[InstinctSource]] = [], cur: [InstinctSource] = [], size = 0
-        for s in sources {
-            if !cur.isEmpty && (size + s.text.count > limit || cur.count >= maxSources) { parts.append(cur); cur = []; size = 0 }
-            cur.append(s); size += s.text.count
-        }
-        if !cur.isEmpty { parts.append(cur) }
-        return parts
+    static func chunks(_ sources: [InstinctSource], limit: Int = InstinctRules.chunkLimit, maxSources: Int = InstinctRules.chunkMaxSources) -> [[InstinctSource]] {
+        InstinctRules.chunks(sources, limit: limit, maxSources: maxSources)
     }
 }

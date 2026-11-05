@@ -126,4 +126,20 @@ extension InstinctGemmaTests {
         let many = (0..<20).map { InstinctSource(id: "s\($0)", kind: .transcript(fileName: "m"), time: Date(), speaker: .you, text: "a") }
         #expect(GemmaInstinctModel.chunks(many, limit: 1000, maxSources: 8).map(\.count) == [8, 8, 4])
     }
+
+    @Test func verificationAnswersParse() {
+        #expect(InstinctParsing.verification(#"{"keep":"yes","project":"no"}"#) == InstinctVerification(holds: true, belongsToProject: false))
+        #expect(InstinctParsing.verification("```json\n{\"keep\":\"no\",\"project\":\"yes\"}\n```") == InstinctVerification(holds: false, belongsToProject: true))
+        #expect(InstinctParsing.verification(#"{"keep":true}"#) == InstinctVerification(holds: true, belongsToProject: false))
+        #expect(InstinctParsing.verification("maybe") == nil)
+        #expect(InstinctParsing.verification(#"{"keep":"perhaps"}"#) == nil)
+    }
+
+    @Test func verifyPromptShowsQuoteSpeakerAndProject() {
+        let item = InstinctItem(category: .fact, text: "t", owner: nil, due: nil, quote: "the quote", sourceID: "s", project: "alpha", confidence: 0.9, conflicts: nil)
+        let hint = InstinctProjectHint(slug: "alpha", description: "Data migration", focus: "Cut over")
+        let user = GemmaInstinctModel.verifyMessages(item, speaker: .them, project: hint).last!.content
+        #expect(user.contains("said by Them") && user.contains("\"the quote\"") && user.contains("Project alpha: Data migration; Cut over"))
+        #expect(GemmaInstinctModel.verifyMessages(item, speaker: nil, project: nil).last!.content.contains("Project: none"))
+    }
 }

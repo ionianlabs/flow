@@ -156,5 +156,48 @@ extension IonianFlowTests {
         let ties = InstinctRules.keepHighestConfidence(["a", "b", "c"], limit: 2, confidence: { _ in 0.8 })
         #expect(ties.kept == ["a", "b"] && ties.cut == 1)
     }
+
+    // Due-date year rollover: a date before the source's day that was said as month and day only moves one year ahead.
+    @Test func dueBeforeTheSourceWithAMonthAndDayMovesAYearAhead() {
+        let src = instinctTestDate(2026, 11, 5)
+        func roll(_ due: String?, _ quote: String) -> String? { InstinctRules.rolledDue(due, quote: quote, sourceTime: src) }
+        #expect(roll("2026-03-03", "Please send it by the third of March") == "2027-03-03")
+        #expect(roll("2026-01-15", "deadline is Jan 15") == "2027-01-15")
+        #expect(roll("2026-03-03", "Please send it by 3 March 2026") == "2026-03-03")   // the year was said
+        #expect(roll("2026-11-04", "I needed it by yesterday") == "2026-11-04")          // no month said
+        #expect(roll("2026-11-05", "by the fifth of November") == "2026-11-05")          // today is not before today
+        #expect(roll("2026-12-01", "by the first of December") == "2026-12-01")
+        #expect(roll(nil, "by the first of March") == nil)
+        #expect(roll("soon", "by the first of March") == "soon")
+        #expect(roll("2026-02-28", "by the 28th of February") == "2027-02-28")
+    }
+
+    // Evidence in the quote: a fact needs something concrete, a decision a settling phrase; a to-do needs nothing more.
+    @Test func factsNeedAConcreteDetailInTheQuote() {
+        func ok(_ q: String) -> Bool { InstinctRules.hasEvidence(kind: "fact", quote: q) }
+        #expect(ok("The nightly sync now handles about forty thousand records."))
+        #expect(ok("The audit is on the third of March."))
+        #expect(ok("The beta opens on 18 January."))
+        #expect(ok("The reporting service is now called Orchid, the old name is retired."))
+        #expect(ok("Der Dienst heißt jetzt umbenannt Orchid."))
+        #expect(!ok("Yeah, the diagram on the wiki is outdated, but the general idea is still right."))
+        #expect(!ok("The thing about that module is that it grew organically, so nobody remembers why half of it exists."))
+        #expect(!ok("what happened was, the request came in, it got a bit stuck, and then it just went through on its own."))
+    }
+
+    @Test func decisionsNeedASettlingPhrase() {
+        func ok(_ q: String) -> Bool { InstinctRules.hasEvidence(kind: "decision", quote: q) }
+        #expect(ok("Okay, so we go with the weekly release train, that's settled."))
+        #expect(ok("We are not renewing the licence, that is the final call."))
+        #expect(ok("We will use Postgres for the ledger."))
+        #expect(ok("We decided to use Postgres for the ledger."))
+        #expect(ok("Wir haben das so entschieden."))
+        #expect(!ok("I would not want to commit to anything right now."))
+        #expect(!ok("Sounds good, let's do that."))
+    }
+
+    @Test func todosNeedNoMoreEvidence() {
+        #expect(InstinctRules.hasEvidence(kind: "todo", quote: "anything at all"))
+    }
 }
 }

@@ -49,7 +49,7 @@ import Testing
         let name = Self.transcriptName
         f.model.items = { _ in [
             Self.item(.todo, "Send the deck", quote: "Can you send me the deck by Friday?", source: "\(name)#0", project: "none", conf: 0.82, due: "2026-11-06"),
-            Self.item(.decision, "Drop the legacy export", quote: "we drop the legacy export", source: "\(name)#1", conf: 0.88),
+            Self.item(.decision, "Drop the legacy export", quote: "we drop the legacy export, that's decided", source: "\(name)#1", conf: 0.88),
         ] }
         let r = await f.run()
         #expect(r.written == 2)
@@ -57,9 +57,28 @@ import Testing
         #expect(!r.failed)
         let text = f.dayText()
         #expect(text.contains("- [ ] todo: Send the deck (due: 2026-11-06) → none > \"Can you send me the deck by Friday?\" ([2026-11-05 10-02](/transcripts/2026-11-05%2010-02.md) 10:14, Them, 0.82)"))
-        #expect(text.contains("- [ ] decision: Drop the legacy export → alpha > \"we drop the legacy export\""))
+        #expect(text.contains("- [ ] decision: Drop the legacy export → alpha > \"we drop the legacy export, that's decided\""))
         #expect(text.contains("Swept 1 meeting, 0 dictations."))
         #expect(InstinctState.load(from: f.instinct).swept == [name])
+    }
+
+    // The sweep groups sources into the small parts the model was tuned on: at most 12 sources, 1,500 characters.
+    @Test func sweepChunksAreTheModelsSmallParts() {
+        let sources = (0..<30).map { InstinctGemmaFixtures.source("s\($0)", .you, String(repeating: "x", count: 200)) }
+        let parts = InstinctSweep.chunks(sources)
+        #expect(parts.allSatisfy { $0.count <= InstinctRules.chunkMaxSources && $0.reduce(0) { $0 + $1.text.count } <= InstinctRules.chunkLimit })
+        #expect(parts.flatMap { $0 }.map(\.id) == sources.map(\.id))
+        #expect(parts.count == 5)   // 7 per part by size
+        #expect(GemmaInstinctModel.chunks(sources) == parts)
+    }
+
+    // Dictations are unrelated snippets and a small model skips items when it reads several at once (measured:
+    // 3 of 5 worth keeping found with 12 per call, 5 of 5 with one per call), so each dictation is its own part.
+    @Test func eachDictationIsItsOwnPartAndMeetingsComeFirst() {
+        let talk = (0..<3).map { InstinctGemmaFixtures.source("t\($0)", .you, "hello there") }
+        let dict = InstinctGemmaFixtures.dictationSources().prefix(4)
+        let parts = InstinctSweep.chunks(Array(dict) + talk)
+        #expect(parts.map { $0.map(\.id) } == [["t0", "t1", "t2"], ["d0"], ["d1"], ["d2"], ["d3"]])
     }
 
     static func lineCount(_ text: String) -> Int { text.components(separatedBy: "\n").filter { $0.hasPrefix("- [ ] ") }.count }
@@ -153,7 +172,7 @@ import Testing
         try f.addTranscript()
         try f.addTranscript("2026-11-05 11-30.md", text: TranscriptSourceTests.transcript(start: "11:30", end: "11:50"))
         f.dictate("remind me to renew the vendor contract")
-        f.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "we drop the legacy export", source: s[1].id)] }
+        f.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "we drop the legacy export, that's decided", source: s[1].id)] }
         let r = await f.run(.meeting, transcript: f.transcripts.appendingPathComponent(Self.transcriptName))
         #expect(r.written == 1)
         #expect(f.model.extractCalls.flatMap { $0 }.allSatisfy { $0.id.hasPrefix(Self.transcriptName) })
@@ -179,18 +198,18 @@ import Testing
         f.dictate("we decided to drop the legacy export \(filler)")
         f.model.items = { s in
             s[0].text.hasPrefix("we decided")
-                ? [Self.item(.decision, "Drop the legacy export", quote: "drop the legacy export", source: s[0].id)] : []
+                ? [Self.item(.decision, "Drop the legacy export", quote: "we decided to drop the legacy export", source: s[0].id)] : []
         }
         f.model.extractFailures = 2   // both attempts on the first chunk
         var r = await f.run()
         #expect(f.model.extractCalls.count == 3)
-        #expect(f.model.extractCalls.allSatisfy { $0.reduce(0) { $0 + $1.text.count } <= Summarizer.chunkSize })
+        #expect(f.model.extractCalls.allSatisfy { $0.reduce(0) { $0 + $1.text.count } <= max(InstinctRules.chunkLimit, $0[0].text.count) && $0.count <= InstinctRules.chunkMaxSources })
         #expect(r.dropped.unreadable == 1)
         #expect(r.written == 1)
 
         let g = try Fixture()
         g.dictate("we decided to drop the legacy export")
-        g.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "drop the legacy export", source: s[0].id)] }
+        g.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "we decided to drop the legacy export", source: s[0].id)] }
         g.model.extractFailures = 1
         r = await g.run()
         #expect(g.model.extractCalls.count == 2)
@@ -201,13 +220,80 @@ import Testing
     @Test func checkpointBeforeEveryModelCall() async throws {
         let f = try Fixture()
         f.dictate("we decided to drop the legacy export")
-        f.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "drop the legacy export", source: s[0].id)] }
+        f.model.items = { s in [Self.item(.decision, "Drop the legacy export", quote: "we decided to drop the legacy export", source: s[0].id)] }
         f.model.verdict = .new
         let log = f.model.log
         _ = await f.sweep.run(kind: .scheduled, transcript: nil, checkpoint: { log.events.append("checkpoint") })
         let events = log.events
         #expect(events.contains("extract"))
-        for (i, e) in events.enumerated() where e == "extract" || e == "judge" { #expect(i > 0 && events[i - 1] == "checkpoint") }
+        for (i, e) in events.enumerated() where e == "extract" || e == "judge" || e == "verify" { #expect(i > 0 && events[i - 1] == "checkpoint") }
+    }
+
+    // The verification call: after the gate and before the duplicate check; a "no" or an error drops the candidate
+    // (counted as low confidence); a wrong project turns the project into none, which the gate then applies again.
+    @Test func verifyDropsCandidatesThatDoNotHold() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract and the audit is on 3 March")
+        f.model.items = { s in [
+            Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id),
+            Self.item(.fact, "The audit is on 3 March", quote: "the audit is on 3 March", source: s[0].id, conf: 0.9),
+        ] }
+        f.model.verification = { InstinctVerification(holds: $0.category == .todo, belongsToProject: true) }
+        let r = await f.run()
+        #expect(r.written == 1 && r.dropped.lowConfidence == 1)
+        #expect(f.model.verifyCalls.count == 2)
+        #expect(f.model.verifyCalls[0].project?.slug == "alpha")
+    }
+
+    @Test func verifyErrorKeepsNothing() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract")
+        f.model.items = { s in [Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id)] }
+        f.model.verifyThrows = true
+        let r = await f.run()
+        #expect(r.written == 0 && r.dropped.lowConfidence == 1)
+    }
+
+    @Test func verifyMovesWrongProjectToNoneAndTheGateAppliesAgain() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract and we decided to drop the legacy export")
+        f.model.items = { s in [
+            Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id, project: "alpha"),
+            Self.item(.decision, "Drop the legacy export", quote: "we decided to drop the legacy export", source: s[0].id, project: "alpha", conf: 0.9),
+        ] }
+        f.model.verification = { _ in InstinctVerification(holds: true, belongsToProject: false) }
+        let r = await f.run()
+        #expect(r.written == 1 && r.dropped.noProject == 1)
+        #expect(f.dayText().contains("todo: Renew the vendor contract → none >"))
+        #expect(f.model.verifyCalls.count == 2)
+    }
+
+    @Test func noVerifyForCandidatesTheGateDropped() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to renew the vendor contract")
+        f.model.items = { s in [Self.item(.todo, "Renew the vendor contract", quote: "renew the vendor contract", source: s[0].id, conf: 0.3)] }
+        _ = await f.run()
+        #expect(f.model.verifyCalls.isEmpty)
+    }
+
+    @Test func quoteWithoutEvidenceIsDroppedByRulesBeforeVerification() async throws {
+        let f = try Fixture()
+        f.dictate("remind me that the wiki diagram is outdated and that I would not want to commit to anything")
+        f.model.items = { s in [
+            Self.item(.fact, "The diagram is outdated", quote: "the wiki diagram is outdated", source: s[0].id, conf: 0.9),
+            Self.item(.decision, "No commitment", quote: "I would not want to commit to anything", source: s[0].id, conf: 0.9),
+        ] }
+        let r = await f.run()
+        #expect(r.written == 0 && r.dropped.byRules == 2)
+        #expect(f.model.verifyCalls.isEmpty)
+    }
+
+    @Test func dueWithoutYearRollsToNextYear() async throws {
+        let f = try Fixture()
+        f.dictate("remind me to file the report by the third of March")
+        f.model.items = { s in [Self.item(.todo, "File the report", quote: "file the report by the third of March", source: s[0].id, due: "2026-03-03")] }
+        _ = await f.run()
+        #expect(f.dayText().contains("(due: 2027-03-03)"))
     }
 
     // F1.22, F1.25, F1.26 inside a sweep: duplicates of the brain and of earlier items are counted, conflicts are marked.

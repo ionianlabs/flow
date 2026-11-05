@@ -28,9 +28,18 @@ struct InstinctProjectHint: Equatable { var slug: String; var description: Strin
 
 enum InstinctVerdict: Equatable { case same, conflicts(String), new }
 
+/// The strict second look at one candidate: does its quote hold a to-do, a settled decision or a lasting fact,
+/// and does it belong to the suggested project.
+struct InstinctVerification: Equatable {
+    var holds: Bool
+    var belongsToProject: Bool
+}
+
 protocol InstinctModel {
     func extract(_ sources: [InstinctSource], projects: [InstinctProjectHint]) async throws -> [InstinctItem]
     func judge(_ item: InstinctItem, against lines: [String]) async throws -> InstinctVerdict
+    /// `project` is the item's project, nil when it has none.
+    func verify(_ item: InstinctItem, speaker: InstinctSpeaker?, project: InstinctProjectHint?) async throws -> InstinctVerification
 }
 
 /// Reading the model's answers. Both return nil when the answer does not parse; the caller retries (F1.32).
@@ -57,6 +66,16 @@ enum InstinctParsing {
         case "conflicts": return (obj["line"] as? String).map { .conflicts($0) }
         default: return nil
         }
+    }
+
+    static func verification(_ answer: String) -> InstinctVerification? {
+        guard let obj = object(in: answer), let keep = yesNo(obj["keep"]) else { return nil }
+        return InstinctVerification(holds: keep, belongsToProject: yesNo(obj["project"]) ?? false)
+    }
+
+    private static func yesNo(_ v: Any?) -> Bool? {
+        if let b = v as? Bool { return b }
+        switch (v as? String)?.lowercased() { case "yes"?, "true"?: return true; case "no"?, "false"?: return false; default: return nil }
     }
 
     /// F1.19: the quote occurs in the source text, whitespace collapsed, case ignored.

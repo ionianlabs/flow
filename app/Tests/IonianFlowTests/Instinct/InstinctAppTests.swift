@@ -82,7 +82,13 @@ extension IonianFlowTests {
         for s in [InstinctApp.sweepNowTitle, InstinctApp.pauseTitle] { #expect(!s.contains("!") && !s.contains("\u{2014}")) }
     }
 
-    // The model factory is not plugged in on this branch: no model, so the app reports "model not downloaded".
+    // The app ships with the Gemma model plugged in.
+    @Test func gemmaIsPluggedIn() throws {
+        let make = try #require(InstinctApp.makeModel)
+        #expect(make(SweepControl()) is GemmaInstinctModel)
+    }
+
+    // Without a model factory the app reports "model not downloaded".
     @Test func liveSweepNeedsModelFactory() {
         let saved = InstinctApp.makeModel
         defer { InstinctApp.makeModel = saved }

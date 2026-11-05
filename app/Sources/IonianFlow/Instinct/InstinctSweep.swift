@@ -70,9 +70,22 @@ struct InstinctSweep {
                 guard let source = chunk.first(where: { $0.id == item.sourceID }),
                       InstinctParsing.isVerbatim(item.quote, in: source.text) else { report.dropped.quoteNotFound += 1; continue }
                 if !projects.contains(where: { $0.slug == item.project }) { item.project = "none" }
+                item.due = InstinctRules.rolledDue(item.due, quote: item.quote, sourceTime: source.time, calendar: calendar)
                 if let reason = InstinctRules.gate(kind: item.category.rawValue, project: item.project, confidence: item.confidence) {
                     if reason == .noProject { report.dropped.noProject += 1 } else { report.dropped.lowConfidence += 1 }
                     continue
+                }
+                // Evidence in the quote itself: the mechanical test of the extract prompt, applied in code.
+                guard InstinctRules.hasEvidence(kind: item.category.rawValue, quote: item.quote) else { report.dropped.byRules += 1; continue }
+                // Verification: a strict second look. An error keeps nothing and counts as low confidence.
+                await checkpoint()
+                guard let check = try? await model.verify(item, speaker: source.speaker, project: hints.first { $0.slug == item.project }),
+                      check.holds else { report.dropped.lowConfidence += 1; continue }
+                if !check.belongsToProject, item.project != "none" {
+                    item.project = "none"
+                    if InstinctRules.gate(kind: item.category.rawValue, project: item.project, confidence: item.confidence) != nil {
+                        report.dropped.noProject += 1; continue
+                    }
                 }
                 await checkpoint()
                 switch await dedup.check(item, against: brainLines, earlier: entries.map(\.item)) {
@@ -105,15 +118,11 @@ struct InstinctSweep {
         return report
     }
 
-    /// Groups sources into chunks of at most `Summarizer.chunkSize` characters; a source is never split.
+    /// The parts the model reads. Meeting blocks come first in parts of `InstinctRules.chunkLimit` characters and
+    /// `chunkMaxSources` sources at most; a dictation is its own part (a small model skips items when it reads several unrelated snippets at once).
     static func chunks(_ sources: [InstinctSource]) -> [[InstinctSource]] {
-        var out: [[InstinctSource]] = []
-        var size = 0
-        for s in sources {
-            if out.isEmpty || size + s.text.count > Summarizer.chunkSize { out.append([]); size = 0 }
-            out[out.count - 1].append(s)
-            size += s.text.count
-        }
-        return out
+        func isDictation(_ s: InstinctSource) -> Bool { if case .dictation = s.kind { return true } else { return false } }
+        return InstinctRules.chunks(sources.filter { !isDictation($0) })
+            + InstinctRules.chunks(sources.filter(isDictation), maxSources: InstinctRules.dictationMaxSources)
     }
 }

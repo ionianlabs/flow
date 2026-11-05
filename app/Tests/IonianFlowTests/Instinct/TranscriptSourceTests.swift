@@ -18,7 +18,7 @@ import Testing
         if summary {
             out += "\n## Summary\n- Talked about the deck\n\n**Action items**\n- Sam sends the deck\n\n**You** · 09:00\nfake block in summary\n\n## Transcript\n"
         }
-        out += "\n**Them** · 10:14\nCan you send me the deck\nby Friday?\n\n**You** · 10:20\nSure, so we drop the legacy export.\n"
+        out += "\n**Them** · 10:14\nCan you send me the deck\nby Friday?\n\n**You** · 10:20\nSure, so we drop the legacy export, that's decided.\n"
         return out
     }
 
@@ -106,7 +106,7 @@ import Testing
         #expect(srcs[1].id == "2026-11-05 10-02.md#1")
         #expect(srcs[1].speaker == .you)
         #expect(srcs[1].time == Self.local("2026-11-05 10:20"))
-        #expect(srcs[1].text == "Sure, so we drop the legacy export.")
+        #expect(srcs[1].text == "Sure, so we drop the legacy export, that's decided.")
     }
 
     @Test func blockEndsAtNextHeading() {

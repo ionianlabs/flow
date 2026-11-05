@@ -1,14 +1,14 @@
 import XCTest
 @testable import IonianFlow
 
-final class InstinctGateTests: XCTestCase {
-    private final class Flag: @unchecked Sendable {
-        private let lock = NSLock()
-        private var v = false
-        var value: Bool { lock.lock(); defer { lock.unlock() }; return v }
-        func set() { lock.lock(); v = true; lock.unlock() }
-    }
+final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var v = false
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return v }
+    func set() { lock.lock(); v = true; lock.unlock() }
+}
 
+final class InstinctGateTests: XCTestCase {
     func testCheckpointReturnsAtOnceWhenNotHeld() async {
         let gate = InstinctGate()
         await gate.checkpoint()
@@ -203,5 +203,130 @@ final class InstinctSchedulerTests: XCTestCase {
         XCTAssertEqual(e.sweeper.runs.count, 2)
         e.now = SchedulerEnv.date(2026, 11, 6, 0, 0)
         XCTAssertNil(e.scheduler.status)
+    }
+
+    private let m1 = URL(fileURLWithPath: "/tmp/fixture-a.md")
+    private let m2 = URL(fileURLWithPath: "/tmp/fixture-b.md")
+
+    // F1.11
+    func testBusyHoldsGateAtOnceAndBusyEndedReleasesIt() async {
+        let e = SchedulerEnv()
+        let passed = Flag()
+        e.scheduler.busyStarted()
+        e.busy = true
+        let t = Task.detached { [gate = e.gate] in await gate.checkpoint(); passed.set() }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertFalse(passed.value)
+        e.busy = false
+        e.scheduler.busyEnded()
+        await t.value
+        XCTAssertTrue(passed.value)
+    }
+
+    func testDueSweepDoesNotStartWhileBusy() async {
+        let e = SchedulerEnv()
+        e.busy = true
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+    }
+
+    // F1.36
+    func testMeetingEndedWhenIdleStartsAtOnceEvenIfScheduledNotDue() async {
+        let e = SchedulerEnv()
+        e.now = SchedulerEnv.date(2026, 11, 5, 10, 45)
+        e.scheduler.meetingEnded(m1)
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.meeting(m1)])
+        XCTAssertEqual(e.state.lastSweep, SchedulerEnv.date(2026, 11, 5, 9, 0))
+    }
+
+    func testMeetingEndedWhileBusyStartsWhenBusyEnds() async {
+        let e = SchedulerEnv()
+        e.busy = true
+        e.scheduler.busyStarted()
+        e.scheduler.meetingEnded(m1)
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+        e.busy = false
+        e.scheduler.busyEnded()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.meeting(m1)])
+    }
+
+    // F1.36 with F1.10
+    func testMeetingOnLowBatteryIsDroppedNotQueued() async {
+        let e = SchedulerEnv()
+        e.power = InstinctPower(onBattery: true, percent: 20)
+        e.scheduler.meetingEnded(m1)
+        await e.settle()
+        e.power = InstinctPower(onBattery: false, percent: 100)
+        e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
+        e.scheduler.tick()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+    }
+
+    func testMeetingIsDroppedWhilePausedOrWithoutBrain() async {
+        let e = SchedulerEnv()
+        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
+        e.scheduler.meetingEnded(m1)
+        e.pausedUntil = nil
+        e.brain = false
+        e.scheduler.meetingEnded(m2)
+        e.brain = true
+        e.scheduler.busyEnded()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
+    }
+
+    // F1.37
+    func testMeetingDuringScheduledSweepQueuesInOrderWithoutDuplicates() async {
+        let e = SchedulerEnv()
+        e.sweeper.blocking = true
+        e.scheduler.tick()
+        await e.waitUntil { e.sweeper.runs.count == 1 }
+        e.scheduler.meetingEnded(m1)
+        e.scheduler.meetingEnded(m2)
+        e.scheduler.meetingEnded(m1)
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        e.sweeper.finish()
+        await e.waitUntil { e.sweeper.runs.count == 2 }
+        XCTAssertEqual(e.sweeper.runs, [.scheduled, .meeting(m1)])
+        e.sweeper.finish()
+        await e.waitUntil { e.sweeper.runs.count == 3 }
+        XCTAssertEqual(e.sweeper.runs, [.scheduled, .meeting(m1), .meeting(m2)])
+        e.sweeper.blocking = false
+        e.sweeper.finish()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs.count, 3)
+    }
+
+    // Interfaces: Sweep now
+    func testSweepNowIgnoresIntervalAndBatteryAndResetsLastSweep() async {
+        let e = SchedulerEnv()
+        e.now = SchedulerEnv.date(2026, 11, 5, 9, 30)
+        e.power = InstinctPower(onBattery: true, percent: 5)
+        e.scheduler.sweepNow()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [.scheduled])
+        XCTAssertEqual(e.state.lastSweep, e.now)
+    }
+
+    func testSweepNowHonoursPauseBrainModelAndBusy() async {
+        let e = SchedulerEnv()
+        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
+        e.scheduler.sweepNow()
+        e.pausedUntil = nil
+        e.brain = false
+        e.scheduler.sweepNow()
+        e.brain = true
+        e.model = false
+        e.scheduler.sweepNow()
+        e.model = true
+        e.busy = true
+        e.scheduler.sweepNow()
+        await e.settle()
+        XCTAssertEqual(e.sweeper.runs, [])
     }
 }

@@ -7,31 +7,14 @@ protocol InstinctSweeping: Sendable {
     func run(_ request: InstinctSweepRequest, gate: InstinctGate) async -> InstinctSweepOutcome
 }
 
-/// F1.11: the sweep calls `checkpoint()` at every step and the model per token; while the scheduler holds the gate it suspends.
+/// F1.11: the sweep calls `checkpoint()` at every step; while the scheduler holds the gate it suspends.
+/// A thin wrapper on `SweepControl`, which `GemmaVaultLLM(hub:control:)` checks per generated token.
 final class InstinctGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var held = false
-    private var waiting: [CheckedContinuation<Void, Never>] = []
+    let control = SweepControl()
 
-    func hold() {
-        lock.lock(); held = true; lock.unlock()
-    }
-
-    func release() {
-        lock.lock()
-        held = false
-        let w = waiting
-        waiting = []
-        lock.unlock()
-        w.forEach { $0.resume() }
-    }
-
-    func checkpoint() async {
-        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
-            lock.lock()
-            if held { waiting.append(c); lock.unlock() } else { lock.unlock(); c.resume() }
-        }
-    }
+    func hold() { control.pause() }
+    func release() { control.resume() }
+    func checkpoint() async { await control.waitWhilePaused() }
 }
 
 /// Decides when a sweep runs; never sweeps itself. The app calls `tick()` every 10 minutes.
@@ -79,9 +62,48 @@ final class InstinctScheduler {
 
     func launch() { tick() }
 
+    private struct Item { var request: InstinctSweepRequest; var forced: Bool }
+    private var queue: [Item] = []
+
+    /// Hotkey pressed or transcription started: the sweep yields the model at once (F1.11).
+    func busyStarted() { gate.hold() }
+
+    func busyEnded() {
+        gate.release()
+        pump()
+    }
+
+    /// Called after the transcript is written and its summary finished or failed (F1.36).
+    func meetingEnded(_ file: URL) { enqueue(.meeting(file), forced: false) }
+
+    func sweepNow() { enqueue(.scheduled, forced: true) }
+
     func tick() {
         guard !isBusy(), !isPaused, brainReady(), modelReady(), !lowPower, isDue() else { return }
-        start(.scheduled)
+        enqueue(.scheduled, forced: false)
+    }
+
+    private func enqueue(_ request: InstinctSweepRequest, forced: Bool) {
+        // A meeting that cannot run now because of pause, brain, model or battery is left for the next scheduled sweep (F1.36).
+        if case .meeting = request, !canRun(forced: false) { return }
+        if queue.contains(where: { $0.request == request }) { return }
+        queue.append(Item(request: request, forced: forced))
+        pump()
+    }
+
+    private func canRun(forced: Bool) -> Bool {
+        !isPaused && brainReady() && modelReady() && (forced || !lowPower)
+    }
+
+    /// Starts the next queued request when nothing runs and Flow is idle.
+    private func pump() {
+        guard running == nil, !isBusy() else { return }
+        while !queue.isEmpty {
+            let item = queue.removeFirst()
+            guard canRun(forced: item.forced) else { continue }  // dropped; a scheduled one stays due
+            start(item.request)
+            return
+        }
     }
 
     private func isDue() -> Bool {
@@ -90,7 +112,6 @@ final class InstinctScheduler {
     }
 
     private func start(_ request: InstinctSweepRequest) {
-        guard running == nil else { return }
         let sweeper = self.sweeper, gate = self.gate
         running = Task(priority: .background) { [weak self] in
             let outcome = await sweeper.run(request, gate: gate)
@@ -106,5 +127,6 @@ final class InstinctScheduler {
             s.lastSweep = clock()
             saveState(s)
         }
+        pump()
     }
 }

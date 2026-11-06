@@ -160,6 +160,28 @@ enum InstinctRules {
         return f.string(from: next)
     }
 
+    private static let weekdayNumbers: [String: Int] = [   // Calendar weekday, Sunday = 1
+        "sunday": 1, "monday": 2, "tuesday": 3, "wednesday": 4, "thursday": 5, "friday": 6, "saturday": 7,
+        "sonntag": 1, "montag": 2, "dienstag": 3, "mittwoch": 4, "donnerstag": 5, "freitag": 6, "samstag": 7, "sonnabend": 7,
+    ]
+
+    /// A weekday named in the quote (English or German, "next" or "nächsten" included) sets the due date to the next
+    /// such day strictly after the source's day; "tomorrow" or "morgen" sets the day after. This replaces the model's
+    /// date. A quote with an explicit date (a digit or a month) and a quote with neither leave `due` as it is.
+    static func weekdayDue(_ due: String?, quote: String, sourceTime: Date, calendar: Calendar = .current) -> String? {
+        let words = cueTokens(quote)
+        if words.contains(where: { $0.contains(where: \.isNumber) || monthWords.contains($0) && $0 != "may" }) { return due }
+        let day = calendar.startOfDay(for: sourceTime)
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd"
+        if words.contains(where: { $0 == "tomorrow" || $0 == "morgen" }) {
+            return calendar.date(byAdding: .day, value: 1, to: day).map(f.string(from:)) ?? due
+        }
+        guard let target = words.compactMap({ weekdayNumbers[$0] }).first else { return due }
+        let ahead = (target - calendar.component(.weekday, from: day) + 6) % 7 + 1   // 1...7, never today
+        return calendar.date(byAdding: .day, value: ahead, to: day).map(f.string(from:)) ?? due
+    }
+
     // MARK: chunks (the parts the model reads)
 
     /// A small model keeps its focus on short parts: at most this many characters and sources per model call.

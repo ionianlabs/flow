@@ -288,6 +288,14 @@ import Testing
         #expect(f.model.verifyCalls.isEmpty)
     }
 
+    @Test func weekdayInTheQuoteOverridesTheModelsDue() async throws {
+        let f = try Fixture()   // the dictation is made on Thursday 2026-11-05
+        f.dictate("remind me to call the plumber on Monday")
+        f.model.items = { s in [Self.item(.todo, "Call the plumber", quote: "call the plumber on Monday", source: s[0].id, due: "2026-11-02")] }
+        _ = await f.run()
+        #expect(f.dayText().contains("(due: 2026-11-09)"))
+    }
+
     @Test func dueWithoutYearRollsToNextYear() async throws {
         let f = try Fixture()
         f.dictate("remind me to file the report by the third of March")

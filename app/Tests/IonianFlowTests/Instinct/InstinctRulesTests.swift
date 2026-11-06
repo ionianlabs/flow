@@ -199,5 +199,22 @@ extension IonianFlowTests {
     @Test func todosNeedNoMoreEvidence() {
         #expect(InstinctRules.hasEvidence(kind: "todo", quote: "anything at all"))
     }
+
+    // Weekday resolution in code: the next such day strictly after the source's day, whatever the model said.
+    @Test func weekdayInTheQuoteSetsTheNextOccurrence() {
+        func due(_ quote: String, _ y: Int, _ m: Int, _ d: Int, model: String? = nil) -> String? {
+            InstinctRules.weekdayDue(model, quote: quote, sourceTime: instinctTestDate(y, m, d))
+        }
+        #expect(due("Remember to bring the ladder on Thursday.", 2026, 11, 3, model: "2026-11-04") == "2026-11-05")   // held-out case, Tuesday
+        #expect(due("Could you book the room for next Monday, ten o'clock?", 2026, 11, 5) == "2026-11-09")           // Thursday
+        #expect(due("Please send it by Thursday", 2026, 11, 5) == "2026-11-12")                                        // same weekday: a week later
+        #expect(due("Bitte bis nächsten Freitag", 2026, 11, 5) == "2026-11-06")
+        #expect(due("Das schicke ich am Montag", 2026, 11, 5) == "2026-11-09")
+        #expect(due("Send it tomorrow", 2026, 12, 31) == "2027-01-01")
+        #expect(due("Schick es morgen", 2026, 11, 5, model: "2026-01-01") == "2026-11-06")
+        #expect(due("Send it by 12 November on Thursday", 2026, 11, 5, model: "2026-11-12") == "2026-11-12")   // explicit date wins
+        #expect(due("Send it soon", 2026, 11, 5, model: "2026-11-20") == "2026-11-20")
+        #expect(due("Send it soon", 2026, 11, 5) == nil)
+    }
 }
 }

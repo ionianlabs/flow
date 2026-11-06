@@ -97,11 +97,11 @@ enum InstinctE2E {
     }
 
     /// A scheduled sweep over the dictations of `InstinctGemmaFixtures.dictations`.
-    static func dictations(model: InstinctModel) async throws -> Score {
+    static func dictations(model: InstinctModel, copies: Int = 1) async throws -> Score {
         let brain = try makeBrain(projects: defaultProjects)
         let instinct = FileManager.default.temporaryDirectory.appendingPathComponent("instinct-e2e-\(UUID().uuidString)")
         let base = instinctTestDate(2026, 11, 5, 8, 0)
-        for (i, d) in InstinctGemmaFixtures.dictations.enumerated() {
+        for (i, d) in (0..<copies).flatMap({ _ in InstinctGemmaFixtures.dictations }).enumerated() {
             let t = base.addingTimeInterval(Double(i) * 90)
             CaptureBuffer(folder: instinct, now: { t }).append(text: d.text, app: d.app, bundle: d.bundle)
         }

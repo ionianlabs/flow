@@ -70,6 +70,9 @@ struct InstinctSweep {
                 guard let source = chunk.first(where: { $0.id == item.sourceID }),
                       InstinctParsing.isVerbatim(item.quote, in: source.text) else { report.dropped.quoteNotFound += 1; continue }
                 if !projects.contains(where: { $0.slug == item.project }) { item.project = "none" }
+                if item.category == .todo {
+                    item.due = InstinctRules.weekdayDue(item.due, quote: item.quote, sourceTime: source.time, calendar: calendar)
+                }
                 item.due = InstinctRules.rolledDue(item.due, quote: item.quote, sourceTime: source.time, calendar: calendar)
                 if let reason = InstinctRules.gate(kind: item.category.rawValue, project: item.project, confidence: item.confidence) {
                     if reason == .noProject { report.dropped.noProject += 1 } else { report.dropped.lowConfidence += 1 }

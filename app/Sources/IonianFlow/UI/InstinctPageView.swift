@@ -102,6 +102,16 @@ struct InstinctSettingsPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: Space.s6)
                 }
             }
+            if page.showsActions {
+                SettingsSection("Actions") {
+                    SettingRow("Read now", InstinctPage.sweepDetail) {
+                        Button("Sweep now") { actions.sweepNow(); refresh() }.buttonStyle(.primaryCompact).disabled(!page.canSweep)
+                    }
+                    SettingRow("Pause", page.pausedLine ?? InstinctPage.pauseDetail) {
+                        Button("Pause for 1 hour ›") { actions.pause(); refresh() }.buttonStyle(.monoLink).disabled(!page.canPause)
+                    }
+                }
+            }
             SettingsSection("Brain") {
                 SettingRow("Folder", page.brainPath ?? InstinctPage.noBrainPath) {
                     HStack(spacing: Space.s4) {
@@ -151,16 +161,6 @@ struct InstinctSettingsPage: View {
                     Spacer()
                 }
                 .frame(minHeight: Space.s6)
-            }
-            if page.showsActions {
-                SettingsSection("Actions") {
-                    SettingRow("Read now", InstinctPage.sweepDetail) {
-                        Button("Sweep now") { actions.sweepNow(); refresh() }.buttonStyle(.primaryCompact).disabled(!page.canSweep)
-                    }
-                    SettingRow("Pause", page.pausedLine ?? InstinctPage.pauseDetail) {
-                        Button("Pause for 1 hour ›") { actions.pause(); refresh() }.buttonStyle(.monoLink).disabled(!page.canPause)
-                    }
-                }
             }
         }
         .onChange(of: on) {

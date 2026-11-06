@@ -23,6 +23,9 @@ import SwiftUI
         "settings-general-shot": generalSurface(.normal, width: 820, height: 540),
         "settings-general-fresh": generalSurface(.fresh, width: 820),
         "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
+        "settings-general-instinct-nobrain": generalSurface(.instinctNoBrain, width: 700),
+        "settings-general-instinct-on": generalSurface(.instinctOn, width: 700),
+        "settings-general-instinct-nomodel": generalSurface(.instinctNoModel, width: 700),
         "settings-general-min": generalSurface(.normal, width: 700),
         "settings-general-fresh-min": generalSurface(.fresh, width: 700),
         "settings-general-cleanup-off-min": generalSurface(.cleanupOff, width: 700),
@@ -67,7 +70,10 @@ import SwiftUI
             var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
             domain["statsWords"] = state == .fresh ? 0 : 2545
             domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
+            // Instinct rows use sample state only: never the user's defaults or brain.
+            domain["instinct"] = [.instinctOn, .instinctNoModel].contains(state)
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+            InstinctApp.brainFound = { state != .instinctNoBrain }
             return AnyView(mainViewForRender(page: .general, state: state))
         })
     }

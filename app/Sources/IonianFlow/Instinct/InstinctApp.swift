@@ -25,7 +25,7 @@ enum InstinctApp {
 
     /// The sweep of the running app: the connected brain, the transcripts folder, the Instinct folder.
     static func liveSweep(_ control: SweepControl) -> InstinctSweep? {
-        guard let make = makeModel, let brain = Settings.vault, BrainLines.isBrain(brain) else { return nil }
+        guard let make = makeModel, let brain = BrainLocator.current() else { return nil }
         return InstinctSweep(brainRoot: brain, transcriptsFolder: Settings.transcriptsFolder,
                              instinctFolder: Settings.instinctFolder, model: make(control))
     }
@@ -76,5 +76,26 @@ enum InstinctApp {
     // MARK: General page copy
 
     static let toggleTitle = "Instinct"
-    static let toggleDetail = "Looks through your dictations and meetings for to-dos, decisions and facts, and proposes them to your brain's inbox."
+    static let toggleDetail = "Proposes to-dos, decisions and facts to your brain's inbox."
+    static let noBrainDetail = "Needs an Ionian Brain. Connect one under Vocabulary."
+    static let noModelDetail = "Needs the cleanup model. Download it under Models."
+    static let getBrainTitle = "Get Ionian Brain ↗"
+    /// Whether a brain is found; the renderer swaps it for sample states.
+    nonisolated(unsafe) static var brainFound: () -> Bool = { BrainLocator.current() != nil }
+    static let getBrainURL = URL(string: "https://github.com/ionianlabs/brain")!
+
+    /// What the General page row shows. Without a brain the toggle is disabled (off), and the detail points to one;
+    /// a stored "on" stays on, and can still be switched off, since the scheduler already refuses to sweep.
+    struct Row: Equatable {
+        var detail: String
+        var enabled: Bool
+        var shownOn: Bool
+        var showsLink: Bool
+    }
+
+    static func row(brainFound: Bool, on: Bool, cleanupInstalled: Bool) -> Row {
+        if !brainFound { return Row(detail: noBrainDetail, enabled: on, shownOn: on, showsLink: true) }
+        if on && !cleanupInstalled { return Row(detail: noModelDetail, enabled: true, shownOn: true, showsLink: false) }
+        return Row(detail: toggleDetail, enabled: true, shownOn: on, showsLink: false)
+    }
 }

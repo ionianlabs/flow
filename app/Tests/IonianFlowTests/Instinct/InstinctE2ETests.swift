@@ -49,6 +49,21 @@ extension IonianFlowTests {
         s.print()
     }
 
+    // SC7 through the real sweep: 3 hours of meetings plus 100 dictations (one model call per dictation), under 10 minutes.
+    @Test(.enabled(if: modelTestsEnabled, "needs Gemma; set IONIAN_FLOW_MODEL_TESTS=1")) func sc7SweepThreeHoursAndHundredDictations() async throws {
+        await warmUp()
+        let t0 = Date()
+        var written = 0
+        let sets = [F.meeting(file: "a.md", minutes: 60, seed: 1, plants: F.meeting1Plants), F.meeting(file: "b.md", minutes: 15, seed: 2, plants: F.meeting2Plants),
+                    F.meeting(file: "c.md", minutes: 60, seed: 3, plants: F.meeting1Plants), F.meeting(file: "d.md", minutes: 45, seed: 4, plants: F.meeting2Plants)]
+        for m in sets { written += try await InstinctE2E.meeting(title: "sc7 meeting", sources: m, labels: [], model: model).written.count }
+        let tMeet = Date().timeIntervalSince(t0)
+        let d = try await InstinctE2E.dictations(model: model, copies: 5)
+        let total = Date().timeIntervalSince(t0)
+        print("SC7 SWEEP: meetings \(Int(tMeet)) s, 100 dictations \(Int(total - tMeet)) s, total \(Int(total)) s, written \(written) + \(d.written.count)")
+        #expect(total < 600, "SC7: \(total) s")
+    }
+
     @Test(.enabled(if: modelTestsEnabled && heldOutEnabled, "held-out: needs IONIAN_FLOW_MODEL_TESTS=1 and IONIAN_FLOW_HELDOUT=1")) func heldOutMeeting() async throws {
         await warmUp()
         let s = try await InstinctE2E.meeting(title: "held-out 30-minute meeting", sources: InstinctHeldOutFixture.meeting(file: "h.md"), labels: InstinctHeldOutFixture.labels, model: model,

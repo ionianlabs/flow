@@ -25,7 +25,7 @@ Things worth keeping are said out loud all day and then lost: "can you send me t
 - Settings UI beyond one toggle; other keys are set with `defaults write dev.ionian.flow`, as `parakeetFinals` is today.
 
 ## Terms
-- **Brain**: `Settings.vault` when it holds `AGENTS.md`, `inbox/` and `projects/`.
+- **Brain**: the first of `Settings.vault`, `$BRAIN_DIR`, `$IONIAN_HOME/brain` and `~/Ionian/brain` that holds `AGENTS.md`, `inbox/` and `projects/`.
 - **Buffer**: the local file of recent dictations waiting for the next sweep.
 - **Sweep**: one batch run, of one of two kinds. A **meeting sweep** reads one transcript right after its meeting ends. A **dictation sweep** runs on the schedule and reads the buffer plus any finished transcript still not swept. Only one sweep runs at a time; a sweep that comes due while another runs waits for it.
 - **Item**: one proposal: category (`todo`, `decision` or `fact`), text, verbatim quote, source, suggested project, confidence.
@@ -186,5 +186,7 @@ Swept 1 meeting, 12 dictations. Dropped: 9 by rules, 1 no project, 2 low confide
 - Clarification (2026-11-05): On first enable, sweep the existing transcript backlog? Answer: no, start from the moment Instinct is turned on. Changed: F1.35, Interfaces (`enabledAt`).
 - Clarification (2026-11-05): Meetings on the schedule or right away? Answer: meetings right after they end, dictations on the schedule. Changed: Terms (Sweep), F1.9, F1.12, F1.36, F1.37 (new), SC8 (new), Interfaces, Decisions. Unreviewed.
 - Clarification (2026-11-05): Name? Answer: Instinct.
-- Approved (2026-11-05) by the user, including the unreviewed meeting-end change. Changed: title, Settings, Interfaces, Decisions.
+- Approved (2026-11-05) by the user, including the unreviewed meeting-end change.
+- Change (2026-11-06, user's request): Instinct requires an Ionian Brain and says so. The Brain is the first of `Settings.vault`, `$BRAIN_DIR`, `$IONIAN_HOME/brain` and `~/Ionian/brain` that holds `AGENTS.md`, `inbox/` and `projects/` (the same lookup as the Brain plugin). Without one, the General page toggle is disabled and its row says that Instinct needs an Ionian Brain, with a link to get it; with Instinct on and the model missing, the row says so too. Shorter toggle copy so it fits one line. Changed: Terms (Brain), Interfaces (General page). Unreviewed.
+- Pending user consent (2026-11-06): parts of at most 1,500 characters and 12 sources (one dictation per call) instead of `Summarizer` chunks, and a verification call per candidate plus an evidence rule for decisions and facts, both from measured precision. Changed: title, Settings, Interfaces, Decisions.
 - Clarification (2026-11-05): What should it extract and how often? Answer: to-dos and real knowledge, with a solid duplicate check so the inbox does not flood with redundant or irrelevant items (the early vocabulary sweep indexed everything); a sweep every 2 to 3 hours over the latest window; the temporary dictation buffer removed after each sweep, transcripts kept; light load. Changed: Problem, Out of scope, Terms, F1, F2, Success criteria, Interfaces, Decisions.

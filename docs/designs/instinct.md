@@ -22,7 +22,6 @@ Things worth keeping are said out loud all day and then lost: "can you send me t
 - Duplicate checks against `knowledge/` notes. Only project files, recent logs and Instinct's own files are compared.
 - A per-meeting "keep out of Instinct" control. The only route is adding `instinct: false` to a transcript's frontmatter by hand.
 - Any network service, audio storage, or suggestions while speaking.
-- Settings UI beyond one toggle; other keys are set with `defaults write dev.ionian.flow`, as `parakeetFinals` is today.
 
 ## Terms
 - **Brain**: the first of `Settings.vault`, `$BRAIN_DIR`, `$IONIAN_HOME/brain` and `~/Ionian/brain` that holds `AGENTS.md`, `inbox/` and `projects/`.
@@ -107,6 +106,27 @@ Story: As the user, I want to see how often each kind of item was accepted and h
 
 Testability: unit. Tested on its own by running the report function on fixture files in a temporary folder; shows the exact lines of F2.1 to F2.3.
 
+### F3. Instinct page (P3)
+Why: Instinct is Flow's key feature, and one row under General hides it. The user needs one place to turn it on, see what it is doing, and say where it writes and what it looks for.
+
+Story: As the user, I want Instinct as its own page in the settings, so that I can see and control it without hunting.
+
+Scenarios:
+- F3.1 Given the Flow window, then the sidebar lists "Instinct" directly under "General", and General has no Instinct row any more.
+- F3.2 Given Instinct is on with a Brain at `~/Ionian/brain`, last sweep 12:00, interval 3 h and 4 lines marked `[ ]` in today's day file, then the page shows the switch, "Last sweep 12:00", "Next around 15:00", "4 items waiting", and the Brain path.
+- F3.3 Given the user picks a folder under Brain, when it is an Ionian Brain, then `instinctBrainFolder` is set and `BrainLocator` tries it first; when it is not, the choice is refused, the old Brain stays, and the page says "That folder is not an Ionian Brain." with the link to get one.
+- F3.4 Given a Brain, when the user chooses "Open inbox", then Finder opens `<brain>/inbox/`. The inbox location itself cannot be changed: it is part of the Brain structure.
+- F3.5 Given "Facts" is switched off under What it looks for (`instinctKinds`, default all three), when a sweep finds a fact, then it is dropped after extraction, before the verification call, and counted "by rules".
+- F3.6 Given "Meetings" (`instinctMeetings`, default true) is off, then no meeting sweep starts and scheduled sweeps read no transcripts; turning it on sets `enabledAt` to now, so meetings from the off period are not swept.
+- F3.7 Given "Dictations" (`instinctDictations`, default true) is off, then nothing is captured, and switching it off deletes `buffer.jsonl`.
+- F3.8 Given the user switches Instinct off, then `buffer.jsonl` is deleted, so no dictation stays on disk while nothing would ever sweep it.
+- F3.9 Given the interval picker (1, 2, 3 or 6 hours, `instinctIntervalHours`), when the user picks 2, then F1.9 uses 2 hours.
+- F3.10 Given the Never capture from list (`instinctExcludedApps`), when the user adds an app, then its bundle id is excluded (F1.2); when they remove one, it is captured again.
+- F3.11 Given "Sweep now" and "Pause for 1 hour" on the page, then they do what the menu items of the same name do; while paused the page says until when.
+- F3.12 Given no Brain, or no cleanup model, then the page shows the matching state from the General row of 2026-11-06 (F1.31) with its link, and the controls that cannot work are disabled.
+
+Testability: unit. Tested on its own by the page's pure state function and the settings and sweep rules with a fixture brain, a fixed clock and injected paths; shows F3.2 to F3.11. Offscreen renders in light and dark for F3.1, F3.2 and F3.12.
+
 ## Success criteria
 - SC1 At least 60% of the first 50 reviewed items are accepted or edited, and at least 70% of reviewed knowledge items, checked with `--instinct-precision`.
 - SC2 At most 10% of reviewed items are marked duplicate, checked with `--instinct-precision`.
@@ -185,6 +205,7 @@ Swept 1 meeting, 12 dictations. Dropped: 9 by rules, 1 no project, 2 low confide
 - Round 2 (2026-11-05): paraphrase context sufficient, 0 divergences, 12 guesses; critic B1 M0 N0; readiness B0 M0 N0 (two Majors noted below its bar). After merging 2 duplicates: fixed 12, rejected 0, escalated 1 (C2-1, fixed with the recommended answer and put to the user). Not run: none. All round 2 fixes are unreviewed.
 - Clarification (2026-11-05): On first enable, sweep the existing transcript backlog? Answer: no, start from the moment Instinct is turned on. Changed: F1.35, Interfaces (`enabledAt`).
 - Clarification (2026-11-05): Meetings on the schedule or right away? Answer: meetings right after they end, dictations on the schedule. Changed: Terms (Sweep), F1.9, F1.12, F1.36, F1.37 (new), SC8 (new), Interfaces, Decisions. Unreviewed.
+- Change (2026-11-06, user's request): Instinct gets its own settings page instead of a row under General, with the Brain folder, inbox, what it looks for and the schedule. Added: F3. Removed from Out of scope: settings UI beyond one toggle. Not reviewed by the zero-context reviewers.
 - Clarification (2026-11-05): Name? Answer: Instinct.
 - Approved (2026-11-05) by the user, including the unreviewed meeting-end change.
 - Change (2026-11-06, user's request): Instinct requires an Ionian Brain and says so. The Brain is the first of `Settings.vault`, `$BRAIN_DIR`, `$IONIAN_HOME/brain` and `~/Ionian/brain` that holds `AGENTS.md`, `inbox/` and `projects/` (the same lookup as the Brain plugin). Without one, the General page toggle is disabled and its row says that Instinct needs an Ionian Brain, with a link to get it; with Instinct on and the model missing, the row says so too. Shorter toggle copy so it fits one line. Changed: Terms (Brain), Interfaces (General page). Unreviewed.

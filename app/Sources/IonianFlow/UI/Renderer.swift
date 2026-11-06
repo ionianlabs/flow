@@ -23,9 +23,18 @@ import SwiftUI
         "settings-general-shot": generalSurface(.normal, width: 820, height: 540),
         "settings-general-fresh": generalSurface(.fresh, width: 820),
         "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
-        "settings-general-instinct-nobrain": generalSurface(.instinctNoBrain, width: 700),
-        "settings-general-instinct-on": generalSurface(.instinctOn, width: 700),
-        "settings-general-instinct-nomodel": generalSurface(.instinctNoModel, width: 700),
+        "stage-teaser": stageSurface(.teaser, clock: 7),
+        "stage-enable-0": stageSurface(.enabling, clock: 7, since: 0),
+        "stage-enable-05": stageSurface(.enabling, clock: 7.9, since: 0.9),
+        "stage-enable-1": stageSurface(.enabling, clock: 8.8, since: 1.8),
+        "stage-on": stageSurface(.on, clock: 9),
+        "stage-reduced": stageSurface(.teaser, clock: 0, reduceMotion: true),
+        "settings-instinct-on": instinctSurface(.instinctOn, width: 820),
+        "settings-instinct-off": instinctSurface(.instinctOff, width: 820),
+        "settings-instinct-nobrain": instinctSurface(.instinctNoBrain, width: 820),
+        "settings-instinct-nomodel": instinctSurface(.instinctNoModel, width: 820),
+        "settings-instinct-on-min": instinctSurface(.instinctOn, width: 700),
+        "settings-instinct-nobrain-min": instinctSurface(.instinctNoBrain, width: 700),
         "settings-general-min": generalSurface(.normal, width: 700),
         "settings-general-fresh-min": generalSurface(.fresh, width: 700),
         "settings-general-cleanup-off-min": generalSurface(.cleanupOff, width: 700),
@@ -70,11 +79,32 @@ import SwiftUI
             var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
             domain["statsWords"] = state == .fresh ? 0 : 2545
             domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
-            // Instinct rows use sample state only: never the user's defaults or brain.
-            domain["instinct"] = [.instinctOn, .instinctNoModel].contains(state)
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
-            InstinctApp.brainFound = { state != .instinctNoBrain }
             return AnyView(mainViewForRender(page: .general, state: state))
+        })
+    }
+
+    /// The stage alone at a fixed instant, `since` seconds into the enable moment.
+    private static func stageSurface(_ mode: InstinctStage.Mode, clock: Double, since: Double = 0, reduceMotion: Bool = false) -> Surface {
+        Surface(size: CGSize(width: 520, height: 172), make: {
+            AnyView(InstinctStageView(on: mode != .teaser, enableStartedAt: nil,
+                                      forceStill: reduceMotion, fixed: reduceMotion ? nil : (mode: mode, clock: clock, since: since))
+                .padding(Space.s5).background(Color.bg))
+        })
+    }
+
+    /// The Instinct page on sample state only: never the user's defaults, brain or files.
+    private static func instinctSurface(_ state: RenderState, width: CGFloat) -> Surface {
+        Surface(size: CGSize(width: width, height: 1100), make: {
+            var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            domain["instinct"] = state != .instinctOff
+            domain["instinctBrainFolder"] = nil
+            domain["instinctExcludedApps"] = InstinctRules.defaultExcludedApps + ["com.apple.Notes"]
+            domain["instinctIntervalHours"] = 3
+            domain["instinctMeetings"] = true
+            domain["instinctDictations"] = true
+            UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+            return AnyView(mainViewForRender(page: .instinct, state: state).environment(\.instinctStageClock, 7))
         })
     }
 

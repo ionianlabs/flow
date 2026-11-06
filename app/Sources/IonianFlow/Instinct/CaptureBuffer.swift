@@ -73,6 +73,12 @@ final class CaptureBuffer {
         return fresh
     }
 
+    /// Deletes the file: nothing stays on disk when Instinct or Dictations is switched off (F3.7, F3.8).
+    func clear() {
+        lock.lock(); defer { lock.unlock() }
+        try? FileManager.default.removeItem(at: file)
+    }
+
     func remove(ids: Set<String>) {
         lock.lock(); defer { lock.unlock() }
         let kept = loadFresh()

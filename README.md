@@ -84,7 +84,7 @@ Open the Vocabulary page from the menu bar.
 Connect a vault once. Flow reads your notes and picks out names, products, acronyms and jargon. It rescans when your notes change, and new terms wait for your review. It only reads your vault and never changes it. You can also add terms by hand, or edit `~/Documents/Ionian Flow/Vocabulary.md`. On my benchmark of synthesized German and English speech, such terms came out right 64 % of the time instead of 36 %.
 
 ## Feed your brain.
-Instinct is new, and off until you turn it on in Settings. It reads your finished meeting transcripts and your dictations, and looks for to-dos, decisions and facts. A meeting is read right after it ends, dictations every 3 hours. It needs an [Ionian Brain](https://github.com/ionianlabs/brain) folder connected as your vault, and the cleanup model.
+Instinct is new, and off until you turn it on, on the Instinct page of the Flow window. It reads your finished meeting transcripts and your dictations, and looks for to-dos, decisions and facts. A meeting is read right after it ends, dictations every 3 hours. It works with an [Ionian Brain](https://github.com/ionianlabs/brain) folder, which you choose on the same page, and the cleanup model.
 
 It writes one file per day into the brain's inbox, and nothing else. Each line holds the proposal, the suggested project and your exact words. To keep the inbox calm, a line needs a verbatim quote, a daily cap applies, and anything the brain already holds is skipped.
 

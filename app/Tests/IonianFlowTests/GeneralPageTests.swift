@@ -22,32 +22,32 @@ extension IonianFlowTests {
         #expect(!GeneralLayout.showHowTo(words: 0, transcribedSeconds: 90))
     }
 
-    @Test func instinctToggleCopy() {
+    // The Instinct row left General for its own page (F3.1); its rules now feed the top of that page.
+    @Test func instinctTopCopy() {
         #expect(InstinctApp.toggleTitle == "Instinct")
-        #expect(InstinctApp.toggleDetail.hasSuffix("."))
-        #expect(!InstinctApp.toggleDetail.contains("\n") && !InstinctApp.toggleDetail.contains("!") && !InstinctApp.toggleDetail.contains("\u{2014}"))
+        #expect(InstinctApp.toggleDetail == "Proposes to-dos, decisions and facts to your brain's inbox.")
     }
 
+    // F3.15: without a Brain the switch stays usable and the row invites.
     @Test func instinctRowWithoutBrain() {
         let r = InstinctApp.row(brainFound: false, on: false, cleanupInstalled: true)
-        #expect(r.detail == "Needs an Ionian Brain. Connect one under Vocabulary.")
-        #expect(!r.enabled && !r.shownOn && r.showsLink)
-        #expect(InstinctApp.getBrainTitle == "Get Ionian Brain ↗")
+        #expect(r.detail == InstinctApp.noBrainDetail && r.enabled && !r.shownOn && r.showsLink)
+        #expect(InstinctApp.getBrainTitle == "Get Ionian Brain ↗" && InstinctApp.getBrainPill == "Get Ionian Brain")
+        #expect(InstinctApp.connectBrainTitle == "I have one, connect it ›")
         #expect(InstinctApp.getBrainURL.absoluteString == "https://github.com/ionianlabs/brain")
+        #expect(InstinctApp.noBrainDetail == "Instinct works with your Ionian Brain: one folder of plain notes your agents already read.")
     }
 
     @Test func instinctRowWithBrain() {
         let off = InstinctApp.row(brainFound: true, on: false, cleanupInstalled: false)
         #expect(off.detail == InstinctApp.toggleDetail && off.enabled && !off.shownOn && !off.showsLink)
-        #expect(InstinctApp.toggleDetail == "Proposes to-dos, decisions and facts to your brain's inbox.")
         let on = InstinctApp.row(brainFound: true, on: true, cleanupInstalled: true)
         #expect(on.detail == InstinctApp.toggleDetail && on.enabled && on.shownOn)
     }
 
     @Test func instinctRowOnWithoutModel() {
         let r = InstinctApp.row(brainFound: true, on: true, cleanupInstalled: false)
-        #expect(r.detail == "Needs the cleanup model. Download it under Models.")
-        #expect(r.enabled && r.shownOn && !r.showsLink)
+        #expect(r.detail == InstinctApp.noModelDetail && r.enabled && r.shownOn && !r.showsLink)
     }
 
     @Test func instinctRowKeepsOnWhenBrainDisappears() {
@@ -55,9 +55,21 @@ extension IonianFlowTests {
         #expect(r.shownOn && r.enabled && r.showsLink && r.detail == InstinctApp.noBrainDetail)
     }
 
+    // F3.15: switching on without a Brain leads to the invitation instead of turning on.
+    @Test func flippingOnWithoutBrainInvites() {
+        #expect(InstinctApp.flip(to: true, brainFound: false) == .invite)
+        #expect(InstinctApp.flip(to: true, brainFound: true) == .apply)
+        #expect(InstinctApp.flip(to: false, brainFound: false) == .apply)
+    }
+
     @Test func instinctRowCopyIsCalm() {
-        for t in [InstinctApp.noBrainDetail, InstinctApp.noModelDetail, InstinctApp.toggleDetail, InstinctApp.getBrainTitle] {
+        for t in [InstinctApp.noBrainDetail, InstinctApp.noModelDetail, InstinctApp.toggleDetail, InstinctApp.getBrainTitle,
+                  InstinctApp.getBrainPill, InstinctApp.connectBrainTitle] {
             #expect(!t.contains("!") && !t.contains("\u{2014}") && !t.contains("\u{2013}") && !t.contains("\n"))
+        }
+        // The invitation never reads as a hurdle.
+        for t in [InstinctApp.noBrainDetail, InstinctApp.getBrainPill, InstinctApp.connectBrainTitle] {
+            #expect(!["needs", "requires", "must", "blocked"].contains { t.lowercased().contains($0) })
         }
     }
 

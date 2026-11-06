@@ -18,6 +18,8 @@ enum Settings {
             "instinct": false,
             "instinctExcludedApps": InstinctRules.defaultExcludedApps,
             "instinctIntervalHours": 3,
+            "instinctMeetings": true,
+            "instinctDictations": true,
         ])
     }
 
@@ -89,6 +91,29 @@ enum Settings {
     static var instinctExcludedApps: [String] {
         get { d.stringArray(forKey: "instinctExcludedApps") ?? InstinctRules.defaultExcludedApps }
         set { d.set(newValue, forKey: "instinctExcludedApps") }
+    }
+
+    /// A folder chosen on the Instinct page; tried before the other places a Brain can be (F3.3).
+    static var instinctBrainFolder: URL? {
+        get { d.string(forKey: "instinctBrainFolder").map { URL(fileURLWithPath: $0, isDirectory: true) } }
+        set { d.set(newValue?.path, forKey: "instinctBrainFolder") }
+    }
+
+    /// What Instinct looks for: "todo", "decision", "fact". Default all three (F3.5).
+    static var instinctKinds: Set<InstinctCategory> {
+        get { InstinctApp.kinds(stored: d.stringArray(forKey: "instinctKinds")) }
+        set { d.set(InstinctCategory.allCases.filter(newValue.contains).map(\.rawValue), forKey: "instinctKinds") }
+    }
+
+    /// Read finished meetings (F3.6) and dictations (F3.7).
+    static var instinctMeetings: Bool {
+        get { d.bool(forKey: "instinctMeetings") }
+        set { d.set(newValue, forKey: "instinctMeetings") }
+    }
+
+    static var instinctDictations: Bool {
+        get { d.bool(forKey: "instinctDictations") }
+        set { d.set(newValue, forKey: "instinctDictations") }
     }
 
     static var instinctIntervalHours: Int {

@@ -18,6 +18,19 @@ enum InstinctRules {
         "com.apple.Passwords", "com.apple.keychainaccess",
     ]
 
+    /// Names for the default list, so the page shows "1Password" and not a bundle id (F3.10).
+    static let knownAppNames = [
+        "com.1password.1password": "1Password", "com.agilebits.onepassword7": "1Password 7", "com.bitwarden.desktop": "Bitwarden",
+        "com.apple.Passwords": "Passwords", "com.apple.keychainaccess": "Keychain Access",
+    ]
+
+    /// The list with one more bundle id, once (F3.10).
+    static func adding(_ bundle: String, to list: [String]) -> [String] {
+        bundle.isEmpty || list.contains(bundle) ? list : list + [bundle]
+    }
+
+    static func removing(_ bundle: String, from list: [String]) -> [String] { list.filter { $0 != bundle } }
+
     static func shouldCapture(bundle: String, excluded: [String], secureInput: Bool, pausedUntil: Date?, now: Date) -> Bool {
         if excluded.contains(bundle) || secureInput { return false }
         if let until = pausedUntil, now < until { return false }

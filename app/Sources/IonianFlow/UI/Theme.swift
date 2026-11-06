@@ -87,6 +87,11 @@ extension EnvironmentValues {
     }
 }
 
+/// `motion.easing.soft-out`, cubic-bezier(.2, .7, .2, 1): gentle settle, no overshoot.
+enum MotionEasing {
+    static let softOut = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.2, y: 0.7), endControlPoint: UnitPoint(x: 0.2, y: 1))
+}
+
 var reduceMotionEnabled: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
 // MARK: - Shadows

@@ -16,6 +16,10 @@ struct InstinctSweep {
     var model: InstinctModel
     var now: () -> Date = Date.init
     var timeZone: TimeZone = .current
+    /// What the Instinct page lets through (F3.5 to F3.7).
+    var kinds: Set<InstinctCategory> = Set(InstinctCategory.allCases)
+    var readsMeetings = true
+    var readsDictations = true
 
     func run(kind: InstinctSweepKind, transcript: URL?, checkpoint: () async -> Void) async -> InstinctSweepReport {
         var report = InstinctSweepReport()
@@ -24,14 +28,15 @@ struct InstinctSweep {
         // Sources.
         let buffer = CaptureBuffer(folder: instinctFolder, now: now)
         let state = InstinctState.load(from: instinctFolder)
-        let pending = TranscriptSource.pending(in: transcriptsFolder, state: state, timeZone: timeZone)
+        let pending = readsMeetings ? TranscriptSource.pending(in: transcriptsFolder, state: state, timeZone: timeZone)
+                                    : TranscriptSource.Pending()
         var sources: [InstinctSource] = []
         var read: [CaptureBuffer.Entry] = []
         var transcriptFiles: [URL] = []
         var recordAsSwept: [String] = []
         switch kind {
         case .scheduled:
-            read = buffer.read()
+            read = readsDictations ? buffer.read() : []
             for e in read {
                 if InstinctRules.prefilter(text: e.text, bundle: e.bundle) != nil {
                     report.dropped.byRules += 1
@@ -43,7 +48,7 @@ struct InstinctSweep {
             transcriptFiles = pending.toRead
             recordAsSwept = pending.recordAsSwept
         case .meeting:
-            guard let transcript, pending.toRead.contains(where: { $0.lastPathComponent == transcript.lastPathComponent }) else { return report }
+            guard readsMeetings, let transcript, pending.toRead.contains(where: { $0.lastPathComponent == transcript.lastPathComponent }) else { return report }
             transcriptFiles = [transcript]
         }
         let transcriptSources = transcriptFiles.flatMap { TranscriptSource.parse(fileURL: $0, timeZone: timeZone) }
@@ -69,6 +74,8 @@ struct InstinctSweep {
             for var item in items {
                 guard let source = chunk.first(where: { $0.id == item.sourceID }),
                       InstinctParsing.isVerbatim(item.quote, in: source.text) else { report.dropped.quoteNotFound += 1; continue }
+                // F3.5: a kind the user switched off is dropped here, before the verification call.
+                guard kinds.contains(item.category) else { report.dropped.byRules += 1; continue }
                 if !projects.contains(where: { $0.slug == item.project }) { item.project = "none" }
                 if item.category == .todo {
                     item.due = InstinctRules.weekdayDue(item.due, quote: item.quote, sourceTime: source.time, calendar: calendar)

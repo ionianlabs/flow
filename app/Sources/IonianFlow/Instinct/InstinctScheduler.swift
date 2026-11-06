@@ -31,6 +31,7 @@ final class InstinctScheduler {
     private let pausedUntil: () -> Date?
     private let loadState: () -> InstinctState
     private let saveState: (InstinctState) -> Void
+    private let meetingsOn: () -> Bool
 
     private(set) var running: Task<Void, Never>?
 
@@ -40,11 +41,11 @@ final class InstinctScheduler {
          power: @escaping () -> InstinctPower = InstinctPower.current,
          brainReady: @escaping () -> Bool, modelReady: @escaping () -> Bool,
          intervalHours: @escaping () -> Int, pausedUntil: @escaping () -> Date?,
-         loadState: @escaping () -> InstinctState, saveState: @escaping (InstinctState) -> Void) {
+         loadState: @escaping () -> InstinctState, saveState: @escaping (InstinctState) -> Void, meetingsOn: @escaping () -> Bool = { true }) {
         self.sweeper = sweeper; self.gate = gate; self.clock = clock; self.isBusy = isBusy
         self.power = power; self.brainReady = brainReady; self.modelReady = modelReady
         self.intervalHours = intervalHours; self.pausedUntil = pausedUntil
-        self.loadState = loadState; self.saveState = saveState
+        self.loadState = loadState; self.saveState = saveState; self.meetingsOn = meetingsOn
     }
 
     private var capDay: Date?
@@ -74,7 +75,10 @@ final class InstinctScheduler {
     }
 
     /// Called after the transcript is written and its summary finished or failed (F1.36).
-    func meetingEnded(_ file: URL) { enqueue(.meeting(file), forced: false) }
+    func meetingEnded(_ file: URL) {
+        guard meetingsOn() else { return }  // F3.6
+        enqueue(.meeting(file), forced: false)
+    }
 
     func sweepNow() { enqueue(.scheduled, forced: true) }
 

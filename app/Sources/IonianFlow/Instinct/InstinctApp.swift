@@ -27,7 +27,9 @@ enum InstinctApp {
     static func liveSweep(_ control: SweepControl) -> InstinctSweep? {
         guard let make = makeModel, let brain = BrainLocator.current() else { return nil }
         return InstinctSweep(brainRoot: brain, transcriptsFolder: Settings.transcriptsFolder,
-                             instinctFolder: Settings.instinctFolder, model: make(control))
+                             instinctFolder: Settings.instinctFolder, model: make(control),
+                             kinds: Settings.instinctKinds, readsMeetings: Settings.instinctMeetings,
+                             readsDictations: Settings.instinctDictations)
     }
 
     // MARK: folder
@@ -44,8 +46,8 @@ enum InstinctApp {
     /// Without a known front app nothing is stored, since the exclusion list could not be applied.
     @discardableResult
     static func capture(text: String, front: (name: String, bundle: String)?, excluded: [String], secureInput: Bool,
-                        pausedUntil: Date?, now: Date, buffer: CaptureBuffer) -> Bool {
-        guard !text.isEmpty, let front, !front.bundle.isEmpty,
+                        pausedUntil: Date?, now: Date, buffer: CaptureBuffer, dictations: Bool = true) -> Bool {
+        guard dictations, !text.isEmpty, let front, !front.bundle.isEmpty,
               InstinctRules.shouldCapture(bundle: front.bundle, excluded: excluded, secureInput: secureInput,
                                           pausedUntil: pausedUntil, now: now) else { return false }
         return buffer.append(text: text, app: front.name, bundle: front.bundle) != nil
@@ -58,6 +60,44 @@ enum InstinctApp {
         var state = InstinctState.load(from: folder)
         state.enabledAt = now
         do { try state.save(to: folder) } catch { NSLog("Ionian Flow: Instinct state not saved: %@", error.localizedDescription) }
+    }
+
+    // MARK: Instinct page settings (F3)
+
+    /// Turning Instinct off leaves no dictation on disk (F3.8).
+    static func disable(folder: URL) { CaptureBuffer(folder: folder).clear() }
+
+    /// Switching Dictations off stops capture, and deletes what was captured (F3.7).
+    static func setDictations(on: Bool, folder: URL) { if !on { CaptureBuffer(folder: folder).clear() } }
+
+    /// Switching Meetings on starts the clock again, so meetings from the off period are not swept (F3.6).
+    static func setMeetings(on: Bool, folder: URL, now: Date) { if on { enable(folder: folder, now: now) } }
+
+    /// The kinds to look for from the stored words; nothing stored means all three (F3.5).
+    static func kinds(stored: [String]?) -> Set<InstinctCategory> {
+        guard let stored else { return Set(InstinctCategory.allCases) }
+        return Set(stored.compactMap(InstinctCategory.init(rawValue:)))
+    }
+
+    static let notABrain = "That folder is not an Ionian Brain."
+
+    /// A chosen folder is kept only when it is an Ionian Brain (F3.3); the old choice stays otherwise.
+    static func chooseBrain(_ url: URL, save: (URL) -> Void) -> Bool {
+        guard BrainLines.isBrain(url) else { return false }
+        save(url)
+        return true
+    }
+
+    /// The inbox is part of the Brain's structure and cannot be moved (F3.4).
+    static func inbox(of brain: URL) -> URL { brain.appendingPathComponent("inbox", isDirectory: true) }
+
+    /// The bundle id of an `.app` folder picked in the open panel (F3.10).
+    static func bundleID(ofApp url: URL) -> String? { Bundle(url: url)?.bundleIdentifier }
+
+    /// "Paused until 14:05" while the pause lasts (F3.11).
+    static func pausedLine(until: Date?, now: Date, timeZone: TimeZone = .current) -> String? {
+        guard let until, until > now else { return nil }
+        return "Paused until " + InstinctPageState.clock(until, timeZone: timeZone)
     }
 
     // MARK: menu (F1.4, F1.28, F1.31)
@@ -73,19 +113,20 @@ enum InstinctApp {
         (status, [sweepNowTitle, pauseTitle])
     }
 
-    // MARK: General page copy
+    // MARK: Instinct page copy
 
     static let toggleTitle = "Instinct"
     static let toggleDetail = "Proposes to-dos, decisions and facts to your brain's inbox."
-    static let noBrainDetail = "Needs an Ionian Brain. Connect one under Vocabulary."
-    static let noModelDetail = "Needs the cleanup model. Download it under Models."
+    /// With no Brain the page invites instead of blocking (F3.15): the Brain is why Instinct is worth having.
+    static let noBrainDetail = "Instinct works with your Ionian Brain: one folder of plain notes your agents already read."
+    static let getBrainPill = "Get Ionian Brain"
+    static let connectBrainTitle = "I have one, connect it ›"
+    static let noModelDetail = "Instinct reads with the cleanup model. Download it on the General page."
     static let getBrainTitle = "Get Ionian Brain ↗"
-    /// Whether a brain is found; the renderer swaps it for sample states.
-    nonisolated(unsafe) static var brainFound: () -> Bool = { BrainLocator.current() != nil }
     static let getBrainURL = URL(string: "https://github.com/ionianlabs/brain")!
 
-    /// What the General page row shows. Without a brain the toggle is disabled (off), and the detail points to one;
-    /// a stored "on" stays on, and can still be switched off, since the scheduler already refuses to sweep.
+    /// What the top of the Instinct page shows. The switch is always usable: without a Brain, flipping it leads to the
+    /// invitation (`flip`), and a stored "on" stays on, since the scheduler already refuses to sweep.
     struct Row: Equatable {
         var detail: String
         var enabled: Bool
@@ -94,8 +135,13 @@ enum InstinctApp {
     }
 
     static func row(brainFound: Bool, on: Bool, cleanupInstalled: Bool) -> Row {
-        if !brainFound { return Row(detail: noBrainDetail, enabled: on, shownOn: on, showsLink: true) }
+        if !brainFound { return Row(detail: noBrainDetail, enabled: true, shownOn: on, showsLink: true) }
         if on && !cleanupInstalled { return Row(detail: noModelDetail, enabled: true, shownOn: true, showsLink: false) }
         return Row(detail: toggleDetail, enabled: true, shownOn: on, showsLink: false)
     }
+
+    enum Flip: Equatable { case apply, invite }
+
+    /// Switching on without a Brain does not turn Instinct on: the page moves focus to the invitation (F3.15).
+    static func flip(to on: Bool, brainFound: Bool) -> Flip { on && !brainFound ? .invite : .apply }
 }

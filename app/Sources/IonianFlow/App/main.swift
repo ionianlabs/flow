@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             rescan: { [weak self] in self?.sweeper.scan(requested: true) },
             setUseVocabulary: { [weak self] in self?.setUseVocabulary($0) }
         ),
-        setInstinct: { [weak self] in self?.setInstinct($0) }
+        instinct: instinctActions()
     ))
     private var scanWatch: AnyCancellable?
     private var onboardingStep = 0
@@ -406,7 +406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     /// F1.1 to F1.4: the delivered text goes to Instinct's buffer unless the app, secure input or the pause says no.
     private func captureForInstinct(_ text: String) {
-        guard Settings.instinct else { return }
+        guard Settings.instinct, Settings.instinctDictations else { return }
         let app = NSWorkspace.shared.frontmostApplication
         InstinctApp.capture(
             text: text, front: app?.bundleIdentifier.map { (name: app?.localizedName ?? $0, bundle: $0) },
@@ -423,7 +423,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && InstinctApp.makeModel != nil },
             intervalHours: { Settings.instinctIntervalHours }, pausedUntil: { Settings.instinctPausedUntil },
             loadState: { InstinctState.load(from: Settings.instinctFolder) },
-            saveState: { try? $0.save(to: Settings.instinctFolder) }) }
+            saveState: { try? $0.save(to: Settings.instinctFolder) },
+            meetingsOn: { Settings.instinctMeetings }) }
         instinct = scheduler
         MainActor.assumeIsolated { scheduler.launch() }
     }
@@ -435,12 +436,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             startInstinct()
         } else {
             instinct = nil
+            InstinctApp.disable(folder: Settings.instinctFolder)  // F3.8
         }
     }
 
     @objc private func sweepInstinctNow() { MainActor.assumeIsolated { instinct?.sweepNow() } }
 
     @objc private func pauseInstinct() { Settings.instinctPausedUntil = InstinctApp.pauseEnd(from: Date()) }
+
+    /// The Instinct page: the same actions as the menu items, plus the Brain, meetings, dictations and app choices (F3).
+    private func instinctActions() -> InstinctActions {
+        var a = InstinctActions()
+        a.setOn = { [weak self] in self?.setInstinct($0) }
+        a.setMeetings = { InstinctApp.setMeetings(on: $0, folder: Settings.instinctFolder, now: Date()) }
+        a.setDictations = { InstinctApp.setDictations(on: $0, folder: Settings.instinctFolder) }
+        a.chooseBrain = { [weak self] in self?.chooseInstinctBrain() }
+        a.openInbox = { NSWorkspace.shared.open(InstinctApp.inbox(of: $0)) }
+        a.pickApp = { [weak self] in self?.pickExcludedApp() }
+        a.appName = { id in
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent
+        }
+        a.sweepNow = { [weak self] in self?.sweepInstinctNow() }
+        a.pause = { [weak self] in self?.pauseInstinct() }
+        a.snapshot = { [weak self] in
+            guard let self else { return InstinctSnapshot(brain: nil, state: InstinctState(), itemsToday: 0, now: Date()) }
+            let now = Date(), brain = BrainLocator.current()
+            let items = brain.map { InstinctWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
+            let running = MainActor.assumeIsolated { self.instinct?.running != nil }
+            return InstinctSnapshot(brain: brain, state: InstinctState.load(from: Settings.instinctFolder), itemsToday: items, now: now, sweeping: running)
+        }
+        return a
+    }
+
+    private func chooseInstinctBrain() -> InstinctActions.BrainChoice? {
+        let panel = NSOpenPanel()
+        panel.title = "Ionian Brain"
+        panel.message = "Pick the folder of your Ionian Brain."
+        panel.prompt = "Choose"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.directoryURL = BrainLocator.current()
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        return InstinctApp.chooseBrain(url) { Settings.instinctBrainFolder = $0 } ? .accepted : .refused
+    }
+
+    private func pickExcludedApp() -> String? {
+        let panel = NSOpenPanel()
+        panel.title = "Never capture from"
+        panel.message = "Pick an app. Dictations into it are never stored."
+        panel.prompt = "Add"
+        panel.allowedContentTypes = [.application]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        return InstinctApp.bundleID(ofApp: url)
+    }
 
     private func paste(_ text: String) {
         let needsSpace = Settings.trailingSpace && !(text.last?.isWhitespace ?? true)
@@ -738,6 +791,8 @@ if CommandLine.arguments.contains("--demo") {
     runTranscriptDemo()
 } else if let i = CommandLine.arguments.firstIndex(of: "--onboarding-demo") {
     runOnboardingDemo(step: CommandLine.arguments.dropFirst(i + 1).first.flatMap { Int($0) } ?? 0)
+} else if let i = CommandLine.arguments.firstIndex(of: "--instinct-stage-demo") {
+    runInstinctStageDemo(mode: CommandLine.arguments.dropFirst(i + 1).first ?? "teaser")
 } else if let i = CommandLine.arguments.firstIndex(of: "--vocabulary-demo") {
     runVocabularyDemo(file: CommandLine.arguments.dropFirst(i + 1).first)
 } else {

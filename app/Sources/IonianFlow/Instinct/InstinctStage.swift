@@ -5,18 +5,19 @@ import SwiftUI
 /// (MOT-01), eased with `motion.easing.soft-out`, and Reduce Motion selects one composed still frame (MOT-04).
 enum InstinctStage {
     enum Mode: Equatable {
-        /// Instinct is off: the stage loops slowly and shows what it would do.
+        /// Instinct is off: the fragments settle once, slowly, then the stage rests as a composed still.
         case teaser
-        /// The switch was just turned on: the stream gathers, the lines settle, the stage resolves into the status.
+        /// The switch was just turned on: the lines let go and the stage settles into its quiet on state.
         case enabling
-        /// Instinct is on: a very slow, nearly still wave.
+        /// Instinct is on: fully still. Only a running sweep moves the wave, gently.
         case on
     }
 
     static let lineCount = 3
-    static let enableDuration: TimeInterval = 1.8
-    static let teaserPeriod: TimeInterval = 16
-    /// Radians per second of the wave: one slow swell, about 18 s per crest.
+    /// The teaser plays once per app launch and takes about 3.5 seconds.
+    static let teaserDuration: TimeInterval = 3.5
+    static let enableDuration: TimeInterval = 1.5
+    /// Radians per second of the wave while it moves: one slow swell, about 18 s per crest.
     static let waveRate = 0.35
 
     /// Everything the drawing needs for one instant.
@@ -33,9 +34,15 @@ enum InstinctStage {
         var lineOpacity: Double
     }
 
-    static let onAmplitude = 0.3
-    static let onStream = 0.4
-    static let sweepingAmplitude = 0.55
+    // The stream stays low in contrast: it is the background, the lines are the point.
+    static let restClock = 6.0
+    static let restAmplitude = 0.5
+    static let restStream = 0.35
+    static let onAmplitude = 0.25
+    static let onStream = 0.3
+    static let sweepingAmplitude = 0.45
+    /// How fast the wave moves while a sweep runs, relative to a second of the clock.
+    static let sweepPace = 0.6
 
     /// Which mode the stage is in. The enable moment is only ever started by the switch, never by opening the page.
     static func mode(on: Bool, enableStartedAt: Date?, now: Date) -> Mode {
@@ -44,53 +51,59 @@ enum InstinctStage {
         return .on
     }
 
-    /// Seconds between frames: the moment of enabling is smooth, the loop is slow and calm, the on state is nearly still.
-    /// Measured at about 3 ms of CPU per frame, so these keep drawing under about 5% of one core.
+    /// Whether anything moves at this instant. When it is false no timeline runs at all, so a resting stage costs nothing.
+    static func animates(mode: Mode, since: Double, sweeping: Bool) -> Bool {
+        switch mode {
+        case .teaser: return since < teaserDuration
+        case .enabling: return since < enableDuration
+        case .on: return sweeping
+        }
+    }
+
+    /// Seconds between frames while something moves.
     static func refreshInterval(mode: Mode, sweeping: Bool) -> TimeInterval {
         switch mode {
         case .enabling: return 1.0 / 30
-        case .teaser: return 1.0 / 15
-        case .on: return sweeping ? 1.0 / 15 : 1.0 / 10
+        case .teaser: return 1.0 / 20
+        case .on: return 1.0 / 12
         }
     }
 
-    /// The frame at `clock` seconds. `since` is the time since the switch was turned on (enabling only).
-    /// `sweeping` makes the wave of the on state move a little more; it is never a progress bar.
-    static func frame(mode: Mode, clock: Double, since: Double = 0, reduceMotion: Bool, sweeping: Bool = false) -> Frame {
+    /// The frame `since` seconds into the mode: since the page showed the teaser, since the switch was turned on,
+    /// or since the sweep began. A sweep is the only thing that moves the on state, and it shows no progress.
+    static func frame(mode: Mode, since: Double, reduceMotion: Bool, sweeping: Bool = false) -> Frame {
         if reduceMotion { return still(mode: mode) }
         switch mode {
         case .teaser:
-            let t = clock.truncatingRemainder(dividingBy: teaserPeriod)
-            // Rise one after the other from 3 s, hold, then let go from 11.5 s.
-            let settle = (0..<lineCount).map { i in
-                ease((t - 3 - 1.1 * Double(i)) / 1.6) * (1 - ease((t - 11.5 - 0.5 * Double(i)) / 1.4))
-            }
-            let lifted = settle.max() ?? 0
-            return Frame(clock: clock, amplitude: 1, streamOpacity: 1 - 0.65 * lifted, settle: settle, lineOpacity: 1)
+            guard since < teaserDuration else { return still(mode: .teaser) }
+            // The lines rise one after the other, slowly; the wave drifts a little on the way to its rest.
+            let settle = (0..<lineCount).map { i in ease((since - 0.3 - 0.9 * Double(i)) / 1.4) }
+            let lifted = settle.reduce(0, +) / Double(lineCount)
+            return Frame(clock: restClock - (teaserDuration - max(0, since)) * 0.5,
+                         amplitude: lerp(0.8, restAmplitude, lifted), streamOpacity: lerp(0.6, restStream, lifted),
+                         settle: settle, lineOpacity: 1)
         case .enabling:
-            let gather = ease(since / 1.0)
-            let resolve = ease((since - 1.15) / 0.65)
-            let settle = (0..<lineCount).map { i in ease((since - 0.2 - 0.22 * Double(i)) / 0.7) }
-            let lifted = settle.max() ?? 0
-            let toward = 1 - 0.4 * gather * (1 - resolve)
-            return Frame(clock: clock,
-                         amplitude: lerp(1, onAmplitude, resolve) * (1 - 0.3 * gather * (1 - resolve)),
-                         streamOpacity: lerp((1 - 0.6 * lifted) * toward, onStream, resolve),
-                         settle: settle, lineOpacity: 1 - resolve)
+            guard since < enableDuration else { return still(mode: .on) }
+            // From the resting teaser to the quiet on state: the lines let go, nothing travels.
+            let resolve = ease((since - 0.6) / 0.9)
+            return Frame(clock: restClock, amplitude: lerp(restAmplitude, onAmplitude, resolve),
+                         streamOpacity: lerp(restStream, onStream, resolve), settle: [1, 1, 1], lineOpacity: 1 - resolve)
         case .on:
-            return Frame(clock: clock, amplitude: sweeping ? sweepingAmplitude : onAmplitude, streamOpacity: onStream,
-                         settle: [0, 0, 0], lineOpacity: 0)
+            guard sweeping else { return still(mode: .on) }
+            let r = ease(since / 1.5)
+            return Frame(clock: restClock + max(0, since) * sweepPace, amplitude: lerp(onAmplitude, sweepingAmplitude, r),
+                         streamOpacity: onStream, settle: [0, 0, 0], lineOpacity: 0)
         }
     }
 
-    /// The composed still of Reduce Motion: the wave held at one phase, and in the teaser the three lines settled.
-    /// Turning the switch on shows the on still; the page cross-fades to it and nothing else moves.
+    /// The composed still: also the Reduce Motion frame. The teaser rests with its three lines settled; the on state
+    /// is the wave alone, held at one phase.
     static func still(mode: Mode) -> Frame {
         switch mode {
         case .teaser:
-            return Frame(clock: 6, amplitude: 0.6, streamOpacity: 0.4, settle: [1, 1, 1], lineOpacity: 1)
+            return Frame(clock: restClock, amplitude: restAmplitude, streamOpacity: restStream, settle: [1, 1, 1], lineOpacity: 1)
         case .enabling, .on:
-            return Frame(clock: 6, amplitude: onAmplitude, streamOpacity: onStream, settle: [0, 0, 0], lineOpacity: 0)
+            return Frame(clock: restClock, amplitude: onAmplitude, streamOpacity: onStream, settle: [0, 0, 0], lineOpacity: 0)
         }
     }
 
@@ -118,4 +131,15 @@ enum InstinctStage {
         "yes the numbers look better than last quarter so let us go with the smaller plan and see how it holds",
         "can you share the notes after the call I will add them to the folder and we can look again on Thursday",
     ]
+}
+
+/// The teaser plays at most once per app launch: opening the page again shows the resting frame.
+enum InstinctStageLaunch {
+    nonisolated(unsafe) static var played = false
+
+    /// True the first time only.
+    static func claim() -> Bool {
+        defer { played = true }
+        return !played
+    }
 }

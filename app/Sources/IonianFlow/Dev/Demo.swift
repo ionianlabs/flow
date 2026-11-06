@@ -133,25 +133,26 @@ struct DemoBackdrop: View {
 private var retainedStageDemo: NSWindow?
 
 /// `--instinct-stage-demo [teaser|enable|on|sweeping]`: the Instinct stage alone in a small window, to watch it move.
-/// Enable plays the moment again every 6 seconds. No settings are read or changed.
+/// Teaser and enable replay every 8 seconds, so you can watch the moment again. No settings are read or changed.
 func runInstinctStageDemo(mode: String) {
     struct Demo: View {
         let mode: String
         @State private var started: Date? = nil
         var body: some View {
             VStack(alignment: .leading, spacing: Space.s3) {
-                InstinctStageView(on: mode != "teaser" && (mode != "enable" || started != nil), enableStartedAt: mode == "enable" ? started : nil,
-                                  sweeping: mode == "sweeping")
+                InstinctStageView(on: mode == "on" || mode == "sweeping" || (mode == "enable" && started != nil),
+                                  enableStartedAt: mode == "enable" ? started : nil, sweeping: mode == "sweeping",
+                                  teaserStartedAt: mode == "teaser" ? started : nil)
                 MonoLabel("Stage preview · \(mode)", color: Color.muted)
             }
             .padding(Space.s5).frame(width: 560).background(Color.bg)
             .task {
-                guard mode == "enable" else { return }
+                guard mode == "teaser" || mode == "enable" else { return }
                 while !Task.isCancelled {
-                    started = nil
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    if mode == "enable" { started = nil }
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
                     started = Date()
-                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    try? await Task.sleep(nanoseconds: 5_500_000_000)
                 }
             }
         }

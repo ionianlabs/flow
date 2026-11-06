@@ -49,7 +49,7 @@ enum InstinctStageDrawing {
                     let y = baseY + sin(x / w * 2 * .pi * 1.3 + phase + Double(r) * 0.6) * f.amplitude * 8
                     // The row a line settles into gives way to it.
                     var give = 0.0
-                    for (s, slotY) in slotYs.enumerated() { give = max(give, f.settle[s] * f.lineOpacity * min(1, max(0, 1.6 - abs(y - slotY) / 14))) }
+                    for (s, slotY) in slotYs.enumerated() { give = max(give, f.settle[s] * min(1, f.lineOpacity / 0.15) * min(1, max(0, 1.6 - abs(y - slotY) / 14))) }
                     var c = ctx
                     c.opacity = 0.7 * f.streamOpacity * edge * edge * (1 - give)
                     guard c.opacity > 0.01 else { continue }
@@ -80,7 +80,7 @@ enum InstinctStageDrawing {
     }
 }
 
-/// The renders ask for one instant instead of the live clock.
+/// The renders ask for one instant instead of the live clock: seconds into the teaser (use a large number for rest).
 private struct StageClockKey: EnvironmentKey { static let defaultValue: Double? = nil }
 
 extension EnvironmentValues {
@@ -91,41 +91,54 @@ extension EnvironmentValues {
     }
 }
 
-/// The stage as a card. Live it follows the clock and stops when the page or window is not visible; under
-/// Reduce Motion it is one still frame and the only change is a cross-fade.
+/// Dates for a timeline that ends: from `start` every `interval` seconds until `duration` has passed. When the
+/// last entry is drawn the timeline is finished and nothing runs any more (a resting stage costs nothing).
+struct StageSchedule: TimelineSchedule {
+    var start: Date
+    var duration: TimeInterval
+    var interval: TimeInterval
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> [Date] {
+        let end = start.addingTimeInterval(duration)
+        var dates: [Date] = []
+        var t = max(startDate, start)
+        while t < end { dates.append(t); t = t.addingTimeInterval(interval) }
+        dates.append(end)
+        return dates
+    }
+}
+
+/// The stage as a card. It moves only while something happens: the teaser once per launch, the enable moment, a
+/// running sweep. Otherwise it is one still frame with no timeline. Under Reduce Motion it is always a still frame
+/// and the only change is a cross-fade.
 struct InstinctStageView: View {
     var on: Bool
     var enableStartedAt: Date?
     var sweeping = false
+    /// Replays the teaser from this moment (the preview window); otherwise it plays once per launch.
+    var teaserStartedAt: Date?
     /// Draw the Reduce Motion still, as if the system setting were on (renders).
     var forceStill = false
-    /// A fixed instant, for renders and previews: mode, clock and seconds since the switch.
-    var fixed: (mode: InstinctStage.Mode, clock: Double, since: Double)?
+    /// A fixed instant, for renders and previews: mode and seconds into it.
+    var fixed: (mode: InstinctStage.Mode, since: Double)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.instinctStageClock) private var renderClock
     @State private var visible = true
+    @State private var ownTeaserStart: Date?
+    @State private var sweepStart: Date?
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
         Group {
             if let fixed {
-                canvas(InstinctStage.frame(mode: fixed.mode, clock: fixed.clock, since: fixed.since, reduceMotion: false, sweeping: sweeping))
+                canvas(InstinctStage.frame(mode: fixed.mode, since: fixed.since, reduceMotion: false, sweeping: sweeping))
             } else if let renderClock {
-                canvas(InstinctStage.frame(mode: on ? .on : .teaser, clock: renderClock, reduceMotion: false, sweeping: sweeping))
+                canvas(InstinctStage.frame(mode: on ? .on : .teaser, since: renderClock, reduceMotion: false, sweeping: sweeping))
             } else if reduceMotion || forceStill {
                 canvas(InstinctStage.still(mode: on ? .on : .teaser)).id(on).transition(.opacity)
             } else {
-                // `.animation` follows the display, capped by `refreshInterval`; `paused` stops it when nothing is visible.
-                let interval = InstinctStage.refreshInterval(
-                    mode: InstinctStage.mode(on: on, enableStartedAt: enableStartedAt, now: Date()), sweeping: sweeping)
-                TimelineView(.animation(minimumInterval: interval, paused: !visible)) { timeline in
-                    let now = timeline.date
-                    let mode = InstinctStage.mode(on: on, enableStartedAt: enableStartedAt, now: now)
-                    let since = enableStartedAt.map { now.timeIntervalSince($0) } ?? 0
-                    canvas(InstinctStage.frame(mode: mode, clock: now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4096),
-                                               since: since, reduceMotion: false, sweeping: sweeping))
-                }
+                live
             }
         }
         .animation(reduceMotion ? .easeInOut(duration: MotionDuration.hover) : nil, value: on)
@@ -134,9 +147,48 @@ struct InstinctStageView: View {
         .overlay(shape.strokeBorder(Color.line))
         .clipShape(shape)
         .accessibilityHidden(true)
-        .onAppear { visible = Self.windowsVisible() }
+        .onAppear {
+            visible = Self.windowsVisible()
+            if !on, teaserStartedAt == nil, InstinctStageLaunch.claim() { ownTeaserStart = Date() }
+            if sweeping, sweepStart == nil { sweepStart = Date() }
+        }
         .onDisappear { visible = false }
+        .onChange(of: sweeping) { sweepStart = sweeping ? Date() : nil }
         .onReceive(Self.visibilityChanges) { _ in visible = Self.windowsVisible() }
+    }
+
+    /// One still canvas, or a timeline that lasts exactly as long as the movement.
+    @ViewBuilder private var live: some View {
+        let now = Date()
+        let mode = InstinctStage.mode(on: on, enableStartedAt: enableStartedAt, now: now)
+        if mode == .enabling, let start = enableStartedAt {
+            timeline(start: start, duration: InstinctStage.enableDuration, mode: mode)
+        } else if mode == .on {
+            if sweeping {
+                let start = sweepStart ?? now
+                TimelineView(.animation(minimumInterval: InstinctStage.refreshInterval(mode: .on, sweeping: true), paused: !visible)) { tl in
+                    canvas(InstinctStage.frame(mode: .on, since: tl.date.timeIntervalSince(start), reduceMotion: false, sweeping: true))
+                }
+            } else {
+                canvas(InstinctStage.still(mode: .on))
+            }
+        } else if let start = teaserStartedAt ?? ownTeaserStart {
+            if now.timeIntervalSince(start) < InstinctStage.teaserDuration {
+                timeline(start: start, duration: InstinctStage.teaserDuration, mode: .teaser)
+            } else {
+                canvas(InstinctStage.still(mode: .teaser))
+            }
+        } else if !InstinctStageLaunch.played {
+            canvas(InstinctStage.frame(mode: .teaser, since: 0, reduceMotion: false))   // the first frame, until onAppear starts it
+        } else {
+            canvas(InstinctStage.still(mode: .teaser))
+        }
+    }
+
+    private func timeline(start: Date, duration: TimeInterval, mode: InstinctStage.Mode) -> some View {
+        TimelineView(StageSchedule(start: start, duration: duration, interval: InstinctStage.refreshInterval(mode: mode, sweeping: false))) { tl in
+            canvas(InstinctStage.frame(mode: mode, since: tl.date.timeIntervalSince(start), reduceMotion: false))
+        }
     }
 
     private func canvas(_ frame: InstinctStage.Frame) -> some View {

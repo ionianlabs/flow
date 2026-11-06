@@ -23,12 +23,15 @@ import SwiftUI
         "settings-general-shot": generalSurface(.normal, width: 820, height: 540),
         "settings-general-fresh": generalSurface(.fresh, width: 820),
         "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
-        "stage-teaser": stageSurface(.teaser, clock: 7),
-        "stage-enable-0": stageSurface(.enabling, clock: 7, since: 0),
-        "stage-enable-05": stageSurface(.enabling, clock: 7.9, since: 0.9),
-        "stage-enable-1": stageSurface(.enabling, clock: 8.8, since: 1.8),
-        "stage-on": stageSurface(.on, clock: 9),
-        "stage-reduced": stageSurface(.teaser, clock: 0, reduceMotion: true),
+        "stage-teaser-0": stageSurface(.teaser, since: 0),
+        "stage-teaser-play": stageSurface(.teaser, since: 1.8),
+        "stage-teaser": stageSurface(.teaser, since: 99),
+        "stage-enable-0": stageSurface(.enabling, since: 0),
+        "stage-enable-05": stageSurface(.enabling, since: 0.9),
+        "stage-enable-1": stageSurface(.enabling, since: 1.5),
+        "stage-on": stageSurface(.on, since: 99),
+        "stage-sweeping": stageSurface(.on, since: 4, sweeping: true),
+        "stage-reduced": stageSurface(.teaser, reduceMotion: true),
         "settings-instinct-on": instinctSurface(.instinctOn, width: 820),
         "settings-instinct-off": instinctSurface(.instinctOff, width: 820),
         "settings-instinct-nobrain": instinctSurface(.instinctNoBrain, width: 820),
@@ -85,10 +88,10 @@ import SwiftUI
     }
 
     /// The stage alone at a fixed instant, `since` seconds into the enable moment.
-    private static func stageSurface(_ mode: InstinctStage.Mode, clock: Double, since: Double = 0, reduceMotion: Bool = false) -> Surface {
+    private static func stageSurface(_ mode: InstinctStage.Mode, since: Double = 0, sweeping: Bool = false, reduceMotion: Bool = false) -> Surface {
         Surface(size: CGSize(width: 520, height: 172), make: {
-            AnyView(InstinctStageView(on: mode != .teaser, enableStartedAt: nil,
-                                      forceStill: reduceMotion, fixed: reduceMotion ? nil : (mode: mode, clock: clock, since: since))
+            AnyView(InstinctStageView(on: mode != .teaser, enableStartedAt: nil, sweeping: sweeping,
+                                      forceStill: reduceMotion, fixed: reduceMotion ? nil : (mode: mode, since: since))
                 .padding(Space.s5).background(Color.bg))
         })
     }
@@ -104,7 +107,7 @@ import SwiftUI
             domain["instinctMeetings"] = true
             domain["instinctDictations"] = true
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
-            return AnyView(mainViewForRender(page: .instinct, state: state).environment(\.instinctStageClock, 7))
+            return AnyView(mainViewForRender(page: .instinct, state: state).environment(\.instinctStageClock, 99))
         })
     }
 

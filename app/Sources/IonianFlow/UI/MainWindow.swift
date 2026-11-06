@@ -303,7 +303,7 @@ private struct GeneralPage: View {
                 }
             }
             SettingsSection("Brain") {
-                SettingToggle(InstinctApp.toggleTitle, InstinctApp.toggleDetail, isOn: $instinct)
+                InstinctRow(models: actions.models, isOn: $instinct)
                     .onChange(of: instinct) { actions.setInstinct(instinct) }
             }
             SettingsSection("Models") {
@@ -312,6 +312,32 @@ private struct GeneralPage: View {
             }
             ThirdPartyNoticesRow()
         }
+    }
+}
+
+/// The Instinct toggle: it needs a brain, and the cleanup model once it is on (`InstinctApp.row`).
+private struct InstinctRow: View {
+    @ObservedObject var models: ModelSetupModel
+    @Binding var isOn: Bool
+
+    var body: some View {
+        let row = InstinctApp.row(brainFound: InstinctApp.brainFound(), on: isOn, cleanupInstalled: models.phase(.cleanup) == .installed)
+        // Laid out like `SettingRow`, with the link under the detail so the detail keeps the full width.
+        HStack(alignment: .center, spacing: Space.s4) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(InstinctApp.toggleTitle).ionianText(IonianType.small).foregroundStyle(Color.ink)
+                Text(row.detail).ionianText(IonianType.caption).foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                if row.showsLink {
+                    Button(InstinctApp.getBrainTitle) { NSWorkspace.shared.open(InstinctApp.getBrainURL) }
+                        .buttonStyle(.monoLink).padding(.top, Space.s1)
+                }
+            }
+            Spacer(minLength: Space.s4)
+            Toggle(InstinctApp.toggleTitle, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                .tint(Color.btnBg).disabled(!row.enabled)
+        }
+        .frame(minHeight: Space.s6)
     }
 }
 
@@ -532,7 +558,7 @@ private struct TranscriptionPage: View {
 }
 
 /// The states `--render settings-general*` can show: the totals, the models and the permissions differ.
-enum RenderState { case normal, fresh, cleanupOff }
+enum RenderState { case normal, fresh, cleanupOff, instinctNoBrain, instinctOn, instinctNoModel }
 
 /// The window's content for the offscreen renderer (`--render settings-general`): a running app, no ASR.
 @MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil, query: String = "", category: String? = nil,
@@ -542,7 +568,7 @@ enum RenderState { case normal, fresh, cleanupOff }
     model.page = page
     model.status = state == .fresh ? "ASR: downloading models" : "ASR: ready"
     model.hotkeyActive = state != .fresh
-    let fake = FakeModelStore(installed: state == .normal ? [.speech, .cleanup] : state == .cleanupOff ? [.speech] : [])
+    let fake = FakeModelStore(installed: [.normal, .instinctNoBrain, .instinctOn].contains(state) ? [.speech, .cleanup] : [.cleanupOff, .instinctNoModel].contains(state) ? [.speech] : [])
     let models = ModelSetupModel(store: fake)
     if state == .fresh {
         models.start(.speech)  // sits at 40 % (the fake holds it)

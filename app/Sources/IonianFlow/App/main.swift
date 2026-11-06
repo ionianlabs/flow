@@ -419,7 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let scheduler = MainActor.assumeIsolated { InstinctScheduler(
             sweeper: InstinctSweepAdapter(build: { InstinctApp.liveSweep($0) }), gate: InstinctGate(),
             isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
-            brainReady: { Settings.vault.map(BrainLines.isBrain) ?? false },
+            brainReady: { BrainLocator.current() != nil },
             modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && InstinctApp.makeModel != nil },
             intervalHours: { Settings.instinctIntervalHours }, pausedUntil: { Settings.instinctPausedUntil },
             loadState: { InstinctState.load(from: Settings.instinctFolder) },

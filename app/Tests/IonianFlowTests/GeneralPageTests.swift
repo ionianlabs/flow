@@ -28,6 +28,39 @@ extension IonianFlowTests {
         #expect(!InstinctApp.toggleDetail.contains("\n") && !InstinctApp.toggleDetail.contains("!") && !InstinctApp.toggleDetail.contains("\u{2014}"))
     }
 
+    @Test func instinctRowWithoutBrain() {
+        let r = InstinctApp.row(brainFound: false, on: false, cleanupInstalled: true)
+        #expect(r.detail == "Needs an Ionian Brain. Connect one under Vocabulary.")
+        #expect(!r.enabled && !r.shownOn && r.showsLink)
+        #expect(InstinctApp.getBrainTitle == "Get Ionian Brain ↗")
+        #expect(InstinctApp.getBrainURL.absoluteString == "https://github.com/ionianlabs/brain")
+    }
+
+    @Test func instinctRowWithBrain() {
+        let off = InstinctApp.row(brainFound: true, on: false, cleanupInstalled: false)
+        #expect(off.detail == InstinctApp.toggleDetail && off.enabled && !off.shownOn && !off.showsLink)
+        #expect(InstinctApp.toggleDetail == "Proposes to-dos, decisions and facts to your brain's inbox.")
+        let on = InstinctApp.row(brainFound: true, on: true, cleanupInstalled: true)
+        #expect(on.detail == InstinctApp.toggleDetail && on.enabled && on.shownOn)
+    }
+
+    @Test func instinctRowOnWithoutModel() {
+        let r = InstinctApp.row(brainFound: true, on: true, cleanupInstalled: false)
+        #expect(r.detail == "Needs the cleanup model. Download it under Models.")
+        #expect(r.enabled && r.shownOn && !r.showsLink)
+    }
+
+    @Test func instinctRowKeepsOnWhenBrainDisappears() {
+        let r = InstinctApp.row(brainFound: false, on: true, cleanupInstalled: false)
+        #expect(r.shownOn && r.enabled && r.showsLink && r.detail == InstinctApp.noBrainDetail)
+    }
+
+    @Test func instinctRowCopyIsCalm() {
+        for t in [InstinctApp.noBrainDetail, InstinctApp.noModelDetail, InstinctApp.toggleDetail, InstinctApp.getBrainTitle] {
+            #expect(!t.contains("!") && !t.contains("\u{2014}") && !t.contains("\u{2013}") && !t.contains("\n"))
+        }
+    }
+
     @Test func speechRowStatus() {
         let ready: (state: StatusState, word: String) = (.ready, "Ready")
         #expect(SpeechModelRow.status(phase: .installed, recognizer: ready).word == "Ready")

@@ -104,13 +104,42 @@ enum InstinctApp {
 
     static let sweepNowTitle = "Sweep now"
     static let pauseTitle = "Pause Instinct for 1 hour"
+    static let resumeTitle = "Resume Instinct"
     static let pauseDuration: TimeInterval = 3600
 
     static func pauseEnd(from now: Date) -> Date { now.addingTimeInterval(pauseDuration) }
 
     /// The titles to show when Instinct is on: the status line (disabled) first when there is one, then the two actions.
-    static func menuLines(status: String?) -> (status: String?, actions: [String]) {
-        (status, [sweepNowTitle, pauseTitle])
+    static func menuLines(status: String?, pausedUntil: Date? = nil, now: Date = Date()) -> (status: String?, actions: [String]) {
+        if let until = pausedUntil, until > now {  // F3.16: paused, the one thing left to do is resume.
+            return ("Instinct: paused until " + InstinctPageState.clock(until), [resumeTitle])
+        }
+        return (status, [sweepNowTitle, pauseTitle])
+    }
+
+    // MARK: notice (F1.41)
+
+    struct Notice: Equatable { var title: String; var body: String }
+
+    private static func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
+
+    /// "1 meeting and 3 dictations", "3 dictations", or nil when nothing was read.
+    static func readText(meetings: Int, dictations: Int) -> String? {
+        let parts = (meetings > 0 ? [count(meetings, "meeting")] : []) + (dictations > 0 ? [count(dictations, "dictation")] : [])
+        return parts.isEmpty ? nil : parts.joined(separator: " and ")
+    }
+
+    /// Proposals always notify. "Nothing" and a failure only answer a sweep the user asked for: the page shows them otherwise.
+    static func notice(_ r: InstinctSweepResult, manual: Bool) -> Notice? {
+        let read = readText(meetings: r.meetings, dictations: r.dictations)
+        if r.written > 0 {
+            return Notice(title: "Instinct wrote \(count(r.written, "proposal")) to your inbox.",
+                          body: (read.map { "From \($0). " } ?? "") + "Open to review.")
+        }
+        guard manual else { return nil }
+        if r.failed { return Notice(title: "Instinct could not read this time.", body: "Nothing was lost. It tries again soon.") }
+        guard let read else { return Notice(title: "Nothing new for Instinct to read.", body: "It reads new dictations and finished meetings.") }
+        return Notice(title: "Instinct found nothing to propose.", body: "It read \(read).")
     }
 
     // MARK: Instinct page copy

@@ -52,6 +52,11 @@ struct InstinctPageState: Equatable {
     var showsActions = false
     var canSweep = false
     var canPause = false
+    /// The Sweep now button: off while paused or already reading, and it says why (F3.16).
+    var sweepEnabled = false
+    var sweepTitle = "Sweep now"
+    var sweepDetail = InstinctPage.sweepDetail
+    var isPaused = false
 
     struct ExcludedApp: Equatable, Identifiable {
         var bundle: String
@@ -60,7 +65,8 @@ struct InstinctPageState: Equatable {
     }
 
     static func make(settings: InstinctPageSettings, brain: URL?, cleanupInstalled: Bool, state: InstinctState,
-                     now: Date, itemsToday: Int, home: String = NSHomeDirectory(), timeZone: TimeZone = .current) -> InstinctPageState {
+                     now: Date, itemsToday: Int, collected: Int = 0, sweeping: Bool = false,
+                     home: String = NSHomeDirectory(), timeZone: TimeZone = .current) -> InstinctPageState {
         let row = InstinctApp.row(brainFound: brain != nil, on: settings.on, cleanupInstalled: cleanupInstalled)
         var s = InstinctPageState()
         s.switchOn = row.shownOn
@@ -72,14 +78,31 @@ struct InstinctPageState: Equatable {
         s.canPause = settings.on
         s.canSweep = settings.on && brain != nil && cleanupInstalled
         s.pausedLine = InstinctApp.pausedLine(until: settings.pausedUntil, now: now, timeZone: timeZone)
+        s.isPaused = s.pausedLine != nil
+        s.sweepEnabled = s.canSweep && !s.isPaused && !sweeping
+        if sweeping { s.sweepTitle = "Reading" }
+        if let line = s.pausedLine { s.sweepDetail = line + ". Resume to read now." }
         if s.canSweep {
             s.statusLines = [
-                state.lastSweep.map { "Last sweep " + when($0, now: now, timeZone: timeZone) } ?? "No sweep yet",
+                sweeping ? "Reading now" : lastSweepLine(state, now: now, timeZone: timeZone),
                 next(last: state.lastSweep, hours: settings.intervalHours, pausedUntil: settings.pausedUntil, now: now, timeZone: timeZone),
                 itemsToday == 0 ? "Nothing waiting" : "\(itemsToday) \(itemsToday == 1 ? "item" : "items") waiting",
             ]
+            if collected > 0 { s.statusLines.append("\(collected) \(collected == 1 ? "dictation" : "dictations") collected") }
         }
         return s
+    }
+
+    /// What the last sweep did, when that is known (F1.40). A meeting sweep has no `lastSweep`, so the result's own time counts.
+    private static func lastSweepLine(_ state: InstinctState, now: Date, timeZone: TimeZone) -> String {
+        guard let r = state.lastResult else {
+            return state.lastSweep.map { "Last sweep " + when($0, now: now, timeZone: timeZone) } ?? "No sweep yet"
+        }
+        let head = "Last sweep " + when(r.at, now: now, timeZone: timeZone)
+        if r.failed { return head + " could not read. Nothing was lost, it tries again soon." }
+        guard let read = InstinctApp.readText(meetings: r.meetings, dictations: r.dictations) else { return head + ": nothing new to read" }
+        if r.written == 0 { return head + ": read \(read), nothing to propose" }
+        return head + ": read \(read), wrote \(r.written) \(r.written == 1 ? "proposal" : "proposals")"
     }
 
     /// The scheduler's rule (F1.9) in words: the interval after the last sweep, not before the pause ends.

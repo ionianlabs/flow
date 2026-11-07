@@ -20,6 +20,7 @@ enum EngineCLI {
             ("--segment-replay", { SegmenterReplay.cli($0) }),
             ("--make-two-speaker", WERScore.makeTwoSpeakerCLI),
             ("--instinct-precision", InstinctPrecision.cli),
+            ("--instinct-sweep", InstinctSweepCLI.cli),
         ]
         for (flag, handler) in routes {
             if let i = args.firstIndex(of: flag) { return handler(Array(args[(i + 1)...])) }

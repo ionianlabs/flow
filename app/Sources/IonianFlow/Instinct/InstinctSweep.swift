@@ -64,11 +64,12 @@ struct InstinctSweep {
         let brainLines = BrainLines.lines(in: brainRoot, now: now(), calendar: calendar)
         let dedup = InstinctDedup(model: model)
         var entries: [InstinctWriter.Entry] = []
-        for chunk in remaining == 0 ? [] : Self.chunks(sources) {
+        let parts = remaining == 0 ? [] : Self.chunks(sources)
+        for chunk in parts {
             var answer: [InstinctItem]?
             for _ in 0..<2 where answer == nil {   // one retry (F1.32)
                 await checkpoint()
-                answer = try? await model.extract(chunk, projects: hints)
+                do { answer = try await model.extract(chunk, projects: hints) } catch { NSLog("Ionian Flow: Instinct model failed: %@", Self.safeDescription(error)) }
             }
             guard let items = answer else { report.dropped.unreadable += 1; continue }
             for var item in items {
@@ -105,6 +106,15 @@ struct InstinctSweep {
             }
         }
 
+        // F1.38: not one part could be read, so the model is the problem, not the content. Keep everything for the next sweep.
+        if !parts.isEmpty, report.dropped.unreadable == parts.count {
+            var failed = InstinctState.load(from: instinctFolder)
+            failed.lastResult = InstinctSweepResult(at: now(), meetings: transcriptFiles.count, dictations: read.count, written: 0, failed: true)
+            try? failed.save(to: instinctFolder)
+            report.failed = true
+            return report
+        }
+
         // Cut (F1.27, F1.28).
         report.capReached = remaining == 0
         let cut = InstinctRules.keepHighestConfidence(entries, limit: min(InstinctRules.perSweepCap, remaining)) { $0.item.confidence }
@@ -119,13 +129,24 @@ struct InstinctSweep {
             for name in transcriptFiles.map(\.lastPathComponent) + recordAsSwept {
                 newState.swept.append(name)
             }
+            newState.lastResult = InstinctSweepResult(at: now(), meetings: transcriptFiles.count, dictations: read.count,
+                                                      written: report.file == nil ? 0 : entries.count, file: report.file?.path)
             try newState.save(to: instinctFolder)
         } catch {
             return InstinctSweepReport(failed: true)
         }
         buffer.remove(ids: Set(read.map(\.id)))
+        let d = report.dropped
+        NSLog("Ionian Flow: Instinct dropped: %d rules, %d no project, %d low confidence, %d duplicate, %d quote not found, %d unreadable, %d below the cut",
+              d.byRules, d.noProject, d.lowConfidence, d.duplicate, d.quoteNotFound, d.unreadable, d.belowCut)
         report.written = report.file == nil ? 0 : entries.count
         return report
+    }
+
+    /// An error for the log: never the model's answer, which quotes what the user said.
+    static func safeDescription(_ error: Error) -> String {
+        if case InstinctModelError.unparsable = error { return "answer did not parse" }
+        return String(describing: type(of: error))
     }
 
     /// The parts the model reads. Meeting blocks come first in parts of `InstinctRules.chunkLimit` characters and

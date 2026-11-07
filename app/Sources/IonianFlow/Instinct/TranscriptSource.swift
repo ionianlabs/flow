@@ -21,7 +21,8 @@ enum TranscriptSource {
             let fm = frontmatter(text)
             guard fm["end"] != nil else { continue }
             if fm["confidential"] == "true" || fm["instinct"] == "false" { continue }
-            if let enabled = state.enabledAt, let started = startDate(fm, timeZone), started < enabled {
+            // The file only stores the minute: a meeting started in the minute Instinct was turned on counts as after it (F1.39).
+            if let enabled = state.enabledAt, let started = startDate(fm, timeZone), started.addingTimeInterval(60) <= enabled {
                 out.recordAsSwept.append(name)
             } else {
                 out.toRead.append(url)

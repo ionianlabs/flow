@@ -34,6 +34,8 @@ final class InstinctScheduler {
     private let meetingsOn: () -> Bool
 
     private(set) var running: Task<Void, Never>?
+    /// A sweep ended; true when the user asked for it (F1.41).
+    var onFinished: ((Bool) -> Void)?
 
     init(sweeper: InstinctSweeping, gate: InstinctGate,
          clock: @escaping () -> Date = Date.init,
@@ -80,7 +82,13 @@ final class InstinctScheduler {
         enqueue(.meeting(file), forced: false)
     }
 
-    func sweepNow() { enqueue(.scheduled, forced: true) }
+    /// False when it cannot run now (pause, brain, model), so the caller can say so (F3.16).
+    @discardableResult
+    func sweepNow() -> Bool {
+        guard canRun(forced: true) else { return false }
+        enqueue(.scheduled, forced: true)
+        return true
+    }
 
     func tick() {
         guard !isBusy(), !isPaused, brainReady(), modelReady(), !lowPower, isDue() else { return }
@@ -105,7 +113,7 @@ final class InstinctScheduler {
         while !queue.isEmpty {
             let item = queue.removeFirst()
             guard canRun(forced: item.forced) else { continue }  // dropped; a scheduled one stays due
-            start(item.request)
+            start(item)
             return
         }
     }
@@ -115,15 +123,16 @@ final class InstinctScheduler {
         return clock().timeIntervalSince(last) >= Double(max(intervalHours(), 1)) * 3600
     }
 
-    private func start(_ request: InstinctSweepRequest) {
+    private func start(_ item: Item) {
         let sweeper = self.sweeper, gate = self.gate
         running = Task(priority: .background) { [weak self] in
-            let outcome = await sweeper.run(request, gate: gate)
-            self?.finished(request, outcome)
+            let outcome = await sweeper.run(item.request, gate: gate)
+            self?.finished(item, outcome)
         }
     }
 
-    private func finished(_ request: InstinctSweepRequest, _ outcome: InstinctSweepOutcome) {
+    private func finished(_ item: Item, _ outcome: InstinctSweepOutcome) {
+        let request = item.request
         running = nil
         if case .done(capReached: true) = outcome { capDay = Calendar.current.startOfDay(for: clock()) }
         if request == .scheduled, case .done = outcome {
@@ -131,6 +140,7 @@ final class InstinctScheduler {
             s.lastSweep = clock()
             saveState(s)
         }
+        onFinished?(item.forced)
         pump()
     }
 }

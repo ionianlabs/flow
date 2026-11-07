@@ -425,6 +425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             loadState: { InstinctState.load(from: Settings.instinctFolder) },
             saveState: { try? $0.save(to: Settings.instinctFolder) },
             meetingsOn: { Settings.instinctMeetings }) }
+        MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.instinctSweepEnded(manual: manual) } }
         instinct = scheduler
         MainActor.assumeIsolated { scheduler.launch() }
     }
@@ -432,6 +433,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private func setInstinct(_ on: Bool) {
         Settings.instinct = on
         if on {
+            Settings.instinctPausedUntil = nil  // switching on means on: an old pause must not keep it silent
             InstinctApp.enable(folder: Settings.instinctFolder, now: Date())
             startInstinct()
         } else {
@@ -440,9 +442,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
     }
 
-    @objc private func sweepInstinctNow() { MainActor.assumeIsolated { instinct?.sweepNow() } }
+    @objc private func sweepInstinctNow() {
+        MainActor.assumeIsolated {
+            guard let instinct else { return }
+            if !instinct.sweepNow() {  // F3.16: never drop a click silently
+                let why = instinct.status ?? InstinctApp.pausedLine(until: Settings.instinctPausedUntil, now: Date()) ?? "Instinct cannot read right now."
+                postInstinctNotice(InstinctApp.Notice(title: why, body: "Open the Instinct page for details."), file: nil)
+            }
+        }
+    }
 
     @objc private func pauseInstinct() { Settings.instinctPausedUntil = InstinctApp.pauseEnd(from: Date()) }
+
+    @objc private func resumeInstinct() {
+        Settings.instinctPausedUntil = nil
+        MainActor.assumeIsolated { instinct?.tick() }
+    }
+
+    /// F1.40, F1.41: log the counts, notify when there is something to say.
+    private func instinctSweepEnded(manual: Bool) {
+        guard let r = InstinctState.load(from: Settings.instinctFolder).lastResult else { return }
+        NSLog("Ionian Flow: Instinct sweep: %d meetings, %d dictations, %d written, failed %d, manual %d",
+              r.meetings, r.dictations, r.written, r.failed ? 1 : 0, manual ? 1 : 0)
+        if let notice = InstinctApp.notice(r, manual: manual) { postInstinctNotice(notice, file: r.file) }
+    }
+
+    private func postInstinctNotice(_ notice: InstinctApp.Notice, file: String?) {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        content.body = notice.body
+        if let file { content.userInfo = ["file": file] }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert]) { granted, _ in
+            guard granted else { return }
+            center.add(UNNotificationRequest(identifier: "instinct", content: content, trigger: nil))
+        }
+    }
 
     /// The Instinct page: the same actions as the menu items, plus the Brain, meetings, dictations and app choices (F3).
     private func instinctActions() -> InstinctActions {
@@ -458,12 +493,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         a.sweepNow = { [weak self] in self?.sweepInstinctNow() }
         a.pause = { [weak self] in self?.pauseInstinct() }
+        a.resume = { [weak self] in self?.resumeInstinct() }
         a.snapshot = { [weak self] in
             guard let self else { return InstinctSnapshot(brain: nil, state: InstinctState(), itemsToday: 0, now: Date()) }
             let now = Date(), brain = BrainLocator.current()
             let items = brain.map { InstinctWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
             let running = MainActor.assumeIsolated { self.instinct?.running != nil }
-            return InstinctSnapshot(brain: brain, state: InstinctState.load(from: Settings.instinctFolder), itemsToday: items, now: now, sweeping: running)
+            let collected = CaptureBuffer(folder: Settings.instinctFolder).read().count
+            return InstinctSnapshot(brain: brain, state: InstinctState.load(from: Settings.instinctFolder), itemsToday: items, now: now, collected: collected, sweeping: running)
         }
         return a
     }
@@ -542,14 +579,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.addItem(.separator())
 
         if Settings.instinct {
-            let lines = InstinctApp.menuLines(status: MainActor.assumeIsolated { instinct?.status })
+            let lines = InstinctApp.menuLines(status: MainActor.assumeIsolated { instinct?.status }, pausedUntil: Settings.instinctPausedUntil)
             if let line = lines.status {
                 let status = NSMenuItem(title: line, action: nil, keyEquivalent: "")
                 status.isEnabled = false
                 menu.addItem(status)
             }
-            menu.addItem(item(lines.actions[0], #selector(sweepInstinctNow)))
-            menu.addItem(item(lines.actions[1], #selector(pauseInstinct)))
+            for title in lines.actions {
+                switch title {
+                case InstinctApp.sweepNowTitle: menu.addItem(item(title, #selector(sweepInstinctNow)))
+                case InstinctApp.resumeTitle: menu.addItem(item(title, #selector(resumeInstinct)))
+                default: menu.addItem(item(title, #selector(pauseInstinct)))
+                }
+            }
             menu.addItem(.separator())
         }
 
@@ -741,7 +783,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
-        DispatchQueue.main.async { self.openVocabulary() }
+        let request = response.notification.request
+        DispatchQueue.main.async {
+            guard request.identifier == "instinct" else { return self.openVocabulary() }
+            // The day file with the proposals, else the Instinct page.
+            if let file = request.content.userInfo["file"] as? String {
+                NSWorkspace.shared.open(URL(fileURLWithPath: file))
+            } else {
+                self.mainWindow.show(.instinct)
+            }
+        }
         done()
     }
 

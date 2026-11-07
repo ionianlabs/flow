@@ -258,3 +258,35 @@ extension GemmaInstinctModel {
         InstinctRules.chunks(sources, limit: limit, maxSources: maxSources)
     }
 }
+
+/// `--instinct-sweep --brain DIR --transcripts DIR --folder DIR`: one scheduled sweep with the real model, printing
+/// counts only. For checking the pipeline on copies; it writes to the given brain's inbox.
+enum InstinctSweepCLI {
+    static func cli(_ args: [String]) -> Int32 {
+        func value(_ flag: String) -> URL? {
+            guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+            return URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        }
+        guard let brain = value("--brain"), let transcripts = value("--transcripts"), let folder = value("--folder") else {
+            print("usage: --instinct-sweep --brain DIR --transcripts DIR --folder DIR")
+            return 2
+        }
+        setvbuf(stdout, nil, _IOLBF, 0)
+        let done = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var code: Int32 = 0
+        Task.detached {
+            let sweep = InstinctSweep(brainRoot: brain, transcriptsFolder: transcripts, instinctFolder: folder,
+                                      model: GemmaInstinctModel(control: nil))
+            let start = Date()
+            let r = await sweep.run(kind: .scheduled, transcript: nil, checkpoint: {})
+            let result = InstinctState.load(from: folder).lastResult
+            print("failed \(r.failed) written \(r.written) meetings \(result?.meetings ?? 0) dictations \(result?.dictations ?? 0) seconds \(Int(Date().timeIntervalSince(start)))")
+            print("dropped \(r.dropped)")
+            print("file \(r.file?.path ?? "none")")
+            code = r.failed ? 1 : 0
+            done.signal()
+        }
+        done.wait()
+        return code
+    }
+}

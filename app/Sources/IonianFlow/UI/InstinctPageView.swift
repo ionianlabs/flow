@@ -8,6 +8,8 @@ struct InstinctSnapshot {
     var state: InstinctState
     var itemsToday: Int
     var now: Date
+    /// Dictations collected and not read yet.
+    var collected = 0
     /// A sweep is running right now (the scheduler's task), shown as a little more movement in the stage.
     var sweeping = false
 }
@@ -26,6 +28,7 @@ struct InstinctActions {
     var appName: (String) -> String? = { _ in nil }
     var sweepNow: () -> Void = {}
     var pause: () -> Void = {}
+    var resume: () -> Void = {}
     var snapshot: () -> InstinctSnapshot = { InstinctSnapshot(brain: nil, state: InstinctState(), itemsToday: 0, now: Date()) }
 }
 
@@ -62,7 +65,7 @@ struct InstinctSettingsPage: View {
         let page = InstinctPageState.make(
             settings: InstinctPageSettings(on: on, intervalHours: hours, pausedUntil: pausedUntil),
             brain: snap.brain, cleanupInstalled: models.phase(.cleanup) == .installed,
-            state: snap.state, now: snap.now, itemsToday: snap.itemsToday)
+            state: snap.state, now: snap.now, itemsToday: snap.itemsToday, collected: snap.collected, sweeping: snap.sweeping)
         SettingsPage(.instinct) {
             VStack(alignment: .leading, spacing: Space.s2) {
                 InstinctStageView(on: page.switchOn, enableStartedAt: enableStartedAt, sweeping: snap.sweeping)
@@ -104,11 +107,15 @@ struct InstinctSettingsPage: View {
             }
             if page.showsActions {
                 SettingsSection("Actions") {
-                    SettingRow("Read now", InstinctPage.sweepDetail) {
-                        Button("Sweep now") { actions.sweepNow(); refresh() }.buttonStyle(.primaryCompact).disabled(!page.canSweep)
+                    SettingRow("Read now", page.sweepDetail) {
+                        Button(page.sweepTitle) { actions.sweepNow(); refresh() }.buttonStyle(.primaryCompact).disabled(!page.sweepEnabled)
                     }
                     SettingRow("Pause", page.pausedLine ?? InstinctPage.pauseDetail) {
-                        Button("Pause for 1 hour ›") { actions.pause(); refresh() }.buttonStyle(.monoLink).disabled(!page.canPause)
+                        if page.isPaused {
+                            Button("Resume ›") { actions.resume(); refresh() }.buttonStyle(.monoLink)
+                        } else {
+                            Button("Pause for 1 hour ›") { actions.pause(); refresh() }.buttonStyle(.monoLink).disabled(!page.canPause)
+                        }
                     }
                 }
             }

@@ -87,6 +87,15 @@ import Testing
         #expect(Self.page().sweepDetail == "Read waiting meetings now.")
     }
 
+    // F1.42: the page counts only meetings still to be read; old ones recorded as swept count for the scheduler alone.
+    @Test func pageCountsOnlyTranscriptsToRead() {
+        let p = TranscriptSource.Pending(toRead: [URL(fileURLWithPath: "/t/a.md")], recordAsSwept: ["old1.md", "old2.md"])
+        #expect(p.forScheduler == 3 && p.forPage == 1)
+        let onlyOld = TranscriptSource.Pending(toRead: [], recordAsSwept: ["old1.md"])
+        #expect(onlyOld.forScheduler == 1 && onlyOld.forPage == 0)
+        #expect(!Self.page(pending: onlyOld.forPage).statusLines.contains { $0.contains("waiting") && $0.contains("meeting") })
+    }
+
     // F1.42: the status lines in order: last result (or Reading now), meetings waiting when any, items waiting. No "Next around".
     @Test func statusLinesAreInOrder() {
         #expect(Self.page().statusLines == ["No sweep yet", "Nothing waiting"])

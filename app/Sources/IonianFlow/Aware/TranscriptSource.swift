@@ -5,6 +5,10 @@ enum TranscriptSource {
     struct Pending: Equatable {
         var toRead: [URL] = []
         var recordAsSwept: [String] = []   // file names older than enabledAt (F1.35)
+        /// What the scheduler checks (F1.42): files to read plus files to record as swept.
+        var forScheduler: Int { toRead.count + recordAsSwept.count }
+        /// What the page shows as waiting: only meetings still to be read, never old ones recorded unread.
+        var forPage: Int { toRead.count }
     }
 
     /// Flat `*.md` files in `folder` (F1.12). Swept files are never read again (F1.14); confidential and

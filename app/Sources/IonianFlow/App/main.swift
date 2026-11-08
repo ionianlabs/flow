@@ -410,7 +410,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
             brainReady: { BrainLocator.current() != nil },
             modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && AwareApp.makeModel != nil },
-            pendingMeetings: { Self.pendingMeetings() }) }
+            pendingMeetings: { Self.pending().forScheduler }) }
         MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.awareSweepEnded(manual: manual) } }
         aware = scheduler
         MainActor.assumeIsolated { scheduler.launch() }
@@ -436,10 +436,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
     }
 
-    /// F1.42: transcripts waiting to be read or recorded as swept.
-    private static func pendingMeetings() -> Int {
-        let p = TranscriptSource.pending(in: Settings.transcriptsFolder, state: AwareState.load(from: Settings.awareFolder))
-        return p.toRead.count + p.recordAsSwept.count
+    /// F1.42: the transcripts waiting, read once per call.
+    private static func pending() -> TranscriptSource.Pending {
+        TranscriptSource.pending(in: Settings.transcriptsFolder, state: AwareState.load(from: Settings.awareFolder))
     }
 
     /// F1.40, F1.41: log the counts, notify when there is something to say.
@@ -475,7 +474,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             let items = brain.map { AwareWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
             let running = MainActor.assumeIsolated { self.aware?.running != nil }
             return AwareSnapshot(brain: brain, state: AwareState.load(from: Settings.awareFolder), itemsToday: items, now: now,
-                                 pending: Self.pendingMeetings(), sweeping: running)
+                                 pending: Self.pending().forPage, sweeping: running)
         }
         return a
     }

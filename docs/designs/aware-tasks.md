@@ -1,5 +1,7 @@
 # Aware: tasks
 
+The dictation items were removed on 2026-11-08 (see `docs/designs/aware.md`); what remains is meetings only.
+
 Spec: `docs/designs/aware.md` (approved 2026-11-05). Start only once the native build is in daily use and stable.
 
 Each item is one TDD loop: the listed scenarios become failing tests first, then the smallest change, `swift test --package-path app` green, one commit. `[P]` items touch no shared file and can run in parallel worktrees once item 0 is merged. All code in `app/Sources/IonianFlow/Aware/` (new), tests in `app/Tests/IonianFlowTests/Aware/` (new). Fixtures use invented names only (public repo).

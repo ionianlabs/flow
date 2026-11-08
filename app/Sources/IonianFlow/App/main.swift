@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             rescan: { [weak self] in self?.sweeper.scan(requested: true) },
             setUseVocabulary: { [weak self] in self?.setUseVocabulary($0) }
         ),
-        instinct: instinctActions()
+        aware: awareActions()
     ))
     private var scanWatch: AnyCancellable?
     private var onboardingStep = 0
@@ -73,14 +73,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private var state = State.idle {
         didSet {
             if case .idle = state { sweeper.resume() } else { sweeper.pause() }
-            if oldValue.isIdle, !state.isIdle { MainActor.assumeIsolated { instinct?.busyStarted() } }
-            if !oldValue.isIdle, state.isIdle { MainActor.assumeIsolated { instinct?.busyEnded() } }
+            if oldValue.isIdle, !state.isIdle { MainActor.assumeIsolated { aware?.busyStarted() } }
+            if !oldValue.isIdle, state.isIdle { MainActor.assumeIsolated { aware?.busyEnded() } }
             if case .transcribing = state { appModel.transcribing = true } else { appModel.transcribing = false }
         }
     }
-    /// Instinct: built while the setting is on; its tick runs every 10 minutes.
-    private var instinct: InstinctScheduler?
-    private var instinctTimer: Timer?
+    /// Aware: built while the setting is on; its tick runs every 10 minutes.
+    private var aware: AwareScheduler?
+    private var awareTimer: Timer?
     private var session = 0
     /// Engine session of the current dictation; events from older sessions are ignored.
     private var dictation = DictationFlow()
@@ -133,11 +133,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         sweeper.onFinished = { [weak self] in self?.notifyScanned($0) }
         transcriber.onFinished = { [weak self] in self?.countTranscript() }
-        transcriber.onFileFinal = { [weak self] url in MainActor.assumeIsolated { self?.instinct?.meetingEnded(url) } }
-        instinctTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.instinct?.tick() }
+        transcriber.onFileFinal = { [weak self] url in MainActor.assumeIsolated { self?.aware?.meetingEnded(url) } }
+        awareTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.aware?.tick() }
         }
-        if Settings.instinct { startInstinct() }
+        if Settings.aware { startAware() }
         sweeper.start()
         // The menu bar icon shows a dot while a scan runs.
         scanWatch = sweeper.$running.receive(on: DispatchQueue.main).sink { [weak self] running in
@@ -401,73 +401,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         Stats.addDictation(text)
         appModel.statsRevision += 1
         paste(text)
-        captureForInstinct(text)
+        captureForAware(text)
     }
 
-    /// F1.1 to F1.4: the delivered text goes to Instinct's buffer unless the app, secure input or the pause says no.
-    private func captureForInstinct(_ text: String) {
-        guard Settings.instinct, Settings.instinctDictations else { return }
+    /// F1.1 to F1.4: the delivered text goes to Aware's buffer unless the app, secure input or the pause says no.
+    private func captureForAware(_ text: String) {
+        guard Settings.aware, Settings.awareDictations else { return }
         let app = NSWorkspace.shared.frontmostApplication
-        InstinctApp.capture(
+        AwareApp.capture(
             text: text, front: app?.bundleIdentifier.map { (name: app?.localizedName ?? $0, bundle: $0) },
-            excluded: Settings.instinctExcludedApps, secureInput: IsSecureEventInputEnabled(),
-            pausedUntil: Settings.instinctPausedUntil, now: Date(), buffer: CaptureBuffer(folder: Settings.instinctFolder))
+            excluded: Settings.awareExcludedApps, secureInput: IsSecureEventInputEnabled(),
+            pausedUntil: Settings.awarePausedUntil, now: Date(), buffer: CaptureBuffer(folder: Settings.awareFolder))
     }
 
-    private func startInstinct() {
-        guard instinct == nil else { return }
-        let scheduler = MainActor.assumeIsolated { InstinctScheduler(
-            sweeper: InstinctSweepAdapter(build: { InstinctApp.liveSweep($0) }), gate: InstinctGate(),
+    private func startAware() {
+        guard aware == nil else { return }
+        let scheduler = MainActor.assumeIsolated { AwareScheduler(
+            sweeper: AwareSweepAdapter(build: { AwareApp.liveSweep($0) }), gate: AwareGate(),
             isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
             brainReady: { BrainLocator.current() != nil },
-            modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && InstinctApp.makeModel != nil },
-            intervalHours: { Settings.instinctIntervalHours }, pausedUntil: { Settings.instinctPausedUntil },
-            loadState: { InstinctState.load(from: Settings.instinctFolder) },
-            saveState: { try? $0.save(to: Settings.instinctFolder) },
-            meetingsOn: { Settings.instinctMeetings }) }
-        MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.instinctSweepEnded(manual: manual) } }
-        instinct = scheduler
+            modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && AwareApp.makeModel != nil },
+            intervalHours: { Settings.awareIntervalHours }, pausedUntil: { Settings.awarePausedUntil },
+            loadState: { AwareState.load(from: Settings.awareFolder) },
+            saveState: { try? $0.save(to: Settings.awareFolder) },
+            meetingsOn: { Settings.awareMeetings }) }
+        MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.awareSweepEnded(manual: manual) } }
+        aware = scheduler
         MainActor.assumeIsolated { scheduler.launch() }
     }
 
-    private func setInstinct(_ on: Bool) {
-        Settings.instinct = on
+    private func setAware(_ on: Bool) {
+        Settings.aware = on
         if on {
-            Settings.instinctPausedUntil = nil  // switching on means on: an old pause must not keep it silent
-            InstinctApp.enable(folder: Settings.instinctFolder, now: Date())
-            startInstinct()
+            Settings.awarePausedUntil = nil  // switching on means on: an old pause must not keep it silent
+            AwareApp.enable(folder: Settings.awareFolder, now: Date())
+            startAware()
         } else {
-            instinct = nil
-            InstinctApp.disable(folder: Settings.instinctFolder)  // F3.8
+            aware = nil
+            AwareApp.disable(folder: Settings.awareFolder)  // F3.8
         }
     }
 
-    @objc private func sweepInstinctNow() {
+    @objc private func sweepAwareNow() {
         MainActor.assumeIsolated {
-            guard let instinct else { return }
-            if !instinct.sweepNow() {  // F3.16: never drop a click silently
-                let why = instinct.status ?? InstinctApp.pausedLine(until: Settings.instinctPausedUntil, now: Date()) ?? "Instinct cannot read right now."
-                postInstinctNotice(InstinctApp.Notice(title: why, body: "Open the Instinct page for details."), file: nil)
+            guard let aware else { return }
+            if !aware.sweepNow() {  // F3.16: never drop a click silently
+                let why = aware.status ?? AwareApp.pausedLine(until: Settings.awarePausedUntil, now: Date()) ?? "Aware cannot read right now."
+                postAwareNotice(AwareApp.Notice(title: why, body: "Open the Aware page for details."), file: nil)
             }
         }
     }
 
-    @objc private func pauseInstinct() { Settings.instinctPausedUntil = InstinctApp.pauseEnd(from: Date()) }
+    @objc private func pauseAware() { Settings.awarePausedUntil = AwareApp.pauseEnd(from: Date()) }
 
-    @objc private func resumeInstinct() {
-        Settings.instinctPausedUntil = nil
-        MainActor.assumeIsolated { instinct?.tick() }
+    @objc private func resumeAware() {
+        Settings.awarePausedUntil = nil
+        MainActor.assumeIsolated { aware?.tick() }
     }
 
     /// F1.40, F1.41: log the counts, notify when there is something to say.
-    private func instinctSweepEnded(manual: Bool) {
-        guard let r = InstinctState.load(from: Settings.instinctFolder).lastResult else { return }
-        NSLog("Ionian Flow: Instinct sweep: %d meetings, %d dictations, %d written, failed %d, manual %d",
+    private func awareSweepEnded(manual: Bool) {
+        guard let r = AwareState.load(from: Settings.awareFolder).lastResult else { return }
+        NSLog("Ionian Flow: Aware sweep: %d meetings, %d dictations, %d written, failed %d, manual %d",
               r.meetings, r.dictations, r.written, r.failed ? 1 : 0, manual ? 1 : 0)
-        if let notice = InstinctApp.notice(r, manual: manual) { postInstinctNotice(notice, file: r.file) }
+        if let notice = AwareApp.notice(r, manual: manual) { postAwareNotice(notice, file: r.file) }
     }
 
-    private func postInstinctNotice(_ notice: InstinctApp.Notice, file: String?) {
+    private func postAwareNotice(_ notice: AwareApp.Notice, file: String?) {
         let content = UNMutableNotificationContent()
         content.title = notice.title
         content.body = notice.body
@@ -475,37 +475,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert]) { granted, _ in
             guard granted else { return }
-            center.add(UNNotificationRequest(identifier: "instinct", content: content, trigger: nil))
+            center.add(UNNotificationRequest(identifier: "aware", content: content, trigger: nil))
         }
     }
 
-    /// The Instinct page: the same actions as the menu items, plus the Brain, meetings, dictations and app choices (F3).
-    private func instinctActions() -> InstinctActions {
-        var a = InstinctActions()
-        a.setOn = { [weak self] in self?.setInstinct($0) }
-        a.setMeetings = { InstinctApp.setMeetings(on: $0, folder: Settings.instinctFolder, now: Date()) }
-        a.setDictations = { InstinctApp.setDictations(on: $0, folder: Settings.instinctFolder) }
-        a.chooseBrain = { [weak self] in self?.chooseInstinctBrain() }
-        a.openInbox = { NSWorkspace.shared.open(InstinctApp.inbox(of: $0)) }
+    /// The Aware page: the same actions as the menu items, plus the Brain, meetings, dictations and app choices (F3).
+    private func awareActions() -> AwareActions {
+        var a = AwareActions()
+        a.setOn = { [weak self] in self?.setAware($0) }
+        a.setMeetings = { AwareApp.setMeetings(on: $0, folder: Settings.awareFolder, now: Date()) }
+        a.setDictations = { AwareApp.setDictations(on: $0, folder: Settings.awareFolder) }
+        a.chooseBrain = { [weak self] in self?.chooseAwareBrain() }
+        a.openInbox = { NSWorkspace.shared.open(AwareApp.inbox(of: $0)) }
         a.pickApp = { [weak self] in self?.pickExcludedApp() }
         a.appName = { id in
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent
         }
-        a.sweepNow = { [weak self] in self?.sweepInstinctNow() }
-        a.pause = { [weak self] in self?.pauseInstinct() }
-        a.resume = { [weak self] in self?.resumeInstinct() }
+        a.sweepNow = { [weak self] in self?.sweepAwareNow() }
+        a.pause = { [weak self] in self?.pauseAware() }
+        a.resume = { [weak self] in self?.resumeAware() }
         a.snapshot = { [weak self] in
-            guard let self else { return InstinctSnapshot(brain: nil, state: InstinctState(), itemsToday: 0, now: Date()) }
+            guard let self else { return AwareSnapshot(brain: nil, state: AwareState(), itemsToday: 0, now: Date()) }
             let now = Date(), brain = BrainLocator.current()
-            let items = brain.map { InstinctWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
-            let running = MainActor.assumeIsolated { self.instinct?.running != nil }
-            let collected = CaptureBuffer(folder: Settings.instinctFolder).read().count
-            return InstinctSnapshot(brain: brain, state: InstinctState.load(from: Settings.instinctFolder), itemsToday: items, now: now, collected: collected, sweeping: running)
+            let items = brain.map { AwareWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
+            let running = MainActor.assumeIsolated { self.aware?.running != nil }
+            let collected = CaptureBuffer(folder: Settings.awareFolder).read().count
+            return AwareSnapshot(brain: brain, state: AwareState.load(from: Settings.awareFolder), itemsToday: items, now: now, collected: collected, sweeping: running)
         }
         return a
     }
 
-    private func chooseInstinctBrain() -> InstinctActions.BrainChoice? {
+    private func chooseAwareBrain() -> AwareActions.BrainChoice? {
         let panel = NSOpenPanel()
         panel.title = "Ionian Brain"
         panel.message = "Pick the folder of your Ionian Brain."
@@ -515,7 +515,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         panel.directoryURL = BrainLocator.current()
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        return InstinctApp.chooseBrain(url) { Settings.instinctBrainFolder = $0 } ? .accepted : .refused
+        return AwareApp.chooseBrain(url) { Settings.awareBrainFolder = $0 } ? .accepted : .refused
     }
 
     private func pickExcludedApp() -> String? {
@@ -529,7 +529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        return InstinctApp.bundleID(ofApp: url)
+        return AwareApp.bundleID(ofApp: url)
     }
 
     private func paste(_ text: String) {
@@ -578,8 +578,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         menu.addItem(.separator())
 
-        if Settings.instinct {
-            let lines = InstinctApp.menuLines(status: MainActor.assumeIsolated { instinct?.status }, pausedUntil: Settings.instinctPausedUntil)
+        if Settings.aware {
+            let lines = AwareApp.menuLines(status: MainActor.assumeIsolated { aware?.status }, pausedUntil: Settings.awarePausedUntil)
             if let line = lines.status {
                 let status = NSMenuItem(title: line, action: nil, keyEquivalent: "")
                 status.isEnabled = false
@@ -587,9 +587,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             }
             for title in lines.actions {
                 switch title {
-                case InstinctApp.sweepNowTitle: menu.addItem(item(title, #selector(sweepInstinctNow)))
-                case InstinctApp.resumeTitle: menu.addItem(item(title, #selector(resumeInstinct)))
-                default: menu.addItem(item(title, #selector(pauseInstinct)))
+                case AwareApp.sweepNowTitle: menu.addItem(item(title, #selector(sweepAwareNow)))
+                case AwareApp.resumeTitle: menu.addItem(item(title, #selector(resumeAware)))
+                default: menu.addItem(item(title, #selector(pauseAware)))
                 }
             }
             menu.addItem(.separator())
@@ -785,12 +785,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                                 withCompletionHandler done: @escaping () -> Void) {
         let request = response.notification.request
         DispatchQueue.main.async {
-            guard request.identifier == "instinct" else { return self.openVocabulary() }
-            // The day file with the proposals, else the Instinct page.
+            guard request.identifier == "aware" else { return self.openVocabulary() }
+            // The day file with the proposals, else the Aware page.
             if let file = request.content.userInfo["file"] as? String {
                 NSWorkspace.shared.open(URL(fileURLWithPath: file))
             } else {
-                self.mainWindow.show(.instinct)
+                self.mainWindow.show(.aware)
             }
         }
         done()
@@ -842,8 +842,8 @@ if CommandLine.arguments.contains("--demo") {
     runTranscriptDemo()
 } else if let i = CommandLine.arguments.firstIndex(of: "--onboarding-demo") {
     runOnboardingDemo(step: CommandLine.arguments.dropFirst(i + 1).first.flatMap { Int($0) } ?? 0)
-} else if let i = CommandLine.arguments.firstIndex(of: "--instinct-stage-demo") {
-    runInstinctStageDemo(mode: CommandLine.arguments.dropFirst(i + 1).first ?? "teaser")
+} else if let i = CommandLine.arguments.firstIndex(of: "--aware-stage-demo") {
+    runAwareStageDemo(mode: CommandLine.arguments.dropFirst(i + 1).first ?? "teaser")
 } else if let i = CommandLine.arguments.firstIndex(of: "--vocabulary-demo") {
     runVocabularyDemo(file: CommandLine.arguments.dropFirst(i + 1).first)
 } else {

@@ -84,11 +84,11 @@ Open the Vocabulary page from the menu bar.
 Connect a vault once. Flow reads your notes and picks out names, products, acronyms and jargon. It rescans when your notes change, and new terms wait for your review. It only reads your vault and never changes it. You can also add terms by hand, or edit `~/Documents/Ionian Flow/Vocabulary.md`. On my benchmark of synthesized German and English speech, such terms came out right 64 % of the time instead of 36 %.
 
 ## Feed your brain.
-Instinct is new, and off until you turn it on, on the Instinct page of the Flow window. It reads your finished meeting transcripts and your dictations, and looks for to-dos, decisions and facts. A meeting is read right after it ends, dictations every 3 hours. It works with an [Ionian Brain](https://github.com/ionianlabs/brain) folder, which you choose on the same page, and the cleanup model.
+Aware is new, and off until you turn it on, on the Aware page of the Flow window. It reads your finished meeting transcripts and your dictations, and looks for to-dos, decisions and facts. A meeting is read right after it ends, dictations every 3 hours. It works with an [Ionian Brain](https://github.com/ionianlabs/brain) folder, which you choose on the same page, and the cleanup model.
 
 It writes one file per day into the brain's inbox, and nothing else. Each line holds the proposal, the suggested project and your exact words. To keep the inbox calm, a line needs a verbatim quote, a daily cap applies, and anything the brain already holds is skipped.
 
-To review, say "instinct" in a session with the Brain plugin, or run `/brain:instinct`. You accept, edit or reject each line, and nothing enters the brain without your yes. The details are in [Works with Ionian Flow](https://github.com/ionianlabs/brain/blob/main/docs/works-with-flow.md). Its thresholds are still being tuned from your accept and reject marks, with `--instinct-precision`.
+To review, say "aware" in a session with the Brain plugin, or run `/brain:aware`. You accept, edit or reject each line, and nothing enters the brain without your yes. The details are in [Works with Ionian Flow](https://github.com/ionianlabs/brain/blob/main/docs/works-with-flow.md). Its thresholds are still being tuned from your accept and reject marks, with `--aware-precision`.
 
 ## Change the settings.
 Choose Settings in the menu bar, or press ⌘, for the Ionian Flow window. It has pages for shortcuts, dictation language and microphone, and the transcripts folder.
@@ -101,7 +101,7 @@ Choose Settings in the menu bar, or press ⌘, for the Ionian Flow window. It ha
 ## Keep it private.
 Transcription and cleanup run on your Mac. There is no cloud option. Only the model downloads go online, once, on first launch. After that Flow runs offline. It keeps only totals, such as word counts, never your text.
 
-Instinct is off by default. It keeps your dictations on the Mac only until the next sweep, at most 24 hours and 1 MB, and skips password fields and password managers. Quotes stay in your brain.
+Aware is off by default. It keeps your dictations on the Mac only until the next sweep, at most 24 hours and 1 MB, and skips password fields and password managers. Quotes stay in your brain.
 
 ## Questions.
 **Why does the key do nothing?** Allow Accessibility and Input Monitoring, then restart Flow. macOS applies these two only to a fresh start.

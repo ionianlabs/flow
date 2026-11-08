@@ -136,7 +136,7 @@ final class Transcriber {
     /// Called once everything is final and saved after stop().
     var onFinished: () -> Void = {}
     /// Called with the transcript file once it is final on disk: after its summary arrived or failed, or right
-    /// after saving when no summary is made. Instinct's meeting sweep starts from here.
+    /// after saving when no summary is made. Aware's meeting sweep starts from here.
     var onFileFinal: (URL) -> Void = { _ in }
 
     private let mic: AudioCapture

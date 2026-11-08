@@ -132,15 +132,15 @@ struct DemoBackdrop: View {
 
 private var retainedStageDemo: NSWindow?
 
-/// `--instinct-stage-demo [teaser|enable|on|sweeping]`: the Instinct stage alone in a small window, to watch it move.
+/// `--aware-stage-demo [teaser|enable|on|sweeping]`: the Aware stage alone in a small window, to watch it move.
 /// Teaser and enable replay every 8 seconds, so you can watch the moment again. No settings are read or changed.
-func runInstinctStageDemo(mode: String) {
+func runAwareStageDemo(mode: String) {
     struct Demo: View {
         let mode: String
         @State private var started: Date? = nil
         var body: some View {
             VStack(alignment: .leading, spacing: Space.s3) {
-                InstinctStageView(on: mode == "on" || mode == "sweeping" || (mode == "enable" && started != nil),
+                AwareStageView(on: mode == "on" || mode == "sweeping" || (mode == "enable" && started != nil),
                                   enableStartedAt: mode == "enable" ? started : nil, sweeping: mode == "sweeping",
                                   teaserStartedAt: mode == "teaser" ? started : nil)
                 MonoLabel("Stage preview · \(mode)", color: Color.muted)
@@ -159,7 +159,7 @@ func runInstinctStageDemo(mode: String) {
     }
     IonianFont.register()
     let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 230), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-    window.title = "Instinct stage"
+    window.title = "Aware stage"
     window.contentView = NSHostingView(rootView: Demo(mode: mode))
     window.center()
     window.makeKeyAndOrderFront(nil)

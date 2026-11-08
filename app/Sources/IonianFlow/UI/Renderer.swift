@@ -32,12 +32,12 @@ import SwiftUI
         "stage-on": stageSurface(.on, since: 99),
         "stage-sweeping": stageSurface(.on, since: 4, sweeping: true),
         "stage-reduced": stageSurface(.teaser, reduceMotion: true),
-        "settings-instinct-on": instinctSurface(.instinctOn, width: 820),
-        "settings-instinct-off": instinctSurface(.instinctOff, width: 820),
-        "settings-instinct-nobrain": instinctSurface(.instinctNoBrain, width: 820),
-        "settings-instinct-nomodel": instinctSurface(.instinctNoModel, width: 820),
-        "settings-instinct-on-min": instinctSurface(.instinctOn, width: 700),
-        "settings-instinct-nobrain-min": instinctSurface(.instinctNoBrain, width: 700),
+        "settings-aware-on": awareSurface(.awareOn, width: 820),
+        "settings-aware-off": awareSurface(.awareOff, width: 820),
+        "settings-aware-nobrain": awareSurface(.awareNoBrain, width: 820),
+        "settings-aware-nomodel": awareSurface(.awareNoModel, width: 820),
+        "settings-aware-on-min": awareSurface(.awareOn, width: 700),
+        "settings-aware-nobrain-min": awareSurface(.awareNoBrain, width: 700),
         "settings-general-min": generalSurface(.normal, width: 700),
         "settings-general-fresh-min": generalSurface(.fresh, width: 700),
         "settings-general-cleanup-off-min": generalSurface(.cleanupOff, width: 700),
@@ -88,26 +88,26 @@ import SwiftUI
     }
 
     /// The stage alone at a fixed instant, `since` seconds into the enable moment.
-    private static func stageSurface(_ mode: InstinctStage.Mode, since: Double = 0, sweeping: Bool = false, reduceMotion: Bool = false) -> Surface {
+    private static func stageSurface(_ mode: AwareStage.Mode, since: Double = 0, sweeping: Bool = false, reduceMotion: Bool = false) -> Surface {
         Surface(size: CGSize(width: 520, height: 172), make: {
-            AnyView(InstinctStageView(on: mode != .teaser, enableStartedAt: nil, sweeping: sweeping,
+            AnyView(AwareStageView(on: mode != .teaser, enableStartedAt: nil, sweeping: sweeping,
                                       forceStill: reduceMotion, fixed: reduceMotion ? nil : (mode: mode, since: since))
                 .padding(Space.s5).background(Color.bg))
         })
     }
 
-    /// The Instinct page on sample state only: never the user's defaults, brain or files.
-    private static func instinctSurface(_ state: RenderState, width: CGFloat) -> Surface {
+    /// The Aware page on sample state only: never the user's defaults, brain or files.
+    private static func awareSurface(_ state: RenderState, width: CGFloat) -> Surface {
         Surface(size: CGSize(width: width, height: 1100), make: {
             var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
-            domain["instinct"] = state != .instinctOff
-            domain["instinctBrainFolder"] = nil
-            domain["instinctExcludedApps"] = InstinctRules.defaultExcludedApps + ["com.apple.Notes"]
-            domain["instinctIntervalHours"] = 3
-            domain["instinctMeetings"] = true
-            domain["instinctDictations"] = true
+            domain["aware"] = state != .awareOff
+            domain["awareBrainFolder"] = nil
+            domain["awareExcludedApps"] = AwareRules.defaultExcludedApps + ["com.apple.Notes"]
+            domain["awareIntervalHours"] = 3
+            domain["awareMeetings"] = true
+            domain["awareDictations"] = true
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
-            return AnyView(mainViewForRender(page: .instinct, state: state).environment(\.instinctStageClock, 99))
+            return AnyView(mainViewForRender(page: .aware, state: state).environment(\.awareStageClock, 99))
         })
     }
 

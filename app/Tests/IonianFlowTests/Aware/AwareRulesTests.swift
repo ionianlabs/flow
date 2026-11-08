@@ -2,72 +2,10 @@ import Foundation
 import Testing
 @testable import IonianFlow
 
-// Unit tests for AwareRules: F1.2, F1.3, F1.4, F1.15, F1.20, F1.21, F1.22 (overlap step), F1.27 (cut helper).
+// Unit tests for AwareRules: F1.20, F1.21, F1.22 (overlap step), F1.27 (cut helper).
 extension IonianFlowTests {
 @Suite struct AwareRulesTests {
     private struct Cand { var name: String; var conf: Double }
-    private let now = Date(timeIntervalSince1970: 1_800_000_000)
-
-    // F1.2
-    @Test func defaultExcludedAppsAreTheFivePasswordManagers() {
-        #expect(Set(AwareRules.defaultExcludedApps) == ["com.1password.1password", "com.agilebits.onepassword7", "com.bitwarden.desktop", "com.apple.Passwords", "com.apple.keychainaccess"])
-    }
-
-    @Test func excludedBundleStoresNothing() {
-        let ex = AwareRules.defaultExcludedApps
-        #expect(!AwareRules.shouldCapture(bundle: "com.bitwarden.desktop", excluded: ex, secureInput: false, pausedUntil: nil, now: now))
-        #expect(AwareRules.shouldCapture(bundle: "com.apple.Notes", excluded: ex, secureInput: false, pausedUntil: nil, now: now))
-        #expect(AwareRules.shouldCapture(bundle: "com.bitwarden.desktop", excluded: [], secureInput: false, pausedUntil: nil, now: now))
-    }
-
-    // F1.3
-    @Test func secureInputStoresNothing() {
-        #expect(!AwareRules.shouldCapture(bundle: "com.apple.Notes", excluded: [], secureInput: true, pausedUntil: nil, now: now))
-    }
-
-    // F1.4
-    @Test func pausedStoresNothingUntilTheTimeIsReached() {
-        let until = now.addingTimeInterval(3600)
-        #expect(!AwareRules.shouldCapture(bundle: "a", excluded: [], secureInput: false, pausedUntil: until, now: now))
-        #expect(!AwareRules.shouldCapture(bundle: "a", excluded: [], secureInput: false, pausedUntil: until, now: until.addingTimeInterval(-1)))
-        #expect(AwareRules.shouldCapture(bundle: "a", excluded: [], secureInput: false, pausedUntil: until, now: until))
-    }
-
-    // F1.15
-    @Test func prefilterConstantsMatchTheSpec() {
-        #expect(Set(AwareRules.codeApps) == ["com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable", "com.mitchellh.ghostty", "com.microsoft.VSCode", "com.apple.dt.Xcode", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed"])
-        #expect(Set(AwareRules.cues) == ["todo", "to do", "remind me", "note to self", "don't forget", "I need to", "we decided", "for the record", "erinner mich", "nicht vergessen", "wir haben entschieden"])
-    }
-
-    @Test func shortDictationsAreDropped() {
-        #expect(AwareRules.prefilter(text: "send it", bundle: "com.apple.Notes") == .tooShort)
-        #expect(AwareRules.prefilter(text: "  ok   thanks  ", bundle: "com.apple.Notes") == .tooShort)
-        #expect(AwareRules.prefilter(text: "send it now", bundle: "com.apple.Notes") == nil)
-        // The word count comes before the app rule: a short Terminal line is "too short".
-        #expect(AwareRules.prefilter(text: "git status", bundle: "com.apple.Terminal") == .tooShort)
-    }
-
-    @Test func codeAppWithoutCueIsDropped() {
-        #expect(AwareRules.prefilter(text: "git rebase main and fix the merge conflicts", bundle: "com.apple.Terminal") == .codeAppNoCue)
-        #expect(AwareRules.prefilter(text: "git rebase main and fix the merge conflicts", bundle: "com.apple.Notes") == nil)
-    }
-
-    @Test func codeAppWithCueGoesToTheModel() {
-        #expect(AwareRules.prefilter(text: "note to self: rotate the staging key monthly", bundle: "com.apple.Terminal") == nil)
-        #expect(AwareRules.prefilter(text: "Wir haben entschieden den Export zu streichen", bundle: "com.microsoft.VSCode") == nil)
-        #expect(AwareRules.prefilter(text: "this is a TODO for the parser", bundle: "dev.zed.Zed") == nil)
-        #expect(AwareRules.prefilter(text: "that is on my to do list somewhere", bundle: "dev.zed.Zed") == nil)
-        #expect(AwareRules.prefilter(text: "I need to fix the lint step", bundle: "com.apple.dt.Xcode") == nil)
-        #expect(AwareRules.prefilter(text: "please don\u{2019}t forget the release notes", bundle: "com.apple.dt.Xcode") == nil)
-        #expect(AwareRules.prefilter(text: "please don't forget the release notes", bundle: "com.apple.dt.Xcode") == nil)
-    }
-
-    @Test func cuesMatchWholeWordsOnly() {
-        // "todos" is not "todo"; "I need to" must not match inside "I need tomatoes".
-        #expect(AwareRules.prefilter(text: "rename all the todos in this file", bundle: "com.apple.Terminal") == .codeAppNoCue)
-        #expect(AwareRules.prefilter(text: "I need tomatoes and some basil", bundle: "com.apple.Terminal") == .codeAppNoCue)
-        #expect(AwareRules.prefilter(text: "the autodo helper does the sorting", bundle: "com.apple.Terminal") == .codeAppNoCue)
-    }
 
     // F1.20, F1.21
     @Test func knowledgeWithoutProjectIsDropped() {

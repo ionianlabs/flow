@@ -401,17 +401,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         Stats.addDictation(text)
         appModel.statsRevision += 1
         paste(text)
-        captureForAware(text)
-    }
-
-    /// F1.1 to F1.4: the delivered text goes to Aware's buffer unless the app, secure input or the pause says no.
-    private func captureForAware(_ text: String) {
-        guard Settings.aware, Settings.awareDictations else { return }
-        let app = NSWorkspace.shared.frontmostApplication
-        AwareApp.capture(
-            text: text, front: app?.bundleIdentifier.map { (name: app?.localizedName ?? $0, bundle: $0) },
-            excluded: Settings.awareExcludedApps, secureInput: IsSecureEventInputEnabled(),
-            pausedUntil: Settings.awarePausedUntil, now: Date(), buffer: CaptureBuffer(folder: Settings.awareFolder))
     }
 
     private func startAware() {
@@ -421,10 +410,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
             brainReady: { BrainLocator.current() != nil },
             modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && AwareApp.makeModel != nil },
-            intervalHours: { Settings.awareIntervalHours }, pausedUntil: { Settings.awarePausedUntil },
-            loadState: { AwareState.load(from: Settings.awareFolder) },
-            saveState: { try? $0.save(to: Settings.awareFolder) },
-            meetingsOn: { Settings.awareMeetings }) }
+            pendingMeetings: { Self.pendingMeetings() }) }
         MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.awareSweepEnded(manual: manual) } }
         aware = scheduler
         MainActor.assumeIsolated { scheduler.launch() }
@@ -433,12 +419,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private func setAware(_ on: Bool) {
         Settings.aware = on
         if on {
-            Settings.awarePausedUntil = nil  // switching on means on: an old pause must not keep it silent
             AwareApp.enable(folder: Settings.awareFolder, now: Date())
             startAware()
         } else {
             aware = nil
-            AwareApp.disable(folder: Settings.awareFolder)  // F3.8
         }
     }
 
@@ -446,24 +430,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         MainActor.assumeIsolated {
             guard let aware else { return }
             if !aware.sweepNow() {  // F3.16: never drop a click silently
-                let why = aware.status ?? AwareApp.pausedLine(until: Settings.awarePausedUntil, now: Date()) ?? "Aware cannot read right now."
+                let why = aware.status ?? "Aware cannot read right now."
                 postAwareNotice(AwareApp.Notice(title: why, body: "Open the Aware page for details."), file: nil)
             }
         }
     }
 
-    @objc private func pauseAware() { Settings.awarePausedUntil = AwareApp.pauseEnd(from: Date()) }
-
-    @objc private func resumeAware() {
-        Settings.awarePausedUntil = nil
-        MainActor.assumeIsolated { aware?.tick() }
+    /// F1.42: transcripts waiting to be read or recorded as swept.
+    private static func pendingMeetings() -> Int {
+        let p = TranscriptSource.pending(in: Settings.transcriptsFolder, state: AwareState.load(from: Settings.awareFolder))
+        return p.toRead.count + p.recordAsSwept.count
     }
 
     /// F1.40, F1.41: log the counts, notify when there is something to say.
     private func awareSweepEnded(manual: Bool) {
         guard let r = AwareState.load(from: Settings.awareFolder).lastResult else { return }
-        NSLog("Ionian Flow: Aware sweep: %d meetings, %d dictations, %d written, failed %d, manual %d",
-              r.meetings, r.dictations, r.written, r.failed ? 1 : 0, manual ? 1 : 0)
+        NSLog("Ionian Flow: Aware sweep: %d meetings, %d written, failed %d, manual %d",
+              r.meetings, r.written, r.failed ? 1 : 0, manual ? 1 : 0)
         if let notice = AwareApp.notice(r, manual: manual) { postAwareNotice(notice, file: r.file) }
     }
 
@@ -479,28 +462,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
     }
 
-    /// The Aware page: the same actions as the menu items, plus the Brain, meetings, dictations and app choices (F3).
+    /// The Aware page: the same actions as the menu items, plus the Brain (F3).
     private func awareActions() -> AwareActions {
         var a = AwareActions()
         a.setOn = { [weak self] in self?.setAware($0) }
-        a.setMeetings = { AwareApp.setMeetings(on: $0, folder: Settings.awareFolder, now: Date()) }
-        a.setDictations = { AwareApp.setDictations(on: $0, folder: Settings.awareFolder) }
         a.chooseBrain = { [weak self] in self?.chooseAwareBrain() }
         a.openInbox = { NSWorkspace.shared.open(AwareApp.inbox(of: $0)) }
-        a.pickApp = { [weak self] in self?.pickExcludedApp() }
-        a.appName = { id in
-            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent
-        }
         a.sweepNow = { [weak self] in self?.sweepAwareNow() }
-        a.pause = { [weak self] in self?.pauseAware() }
-        a.resume = { [weak self] in self?.resumeAware() }
         a.snapshot = { [weak self] in
             guard let self else { return AwareSnapshot(brain: nil, state: AwareState(), itemsToday: 0, now: Date()) }
             let now = Date(), brain = BrainLocator.current()
             let items = brain.map { AwareWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
             let running = MainActor.assumeIsolated { self.aware?.running != nil }
-            let collected = CaptureBuffer(folder: Settings.awareFolder).read().count
-            return AwareSnapshot(brain: brain, state: AwareState.load(from: Settings.awareFolder), itemsToday: items, now: now, collected: collected, sweeping: running)
+            return AwareSnapshot(brain: brain, state: AwareState.load(from: Settings.awareFolder), itemsToday: items, now: now,
+                                 pending: Self.pendingMeetings(), sweeping: running)
         }
         return a
     }
@@ -516,20 +491,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         return AwareApp.chooseBrain(url) { Settings.awareBrainFolder = $0 } ? .accepted : .refused
-    }
-
-    private func pickExcludedApp() -> String? {
-        let panel = NSOpenPanel()
-        panel.title = "Never capture from"
-        panel.message = "Pick an app. Dictations into it are never stored."
-        panel.prompt = "Add"
-        panel.allowedContentTypes = [.application]
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
-        NSApp.activate()
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        return AwareApp.bundleID(ofApp: url)
     }
 
     private func paste(_ text: String) {
@@ -579,19 +540,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.addItem(.separator())
 
         if Settings.aware {
-            let lines = AwareApp.menuLines(status: MainActor.assumeIsolated { aware?.status }, pausedUntil: Settings.awarePausedUntil)
+            let lines = AwareApp.menuLines(status: MainActor.assumeIsolated { aware?.status })
             if let line = lines.status {
                 let status = NSMenuItem(title: line, action: nil, keyEquivalent: "")
                 status.isEnabled = false
                 menu.addItem(status)
             }
-            for title in lines.actions {
-                switch title {
-                case AwareApp.sweepNowTitle: menu.addItem(item(title, #selector(sweepAwareNow)))
-                case AwareApp.resumeTitle: menu.addItem(item(title, #selector(resumeAware)))
-                default: menu.addItem(item(title, #selector(pauseAware)))
-                }
-            }
+            for title in lines.actions { menu.addItem(item(title, #selector(sweepAwareNow))) }
             menu.addItem(.separator())
         }
 

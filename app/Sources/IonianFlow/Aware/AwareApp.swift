@@ -10,15 +10,15 @@ struct AwareSweepAdapter: AwareSweeping, @unchecked Sendable {
         let checkpoint: () async -> Void = { await gate.checkpoint() }
         let report: AwareSweepReport
         switch request {
-        case .scheduled: report = await sweep.run(kind: .scheduled, transcript: nil, checkpoint: checkpoint)
+        case .catchUp: report = await sweep.run(kind: .catchUp, transcript: nil, checkpoint: checkpoint)
         case .meeting(let url): report = await sweep.run(kind: .meeting, transcript: url, checkpoint: checkpoint)
         }
         return report.failed ? .failed : .done(capReached: report.capReached)
     }
 }
 
-/// App glue for Aware that has rules worth testing: where the files live, when a dictation is captured,
-/// what happens when the setting flips, the pause and the menu lines.
+/// App glue for Aware that has rules worth testing: where the files live,
+/// what happens when the setting flips, the notice and the menu lines.
 enum AwareApp {
     /// The model of a sweep: Gemma, paused through the sweep's control. Nil (tests) is reported as "model not downloaded".
     nonisolated(unsafe) static var makeModel: ((SweepControl) -> AwareModel)? = { GemmaAwareModel(control: $0) }
@@ -28,8 +28,7 @@ enum AwareApp {
         guard let make = makeModel, let brain = BrainLocator.current() else { return nil }
         return AwareSweep(brainRoot: brain, transcriptsFolder: Settings.transcriptsFolder,
                              awareFolder: Settings.awareFolder, model: make(control),
-                             kinds: Settings.awareKinds, readsMeetings: Settings.awareMeetings,
-                             readsDictations: Settings.awareDictations)
+                             kinds: Settings.awareKinds)
     }
 
     // MARK: folder
@@ -38,19 +37,6 @@ enum AwareApp {
     static func folder(testDir: URL?, home: URL) -> URL {
         if let testDir { return testDir.appendingPathComponent("Aware", isDirectory: true) }
         return home.appendingPathComponent("Library/Application Support/Ionian Flow/Aware", isDirectory: true)
-    }
-
-    // MARK: capture (F1.1 to F1.4)
-
-    /// Appends the delivered text to the buffer when the rules allow it; true when stored.
-    /// Without a known front app nothing is stored, since the exclusion list could not be applied.
-    @discardableResult
-    static func capture(text: String, front: (name: String, bundle: String)?, excluded: [String], secureInput: Bool,
-                        pausedUntil: Date?, now: Date, buffer: CaptureBuffer, dictations: Bool = true) -> Bool {
-        guard dictations, !text.isEmpty, let front, !front.bundle.isEmpty,
-              AwareRules.shouldCapture(bundle: front.bundle, excluded: excluded, secureInput: secureInput,
-                                          pausedUntil: pausedUntil, now: now) else { return false }
-        return buffer.append(text: text, app: front.name, bundle: front.bundle) != nil
     }
 
     // MARK: enabling (F1.35)
@@ -63,15 +49,6 @@ enum AwareApp {
     }
 
     // MARK: Aware page settings (F3)
-
-    /// Turning Aware off leaves no dictation on disk (F3.8).
-    static func disable(folder: URL) { CaptureBuffer(folder: folder).clear() }
-
-    /// Switching Dictations off stops capture, and deletes what was captured (F3.7).
-    static func setDictations(on: Bool, folder: URL) { if !on { CaptureBuffer(folder: folder).clear() } }
-
-    /// Switching Meetings on starts the clock again, so meetings from the off period are not swept (F3.6).
-    static func setMeetings(on: Bool, folder: URL, now: Date) { if on { enable(folder: folder, now: now) } }
 
     /// The kinds to look for from the stored words; nothing stored means all three (F3.5).
     static func kinds(stored: [String]?) -> Set<AwareCategory> {
@@ -91,30 +68,13 @@ enum AwareApp {
     /// The inbox is part of the Brain's structure and cannot be moved (F3.4).
     static func inbox(of brain: URL) -> URL { brain.appendingPathComponent("inbox", isDirectory: true) }
 
-    /// The bundle id of an `.app` folder picked in the open panel (F3.10).
-    static func bundleID(ofApp url: URL) -> String? { Bundle(url: url)?.bundleIdentifier }
-
-    /// "Paused until 14:05" while the pause lasts (F3.11).
-    static func pausedLine(until: Date?, now: Date, timeZone: TimeZone = .current) -> String? {
-        guard let until, until > now else { return nil }
-        return "Paused until " + AwarePageState.clock(until, timeZone: timeZone)
-    }
-
-    // MARK: menu (F1.4, F1.28, F1.31)
+    // MARK: menu (F1.28, F1.31)
 
     static let sweepNowTitle = "Sweep now"
-    static let pauseTitle = "Pause Aware for 1 hour"
-    static let resumeTitle = "Resume Aware"
-    static let pauseDuration: TimeInterval = 3600
 
-    static func pauseEnd(from now: Date) -> Date { now.addingTimeInterval(pauseDuration) }
-
-    /// The titles to show when Aware is on: the status line (disabled) first when there is one, then the two actions.
-    static func menuLines(status: String?, pausedUntil: Date? = nil, now: Date = Date()) -> (status: String?, actions: [String]) {
-        if let until = pausedUntil, until > now {  // F3.16: paused, the one thing left to do is resume.
-            return ("Aware: paused until " + AwarePageState.clock(until), [resumeTitle])
-        }
-        return (status, [sweepNowTitle, pauseTitle])
+    /// The titles to show when Aware is on: the status line (disabled) first when there is one, then the one action.
+    static func menuLines(status: String?) -> (status: String?, actions: [String]) {
+        (status, [sweepNowTitle])
     }
 
     // MARK: notice (F1.41)
@@ -123,29 +83,26 @@ enum AwareApp {
 
     private static func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
 
-    /// "1 meeting and 3 dictations", "3 dictations", or nil when nothing was read.
-    static func readText(meetings: Int, dictations: Int) -> String? {
-        let parts = (meetings > 0 ? [count(meetings, "meeting")] : []) + (dictations > 0 ? [count(dictations, "dictation")] : [])
-        return parts.isEmpty ? nil : parts.joined(separator: " and ")
-    }
+    /// "1 meeting", "2 meetings", or nil when nothing was read.
+    static func readText(meetings: Int) -> String? { meetings > 0 ? count(meetings, "meeting") : nil }
 
     /// Proposals always notify. "Nothing" and a failure only answer a sweep the user asked for: the page shows them otherwise.
     static func notice(_ r: AwareSweepResult, manual: Bool) -> Notice? {
-        let read = readText(meetings: r.meetings, dictations: r.dictations)
+        let read = readText(meetings: r.meetings)
         if r.written > 0 {
             return Notice(title: "Aware wrote \(count(r.written, "proposal")) to your inbox.",
-                          body: (read.map { "From \($0). " } ?? "") + "Open to review.")
+                          body: "From \(read ?? count(r.meetings, "meeting")). Open to review.")
         }
         guard manual else { return nil }
         if r.failed { return Notice(title: "Aware could not read this time.", body: "Nothing was lost. It tries again soon.") }
-        guard let read else { return Notice(title: "Nothing new for Aware to read.", body: "It reads new dictations and finished meetings.") }
+        guard let read else { return Notice(title: "Nothing new for Aware to read.", body: "It reads meetings when they end.") }
         return Notice(title: "Aware found nothing to propose.", body: "It read \(read).")
     }
 
     // MARK: Aware page copy
 
     static let toggleTitle = "Aware"
-    static let toggleDetail = "Proposes to-dos, decisions and facts to your brain's inbox."
+    static let toggleDetail = "Proposes to-dos, decisions and facts from your meetings to your brain's inbox."
     /// With no Brain the page invites instead of blocking (F3.15): the Brain is why Aware is worth having.
     static let noBrainDetail = "Aware works with your Ionian Brain: one folder of plain notes your agents already read."
     static let getBrainPill = "Get Ionian Brain"

@@ -178,11 +178,7 @@ struct GemmaAwareModel: AwareModel {
         }
         out += "\nSources:\n"
         for (n, s) in sources.enumerated() {
-            let who: String
-            switch s.kind {
-            case .dictation(let app, _): who = "dictated in \(app)"
-            case .transcript: who = s.speaker?.rawValue ?? "unknown speaker"
-            }
+            let who = s.speaker?.rawValue ?? "unknown speaker"
             out += "Source S\(n + 1) | \(dateFormatter.string(from: s.time)) | \(who)\n\(s.text)\n\n"
         }
         out += "Return the JSON object now."
@@ -259,7 +255,7 @@ extension GemmaAwareModel {
     }
 }
 
-/// `--aware-sweep --brain DIR --transcripts DIR --folder DIR`: one scheduled sweep with the real model, printing
+/// `--aware-sweep --brain DIR --transcripts DIR --folder DIR`: one catch-up sweep with the real model, printing
 /// counts only. For checking the pipeline on copies; it writes to the given brain's inbox.
 enum AwareSweepCLI {
     static func cli(_ args: [String]) -> Int32 {
@@ -278,9 +274,9 @@ enum AwareSweepCLI {
             let sweep = AwareSweep(brainRoot: brain, transcriptsFolder: transcripts, awareFolder: folder,
                                       model: GemmaAwareModel(control: nil))
             let start = Date()
-            let r = await sweep.run(kind: .scheduled, transcript: nil, checkpoint: {})
+            let r = await sweep.run(kind: .catchUp, transcript: nil, checkpoint: {})
             let result = AwareState.load(from: folder).lastResult
-            print("failed \(r.failed) written \(r.written) meetings \(result?.meetings ?? 0) dictations \(result?.dictations ?? 0) seconds \(Int(Date().timeIntervalSince(start)))")
+            print("failed \(r.failed) written \(r.written) meetings \(result?.meetings ?? 0) seconds \(Int(Date().timeIntervalSince(start)))")
             print("dropped \(r.dropped)")
             print("file \(r.file?.path ?? "none")")
             code = r.failed ? 1 : 0

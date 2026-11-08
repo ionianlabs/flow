@@ -1,65 +1,12 @@
 import Foundation
 
-/// Constants and pure rules of Aware (spec F1.2 to F1.4, F1.15, F1.20 to F1.22, F1.27).
+/// Constants and pure rules of Aware (spec F1.20 to F1.22, F1.27).
 /// Thresholds are constants like `SweepRank.minScore`, to be tuned from the precision report.
 enum AwareRules {
-    /// Why an item or dictation was dropped; the raw value is the label the footer counts.
+    /// Why an item was dropped; the raw value is the label the footer counts.
     enum DropReason: String, Equatable {
-        case tooShort = "too short"
-        case codeAppNoCue = "code app, no cue"
         case noProject = "no project"
         case lowConfidence = "low confidence"
-    }
-
-    // MARK: capture (F1.2 to F1.4)
-
-    static let defaultExcludedApps = [
-        "com.1password.1password", "com.agilebits.onepassword7", "com.bitwarden.desktop",
-        "com.apple.Passwords", "com.apple.keychainaccess",
-    ]
-
-    /// Names for the default list, so the page shows "1Password" and not a bundle id (F3.10).
-    static let knownAppNames = [
-        "com.1password.1password": "1Password", "com.agilebits.onepassword7": "1Password 7", "com.bitwarden.desktop": "Bitwarden",
-        "com.apple.Passwords": "Passwords", "com.apple.keychainaccess": "Keychain Access",
-    ]
-
-    /// The list with one more bundle id, once (F3.10).
-    static func adding(_ bundle: String, to list: [String]) -> [String] {
-        bundle.isEmpty || list.contains(bundle) ? list : list + [bundle]
-    }
-
-    static func removing(_ bundle: String, from list: [String]) -> [String] { list.filter { $0 != bundle } }
-
-    static func shouldCapture(bundle: String, excluded: [String], secureInput: Bool, pausedUntil: Date?, now: Date) -> Bool {
-        if excluded.contains(bundle) || secureInput { return false }
-        if let until = pausedUntil, now < until { return false }
-        return true
-    }
-
-    // MARK: dictation prefilter (F1.15)
-
-    static let minWords = 3
-    static let codeApps = [
-        "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable", "com.mitchellh.ghostty",
-        "com.microsoft.VSCode", "com.apple.dt.Xcode", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed",
-    ]
-    static let cues = [
-        "todo", "to do", "remind me", "note to self", "don't forget", "I need to", "we decided", "for the record",
-        "erinner mich", "nicht vergessen", "wir haben entschieden",
-    ]
-
-    /// Order of F1.15: too short, then code app without cue; nil means the dictation goes to the model.
-    static func prefilter(text: String, bundle: String) -> DropReason? {
-        if text.split(whereSeparator: { $0.isWhitespace }).count < minWords { return .tooShort }
-        if codeApps.contains(bundle), !hasCue(text) { return .codeAppNoCue }
-        return nil
-    }
-
-    /// Whole words or phrases, ignoring case; the typographic apostrophe counts as the plain one.
-    static func hasCue(_ text: String) -> Bool {
-        let hay = " " + cueTokens(text).joined(separator: " ") + " "
-        return cues.contains { hay.contains(" " + cueTokens($0).joined(separator: " ") + " ") }
     }
 
     private static func cueTokens(_ s: String) -> [String] {
@@ -200,7 +147,6 @@ enum AwareRules {
     /// A small model keeps its focus on short parts: at most this many characters and sources per model call.
     static let chunkLimit = 1_500
     static let chunkMaxSources = 12
-    static let dictationMaxSources = 1
 
     /// Groups sources, in order and never split, into parts of at most `limit` characters of text and `maxSources` sources.
     static func chunks(_ sources: [AwareSource], limit: Int = chunkLimit, maxSources: Int = chunkMaxSources) -> [[AwareSource]] {

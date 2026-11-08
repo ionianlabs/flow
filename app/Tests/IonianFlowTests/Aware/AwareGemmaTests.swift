@@ -21,7 +21,7 @@ func awareTestDate(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 10, _ min: Int = 14)
     var sources: [AwareSource] {
         [AwareSource(id: "m.md#3", kind: .transcript(fileName: "m.md"), time: thu, speaker: .them,
                         text: "Can you send me the deck by Friday?"),
-         AwareSource(id: "d7", kind: .dictation(app: "Notes", bundle: "com.apple.Notes"), time: thu, speaker: nil,
+         AwareSource(id: "m.md#4", kind: .transcript(fileName: "m.md"), time: thu, speaker: .you,
                         text: "Remind me to renew the vendor contract")]
     }
     let projects = [AwareProjectHint(slug: "alpha", description: "The export rewrite", focus: "Ship in Q1")]
@@ -38,7 +38,6 @@ func awareTestDate(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 10, _ min: Int = 14)
         #expect(all.contains("2026-11-05 Thursday"))
         #expect(all.contains("Them"))
         #expect(all.contains("Can you send me the deck by Friday?"))
-        #expect(all.contains("Notes"))
         #expect(all.contains("alpha: The export rewrite; Ship in Q1"))
         #expect(all.contains(#"{"items":["#))
     }
@@ -54,7 +53,7 @@ func awareTestDate(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 10, _ min: Int = 14)
     @Test func sourceNumbersMapBackToRealIDs() async throws {
         let json = #"{"items":[{"category":"todo","text":"Renew","quote":"renew the vendor contract","source":"S2","project":"none","confidence":0.9},{"category":"todo","text":"Send","quote":"send me the deck by Friday","source":"[S9]","project":"none","confidence":0.9},{"category":"fact","text":"X","quote":"not in any source","source":"S1","project":"none","confidence":0.9}]}"#
         let items = try await GemmaAwareModel(llm: FakeLLM([json])).extract(sources, projects: projects)
-        #expect(items.map(\.sourceID) == ["d7", "m.md#3", "S1"])  // wrong number: found by quote; no source holds the quote: left for the verbatim guard
+        #expect(items.map(\.sourceID) == ["m.md#4", "m.md#3", "S1"])  // wrong number: found by quote; no source holds the quote: left for the verbatim guard
     }
 
     @Test func extractSendsWorkedExamplesBeforeTheRealRequest() async throws {

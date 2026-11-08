@@ -8,8 +8,8 @@ struct AwareSnapshot {
     var state: AwareState
     var itemsToday: Int
     var now: Date
-    /// Dictations collected and not read yet.
-    var collected = 0
+    /// Finished meetings waiting to be read or recorded as swept.
+    var pending = 0
     /// A sweep is running right now (the scheduler's task), shown as a little more movement in the stage.
     var sweeping = false
 }
@@ -18,17 +18,10 @@ struct AwareSnapshot {
 struct AwareActions {
     enum BrainChoice { case accepted, refused }
     var setOn: (Bool) -> Void = { _ in }
-    var setMeetings: (Bool) -> Void = { _ in }
-    var setDictations: (Bool) -> Void = { _ in }
     /// Opens the folder panel; nil when the user cancelled.
     var chooseBrain: () -> BrainChoice? = { nil }
     var openInbox: (URL) -> Void = { _ in }
-    /// Opens the panel on /Applications and returns the chosen app's bundle id.
-    var pickApp: () -> String? = { nil }
-    var appName: (String) -> String? = { _ in nil }
     var sweepNow: () -> Void = {}
-    var pause: () -> Void = {}
-    var resume: () -> Void = {}
     var snapshot: () -> AwareSnapshot = { AwareSnapshot(brain: nil, state: AwareState(), itemsToday: 0, now: Date()) }
 }
 
@@ -36,8 +29,7 @@ extension AppModel.Page {
     var awareSymbol: String { "brain" }
 }
 
-/// The Aware page: the stage, the switch and what it is doing, the Brain, what it looks for and reads, the apps it
-/// ignores, two actions. Without a Brain the top section invites instead of blocking (F3.15).
+/// The Aware page: the stage, the switch and what it is doing, the Brain, what it looks for, one action. Without a Brain the top section invites instead of blocking (F3.15).
 struct AwareSettingsPage: View {
     @ObservedObject var models: ModelSetupModel
     var actions: AwareActions
@@ -45,27 +37,21 @@ struct AwareSettingsPage: View {
     @State private var enableStartedAt: Date?
     @State private var reverting = false
     @State private var kinds = Settings.awareKinds
-    @State private var meetings = Settings.awareMeetings
-    @State private var dictations = Settings.awareDictations
-    @State private var hours = Settings.awareIntervalHours
-    @State private var excluded = Settings.awareExcludedApps
     @State private var refused = false
     @State private var snapshot: AwareSnapshot?
-    @State private var pausedUntil = Settings.awarePausedUntil
     @FocusState private var inviteFocused: Bool
     private let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     private func refresh() {
         snapshot = actions.snapshot()
-        pausedUntil = Settings.awarePausedUntil
     }
 
     var body: some View {
         let snap = snapshot ?? actions.snapshot()
         let page = AwarePageState.make(
-            settings: AwarePageSettings(on: on, intervalHours: hours, pausedUntil: pausedUntil),
+            settings: AwarePageSettings(on: on),
             brain: snap.brain, cleanupInstalled: models.phase(.cleanup) == .installed,
-            state: snap.state, now: snap.now, itemsToday: snap.itemsToday, collected: snap.collected, sweeping: snap.sweeping)
+            state: snap.state, now: snap.now, itemsToday: snap.itemsToday, pending: snap.pending, sweeping: snap.sweeping)
         SettingsPage(.aware) {
             VStack(alignment: .leading, spacing: Space.s2) {
                 AwareStageView(on: page.switchOn, enableStartedAt: enableStartedAt, sweeping: snap.sweeping)
@@ -110,13 +96,6 @@ struct AwareSettingsPage: View {
                     SettingRow("Read now", page.sweepDetail) {
                         Button(page.sweepTitle) { actions.sweepNow(); refresh() }.buttonStyle(.primaryCompact).disabled(!page.sweepEnabled)
                     }
-                    SettingRow("Pause", page.pausedLine ?? AwarePage.pauseDetail) {
-                        if page.isPaused {
-                            Button("Resume ›") { actions.resume(); refresh() }.buttonStyle(.monoLink)
-                        } else {
-                            Button("Pause for 1 hour ›") { actions.pause(); refresh() }.buttonStyle(.monoLink).disabled(!page.canPause)
-                        }
-                    }
                 }
             }
             SettingsSection("Brain") {
@@ -139,35 +118,6 @@ struct AwareSettingsPage: View {
                 ForEach(AwarePage.kindLines, id: \.0) { kind, line in
                     SettingToggle(AwarePage.kindTitles[kind] ?? kind.rawValue, line, isOn: kindBinding(kind))
                 }
-            }
-            SettingsSection("What it reads") {
-                SettingToggle("Meetings", AwarePage.meetingsDetail, isOn: $meetings)
-                    .onChange(of: meetings) { Settings.awareMeetings = meetings; actions.setMeetings(meetings) }
-                SettingRow("Dictations", AwarePage.dictationsDetail) {
-                    HStack(spacing: Space.s3) {
-                        Picker("Interval", selection: $hours) {
-                            ForEach(AwarePage.intervals, id: \.self) { Text(AwarePage.intervalTitle($0)).tag($0) }
-                        }
-                        .labelsHidden().pickerStyle(.menu).controlSize(.small).fixedSize()
-                        .disabled(!dictations)
-                        .onChange(of: hours) { Settings.awareIntervalHours = hours }
-                        Toggle("Dictations", isOn: $dictations).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Color.btnBg)
-                            .onChange(of: dictations) { Settings.awareDictations = dictations; actions.setDictations(dictations) }
-                    }
-                }
-            }
-            SettingsSection("Never capture from", note: AwarePage.excludedNote) {
-                ForEach(AwarePageState.excludedRows(excluded, resolve: actions.appName)) { app in
-                    SettingRow(app.name, app.name == app.bundle ? nil : app.bundle) {
-                        Button("Remove") { excluded = AwareRules.removing(app.bundle, from: excluded); Settings.awareExcludedApps = excluded }
-                            .buttonStyle(.monoLink)
-                    }
-                }
-                HStack {
-                    Button("Add app +", action: addApp).buttonStyle(.monoLink)
-                    Spacer()
-                }
-                .frame(minHeight: Space.s6)
             }
         }
         .onChange(of: on) {
@@ -195,11 +145,5 @@ struct AwareSettingsPage: View {
         case .refused: refused = true
         case nil: break
         }
-    }
-
-    private func addApp() {
-        guard let bundle = actions.pickApp() else { return }
-        excluded = AwareRules.adding(bundle, to: excluded)
-        Settings.awareExcludedApps = excluded
     }
 }

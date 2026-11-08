@@ -102,10 +102,6 @@ import SwiftUI
             var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
             domain["aware"] = state != .awareOff
             domain["awareBrainFolder"] = nil
-            domain["awareExcludedApps"] = AwareRules.defaultExcludedApps + ["com.apple.Notes"]
-            domain["awareIntervalHours"] = 3
-            domain["awareMeetings"] = true
-            domain["awareDictations"] = true
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
             return AnyView(mainViewForRender(page: .aware, state: state).environment(\.awareStageClock, 99))
         })

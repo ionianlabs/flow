@@ -16,10 +16,6 @@ enum Settings {
             "parakeetFinals": true,
             "summarizeTranscripts": true,
             "aware": false,
-            "awareExcludedApps": AwareRules.defaultExcludedApps,
-            "awareIntervalHours": 3,
-            "awareMeetings": true,
-            "awareDictations": true,
         ])
     }
 
@@ -81,16 +77,10 @@ enum Settings {
         set { d.set(newValue.path, forKey: "transcriptsFolder") }
     }
 
-    /// Aware: propose to-dos, decisions and facts from dictations and meetings to the brain's inbox.
+    /// Aware: propose to-dos, decisions and facts from finished meetings to the brain's inbox.
     static var aware: Bool {
         get { d.bool(forKey: "aware") }
         set { d.set(newValue, forKey: "aware") }
-    }
-
-    /// Dictations from these apps (bundle ids) are never stored for Aware.
-    static var awareExcludedApps: [String] {
-        get { d.stringArray(forKey: "awareExcludedApps") ?? AwareRules.defaultExcludedApps }
-        set { d.set(newValue, forKey: "awareExcludedApps") }
     }
 
     /// A folder chosen on the Aware page; tried before the other places a Brain can be (F3.3).
@@ -105,29 +95,7 @@ enum Settings {
         set { d.set(AwareCategory.allCases.filter(newValue.contains).map(\.rawValue), forKey: "awareKinds") }
     }
 
-    /// Read finished meetings (F3.6) and dictations (F3.7).
-    static var awareMeetings: Bool {
-        get { d.bool(forKey: "awareMeetings") }
-        set { d.set(newValue, forKey: "awareMeetings") }
-    }
-
-    static var awareDictations: Bool {
-        get { d.bool(forKey: "awareDictations") }
-        set { d.set(newValue, forKey: "awareDictations") }
-    }
-
-    static var awareIntervalHours: Int {
-        get { max(d.integer(forKey: "awareIntervalHours"), 1) }
-        set { d.set(newValue, forKey: "awareIntervalHours") }
-    }
-
-    /// "Pause Aware for 1 hour": nothing is stored and no sweep runs until then.
-    static var awarePausedUntil: Date? {
-        get { d.object(forKey: "awarePausedUntil") as? Date }
-        set { d.set(newValue, forKey: "awarePausedUntil") }
-    }
-
-    /// Buffer, state and nothing else of Aware's own; the proposals go to the brain.
+    /// State and nothing else of Aware's own; the proposals go to the brain.
     static var awareFolder: URL {
         AwareApp.folder(testDir: testDir, home: FileManager.default.homeDirectoryForCurrentUser)
     }

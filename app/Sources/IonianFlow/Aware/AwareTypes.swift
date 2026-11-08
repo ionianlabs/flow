@@ -4,10 +4,10 @@ enum AwareCategory: String, Codable, CaseIterable { case todo, decision, fact }
 enum AwareSpeaker: String, Codable { case you = "You", them = "Them" }
 
 struct AwareSource: Equatable {
-    enum Kind: Equatable { case dictation(app: String, bundle: String), transcript(fileName: String) }
-    var id: String          // buffer line id, or "<file name>#<block index>"
+    enum Kind: Equatable { case transcript(fileName: String) }
+    var id: String          // "<file name>#<block index>"
     var kind: Kind
-    var time: Date          // dictation time, or the block's start (frontmatter date + block HH:mm)
+    var time: Date          // the block's start (frontmatter date + block HH:mm)
     var speaker: AwareSpeaker?
     var text: String
 }

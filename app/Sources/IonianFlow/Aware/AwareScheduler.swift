@@ -1,6 +1,6 @@
 import Foundation
 
-enum AwareSweepRequest: Equatable, Sendable { case scheduled, meeting(URL) }
+enum AwareSweepRequest: Equatable, Sendable { case catchUp, meeting(URL) }
 enum AwareSweepOutcome: Equatable, Sendable { case done(capReached: Bool), failed }
 
 protocol AwareSweeping: Sendable {
@@ -27,11 +27,8 @@ final class AwareScheduler {
     private let power: () -> AwarePower
     private let brainReady: () -> Bool
     private let modelReady: () -> Bool
-    private let intervalHours: () -> Int
-    private let pausedUntil: () -> Date?
-    private let loadState: () -> AwareState
-    private let saveState: (AwareState) -> Void
-    private let meetingsOn: () -> Bool
+    /// Transcripts waiting: to read, or to record as swept (F1.42).
+    private let pendingMeetings: () -> Int
 
     private(set) var running: Task<Void, Never>?
     /// A sweep ended; true when the user asked for it (F1.41).
@@ -42,12 +39,10 @@ final class AwareScheduler {
          isBusy: @escaping () -> Bool,
          power: @escaping () -> AwarePower = AwarePower.current,
          brainReady: @escaping () -> Bool, modelReady: @escaping () -> Bool,
-         intervalHours: @escaping () -> Int, pausedUntil: @escaping () -> Date?,
-         loadState: @escaping () -> AwareState, saveState: @escaping (AwareState) -> Void, meetingsOn: @escaping () -> Bool = { true }) {
+         pendingMeetings: @escaping () -> Int) {
         self.sweeper = sweeper; self.gate = gate; self.clock = clock; self.isBusy = isBusy
         self.power = power; self.brainReady = brainReady; self.modelReady = modelReady
-        self.intervalHours = intervalHours; self.pausedUntil = pausedUntil
-        self.loadState = loadState; self.saveState = saveState; self.meetingsOn = meetingsOn
+        self.pendingMeetings = pendingMeetings
     }
 
     private var capDay: Date?
@@ -60,7 +55,6 @@ final class AwareScheduler {
         return nil
     }
 
-    private var isPaused: Bool { pausedUntil().map { $0 > clock() } ?? false }
     private var lowPower: Bool { let p = power(); return p.onBattery && p.percent < 30 }
 
     func launch() { tick() }
@@ -78,25 +72,26 @@ final class AwareScheduler {
 
     /// Called after the transcript is written and its summary finished or failed (F1.36).
     func meetingEnded(_ file: URL) {
-        guard meetingsOn() else { return }  // F3.6
         enqueue(.meeting(file), forced: false)
     }
 
-    /// False when it cannot run now (pause, brain, model), so the caller can say so (F3.16).
+    /// False when it cannot run now (brain, model), so the caller can say so (F3.16).
     @discardableResult
     func sweepNow() -> Bool {
         guard canRun(forced: true) else { return false }
-        enqueue(.scheduled, forced: true)
+        enqueue(.catchUp, forced: true)
         return true
     }
 
+    /// F1.42: a catch-up sweep when transcripts are waiting, Flow is idle, the brain and model are ready, power is not low
+    /// and no sweep runs.
     func tick() {
-        guard !isBusy(), !isPaused, brainReady(), modelReady(), !lowPower, isDue() else { return }
-        enqueue(.scheduled, forced: false)
+        guard running == nil, !isBusy(), brainReady(), modelReady(), !lowPower, pendingMeetings() > 0 else { return }
+        enqueue(.catchUp, forced: false)
     }
 
     private func enqueue(_ request: AwareSweepRequest, forced: Bool) {
-        // A meeting that cannot run now because of pause, brain, model or battery is left for the next scheduled sweep (F1.36).
+        // A meeting that cannot run now because of brain, model or battery is left for the next catch-up sweep (F1.36, F1.42).
         if case .meeting = request, !canRun(forced: false) { return }
         if queue.contains(where: { $0.request == request }) { return }
         queue.append(Item(request: request, forced: forced))
@@ -104,7 +99,7 @@ final class AwareScheduler {
     }
 
     private func canRun(forced: Bool) -> Bool {
-        !isPaused && brainReady() && modelReady() && (forced || !lowPower)
+        brainReady() && modelReady() && (forced || !lowPower)
     }
 
     /// Starts the next queued request when nothing runs and Flow is idle.
@@ -112,15 +107,10 @@ final class AwareScheduler {
         guard running == nil, !isBusy() else { return }
         while !queue.isEmpty {
             let item = queue.removeFirst()
-            guard canRun(forced: item.forced) else { continue }  // dropped; a scheduled one stays due
+            guard canRun(forced: item.forced) else { continue }  // dropped; the transcripts stay pending for the next catch-up
             start(item)
             return
         }
-    }
-
-    private func isDue() -> Bool {
-        guard let last = loadState().lastSweep else { return true }
-        return clock().timeIntervalSince(last) >= Double(max(intervalHours(), 1)) * 3600
     }
 
     private func start(_ item: Item) {
@@ -132,14 +122,8 @@ final class AwareScheduler {
     }
 
     private func finished(_ item: Item, _ outcome: AwareSweepOutcome) {
-        let request = item.request
         running = nil
         if case .done(capReached: true) = outcome { capDay = Calendar.current.startOfDay(for: clock()) }
-        if request == .scheduled, case .done = outcome {
-            var s = loadState()
-            s.lastSweep = clock()
-            saveState(s)
-        }
         onFinished?(item.forced)
         pump()
     }

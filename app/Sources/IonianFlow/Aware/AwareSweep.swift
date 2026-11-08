@@ -8,7 +8,7 @@ struct AwareSweepReport: Equatable {
     var failed = false
 }
 
-/// One sweep over the buffer and the finished transcripts (spec F1.12 to F1.34). Everything it touches is injected.
+/// One sweep over the finished transcripts (spec F1.12 to F1.34, F1.42). Everything it touches is injected.
 struct AwareSweep {
     var brainRoot: URL
     var transcriptsFolder: URL
@@ -18,41 +18,25 @@ struct AwareSweep {
     var timeZone: TimeZone = .current
     /// What the Aware page lets through (F3.5 to F3.7).
     var kinds: Set<AwareCategory> = Set(AwareCategory.allCases)
-    var readsMeetings = true
-    var readsDictations = true
 
     func run(kind: AwareSweepKind, transcript: URL?, checkpoint: () async -> Void) async -> AwareSweepReport {
         var report = AwareSweepReport()
         guard BrainLines.isBrain(brainRoot) else { report.failed = true; return report }
 
         // Sources.
-        let buffer = CaptureBuffer(folder: awareFolder, now: now)
         let state = AwareState.load(from: awareFolder)
-        let pending = readsMeetings ? TranscriptSource.pending(in: transcriptsFolder, state: state, timeZone: timeZone)
-                                    : TranscriptSource.Pending()
-        var sources: [AwareSource] = []
-        var read: [CaptureBuffer.Entry] = []
+        let pending = TranscriptSource.pending(in: transcriptsFolder, state: state, timeZone: timeZone)
         var transcriptFiles: [URL] = []
         var recordAsSwept: [String] = []
         switch kind {
-        case .scheduled:
-            read = readsDictations ? buffer.read() : []
-            for e in read {
-                if AwareRules.prefilter(text: e.text, bundle: e.bundle) != nil {
-                    report.dropped.byRules += 1
-                } else {
-                    sources.append(AwareSource(id: e.id, kind: .dictation(app: e.app, bundle: e.bundle), time: e.time,
-                                                  speaker: nil, text: e.text))
-                }
-            }
+        case .catchUp:
             transcriptFiles = pending.toRead
             recordAsSwept = pending.recordAsSwept
         case .meeting:
-            guard readsMeetings, let transcript, pending.toRead.contains(where: { $0.lastPathComponent == transcript.lastPathComponent }) else { return report }
+            guard let transcript, pending.toRead.contains(where: { $0.lastPathComponent == transcript.lastPathComponent }) else { return report }
             transcriptFiles = [transcript]
         }
-        let transcriptSources = transcriptFiles.flatMap { TranscriptSource.parse(fileURL: $0, timeZone: timeZone) }
-        sources = transcriptSources + sources
+        let sources = transcriptFiles.flatMap { TranscriptSource.parse(fileURL: $0, timeZone: timeZone) }
 
         // Extract and validate.
         let projects = BrainLines.projects(in: brainRoot)
@@ -109,7 +93,7 @@ struct AwareSweep {
         // F1.38: not one part could be read, so the model is the problem, not the content. Keep everything for the next sweep.
         if !parts.isEmpty, report.dropped.unreadable == parts.count {
             var failed = AwareState.load(from: awareFolder)
-            failed.lastResult = AwareSweepResult(at: now(), meetings: transcriptFiles.count, dictations: read.count, written: 0, failed: true)
+            failed.lastResult = AwareSweepResult(at: now(), meetings: transcriptFiles.count, written: 0, failed: true)
             try? failed.save(to: awareFolder)
             report.failed = true
             return report
@@ -121,21 +105,20 @@ struct AwareSweep {
         entries = cut.kept
         report.dropped.belowCut = cut.cut
 
-        // Write, then state, then buffer (F1.33).
+        // Write, then state (F1.33).
         do {
             report.file = try writer.write(at: now(), kind: kind, entries: entries, meetings: transcriptFiles.count,
-                                           dictations: read.count, dropped: report.dropped)
+                                           dropped: report.dropped)
             var newState = AwareState.load(from: awareFolder)
             for name in transcriptFiles.map(\.lastPathComponent) + recordAsSwept {
                 newState.swept.append(name)
             }
-            newState.lastResult = AwareSweepResult(at: now(), meetings: transcriptFiles.count, dictations: read.count,
+            newState.lastResult = AwareSweepResult(at: now(), meetings: transcriptFiles.count,
                                                       written: report.file == nil ? 0 : entries.count, file: report.file?.path)
             try newState.save(to: awareFolder)
         } catch {
             return AwareSweepReport(failed: true)
         }
-        buffer.remove(ids: Set(read.map(\.id)))
         let d = report.dropped
         NSLog("Ionian Flow: Aware dropped: %d rules, %d no project, %d low confidence, %d duplicate, %d quote not found, %d unreadable, %d below the cut",
               d.byRules, d.noProject, d.lowConfidence, d.duplicate, d.quoteNotFound, d.unreadable, d.belowCut)
@@ -149,11 +132,7 @@ struct AwareSweep {
         return String(describing: type(of: error))
     }
 
-    /// The parts the model reads. Meeting blocks come first in parts of `AwareRules.chunkLimit` characters and
-    /// `chunkMaxSources` sources at most; a dictation is its own part (a small model skips items when it reads several unrelated snippets at once).
-    static func chunks(_ sources: [AwareSource]) -> [[AwareSource]] {
-        func isDictation(_ s: AwareSource) -> Bool { if case .dictation = s.kind { return true } else { return false } }
-        return AwareRules.chunks(sources.filter { !isDictation($0) })
-            + AwareRules.chunks(sources.filter(isDictation), maxSources: AwareRules.dictationMaxSources)
-    }
+    /// The parts the model reads: meeting blocks in order, in parts of `AwareRules.chunkLimit` characters and
+    /// `chunkMaxSources` sources at most.
+    static func chunks(_ sources: [AwareSource]) -> [[AwareSource]] { AwareRules.chunks(sources) }
 }

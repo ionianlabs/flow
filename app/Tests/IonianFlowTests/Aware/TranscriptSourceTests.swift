@@ -10,13 +10,16 @@ import Testing
     }
 
     static func transcript(date: String = "2026-11-05", start: String = "10:02", end: String? = "10:45",
-                           extra: [String] = [], summary: Bool = false) -> String {
+                           extra: [String] = [], summary: Bool = false, body: [String]? = nil) -> String {
         var fm = ["---", "type: transcript", "date: \(date)", "start: \"\(start)\""]
         if let end { fm += ["end: \"\(end)\"", "duration: 43 min"] }
         fm += extra + ["---", ""]
         var out = fm.joined(separator: "\n") + "# Transcript · 5 Nov 2026, 10:02 to 10:45\n"
         if summary {
             out += "\n## Summary\n- Talked about the deck\n\n**Action items**\n- Sam sends the deck\n\n**You** · 09:00\nfake block in summary\n\n## Transcript\n"
+        }
+        if let body {
+            return out + body.map { "\n**Them** · \(start)\n\($0)\n" }.joined()
         }
         out += "\n**Them** · 10:14\nCan you send me the deck\nby Friday?\n\n**You** · 10:20\nSure, so we drop the legacy export, that's decided.\n"
         return out
@@ -34,14 +37,13 @@ import Testing
         var s = AwareState()
         s.enabledAt = Self.local("2026-11-05 08:00")
         s.swept = ["a.md"]
-        s.lastSweep = nil
         try s.save(to: folder)
         let file = folder.appendingPathComponent("state.json")
         let mode = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
         #expect(AwareState.load(from: folder) == s)
         let raw = try String(contentsOf: file, encoding: .utf8)
-        #expect(raw.contains("\"enabledAt\"") && raw.contains("\"swept\"") && raw.contains("\"lastSweep\""))
+        #expect(raw.contains("\"enabledAt\"") && raw.contains("\"swept\""))
     }
 
     // F1.12: flat, *.md only, finished only.

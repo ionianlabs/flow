@@ -566,10 +566,10 @@ enum RenderState { case normal, fresh, cleanupOff, awareNoBrain, awareOn, awareO
     func at(_ h: Int, _ m: Int) -> Date { cal.date(bySettingHour: h, minute: m, second: 0, of: today)! }
     var a = AwareActions()
     a.snapshot = {
-        AwareSnapshot(brain: state == .awareNoBrain ? nil : URL(fileURLWithPath: NSHomeDirectory() + "/Ionian/brain", isDirectory: true),
-                         state: AwareState(enabledAt: at(8, 0), swept: [], lastSweep: at(12, 0)),
-                         itemsToday: 4, now: at(13, 10), sweeping: false)
+        var sample = AwareState(enabledAt: at(8, 0), swept: [])
+        sample.lastResult = AwareSweepResult(at: at(12, 0), meetings: 2, written: 4)
+        return AwareSnapshot(brain: state == .awareNoBrain ? nil : URL(fileURLWithPath: NSHomeDirectory() + "/Ionian/brain", isDirectory: true),
+                             state: sample, itemsToday: 4, now: at(13, 10), pending: 1, sweeping: false)
     }
-    a.appName = { $0 == "com.apple.Notes" ? "Notes" : nil }
     return a
 }

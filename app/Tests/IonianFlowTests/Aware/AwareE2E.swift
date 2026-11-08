@@ -96,23 +96,6 @@ enum AwareE2E {
         return score(title: title, report: report, labels: labels, seconds: seconds)
     }
 
-    /// A scheduled sweep over the dictations of `AwareGemmaFixtures.dictations`.
-    static func dictations(model: AwareModel, copies: Int = 1) async throws -> Score {
-        let brain = try makeBrain(projects: defaultProjects)
-        let aware = FileManager.default.temporaryDirectory.appendingPathComponent("aware-e2e-\(UUID().uuidString)")
-        let base = awareTestDate(2026, 11, 5, 8, 0)
-        for (i, d) in (0..<copies).flatMap({ _ in AwareGemmaFixtures.dictations }).enumerated() {
-            let t = base.addingTimeInterval(Double(i) * 90)
-            CaptureBuffer(folder: aware, now: { t }).append(text: d.text, app: d.app, bundle: d.bundle)
-        }
-        let now = awareTestDate(2026, 11, 5, 9, 0)
-        let sweep = AwareSweep(brainRoot: brain.root, transcriptsFolder: brain.root.appendingPathComponent("transcripts"),
-                                  awareFolder: aware, model: model, now: { now })
-        let t0 = Date()
-        let report = await sweep.run(kind: .scheduled, transcript: nil, checkpoint: {})
-        return score(title: "20 dictations", report: report, labels: AwareGemmaFixtures.dictationLabels, seconds: Date().timeIntervalSince(t0))
-    }
-
     static func score(title: String, report: AwareSweepReport, labels: [Label], seconds: Double) -> Score {
         var s = Score(title: title, labels: labels, seconds: seconds)
         guard let file = report.file, let text = try? String(contentsOf: file, encoding: .utf8) else { return s }

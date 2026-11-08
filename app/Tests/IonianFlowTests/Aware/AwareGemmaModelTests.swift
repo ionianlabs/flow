@@ -102,7 +102,7 @@ extension IonianFlowTests {
     }
 
     // SC6, precision by hand, SC8.
-    @Test(.enabled(if: modelTestsEnabled, "needs Gemma; set IONIAN_FLOW_MODEL_TESTS=1")) func longMeetingAndDictations() async throws {
+    @Test(.enabled(if: modelTestsEnabled, "needs Gemma; set IONIAN_FLOW_MODEL_TESTS=1")) func longMeetings() async throws {
         let m1 = F.meeting(file: "m1.md", minutes: 60, seed: 1, plants: F.meeting1Plants)
         let m2 = F.meeting(file: "m2.md", minutes: 15, seed: 2, plants: F.meeting2Plants)
         let words = m1.reduce(0) { $0 + $1.text.split(separator: " ").count }
@@ -116,13 +116,10 @@ extension IonianFlowTests {
         show("60-minute meeting", i1)
         let i2 = try await extractAll(model, m2)
         show("15-minute meeting", i2)
-        let dict = F.dictationSources()
-        let i3 = try await extractAll(model, dict)
-        show("20 dictations", i3)
 
-        let byID = Dictionary(uniqueKeysWithValues: (m1 + m2 + dict).map { ($0.id, $0) })
+        let byID = Dictionary(uniqueKeysWithValues: (m1 + m2).map { ($0.id, $0) })
         // SC6: what the sweep would write passes the F1.19 guard, so every quote is verbatim. Also report the raw rate.
-        let all = i1 + i2 + i3
+        let all = i1 + i2
         let bad = all.filter { i in byID[i.sourceID].map { !AwareParsing.isVerbatim(i.quote, in: $0.text) } ?? true }
         print("SC6 raw: \(all.count - bad.count)/\(all.count) quotes verbatim in their source")
         for b in bad { print("  not verbatim (src=\(b.sourceID)): \(b.quote)") }
@@ -132,21 +129,18 @@ extension IonianFlowTests {
         #expect(sc8 < 300, "SC8: \(sc8) s")
     }
 
-    // SC7: 3 hours of meetings and 100 dictations.
-    @Test(.enabled(if: modelTestsEnabled, "needs Gemma; set IONIAN_FLOW_MODEL_TESTS=1")) func threeHoursAndHundredDictations() async throws {
+    // SC7: 3 hours of meetings.
+    @Test(.enabled(if: modelTestsEnabled, "needs Gemma; set IONIAN_FLOW_MODEL_TESTS=1")) func threeHoursOfMeetings() async throws {
         let sets = [F.meeting(file: "a.md", minutes: 60, seed: 1, plants: F.meeting1Plants),
                     F.meeting(file: "b.md", minutes: 15, seed: 2, plants: F.meeting2Plants),
                     F.meeting(file: "c.md", minutes: 60, seed: 3, plants: F.meeting1Plants),
                     F.meeting(file: "d.md", minutes: 45, seed: 4, plants: F.meeting2Plants)]
-        let dict = F.dictationSources(copies: 5)
         _ = try await model.judge(item("warm up"), against: ["x"])
         let t0 = Date()
         var total = 0
         for m in sets { total += try await extractAll(model, m).count }
-        let tMeet = Date().timeIntervalSince(t0)
-        total += try await extractAll(model, dict).count
         let t = Date().timeIntervalSince(t0)
-        print("SC7: meetings \(Int(tMeet)) s, dictations \(Int(t - tMeet)) s, total \(Int(t)) s, \(total) items, \(sets.flatMap { $0 }.count) blocks")
+        print("SC7: meetings \(Int(t)) s, total \(Int(t)) s, \(total) items, \(sets.flatMap { $0 }.count) blocks")
         #expect(t < 600, "SC7: \(t) s")
     }
 }

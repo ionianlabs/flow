@@ -25,7 +25,7 @@ extension IonianFlowTests {
     // The Aware row left General for its own page (F3.1); its rules now feed the top of that page.
     @Test func awareTopCopy() {
         #expect(AwareApp.toggleTitle == "Aware")
-        #expect(AwareApp.toggleDetail == "Proposes to-dos, decisions and facts to your brain's inbox.")
+        #expect(AwareApp.toggleDetail == "Proposes to-dos, decisions and facts from your meetings to your brain's inbox.")
     }
 
     // F3.15: without a Brain the switch stays usable and the row invites.

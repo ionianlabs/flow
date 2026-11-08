@@ -5,7 +5,7 @@ struct AwareDropCounts: Equatable {
     var byRules = 0, noProject = 0, lowConfidence = 0, duplicate = 0, quoteNotFound = 0, unreadable = 0, belowCut = 0
 }
 
-enum AwareSweepKind { case scheduled, meeting }
+enum AwareSweepKind { case catchUp, meeting }
 
 /// Creates or appends `inbox/YYYY-MM-DD-aware.md` (F1.29, F1.30). Every path is injected.
 struct AwareWriter {
@@ -30,14 +30,14 @@ struct AwareWriter {
 
     /// Writes one section and returns the file, or nil (nothing written) when there are no items (F1.30).
     @discardableResult
-    func write(at date: Date, kind: AwareSweepKind, entries: [Entry], meetings: Int, dictations: Int,
+    func write(at date: Date, kind: AwareSweepKind, entries: [Entry], meetings: Int,
                dropped: AwareDropCounts) throws -> URL? {
         guard !entries.isEmpty else { return nil }
         let url = fileURL(on: date)
         let day = fmt(date, "yyyy-MM-dd")
         var section = ["## " + fmt(date, "HH:mm") + (kind == .meeting ? " meeting" : "")]
         section += entries.map(line)
-        section += ["", footer(meetings: meetings, dictations: dictations, dropped: dropped)]
+        section += ["", footer(meetings: meetings, dropped: dropped)]
 
         var text: String
         if let existing = try? String(contentsOf: url, encoding: .utf8) {
@@ -85,8 +85,6 @@ struct AwareWriter {
 
     private func sourceText(_ s: AwareSource) -> String {
         switch s.kind {
-        case .dictation(let app, _):
-            return "\(app) \(fmt(s.time, "yyyy-MM-dd HH:mm"))"
         case .transcript(let name):
             let time = fmt(s.time, "HH:mm")
             let file = transcriptsFolder.appendingPathComponent(name)
@@ -102,8 +100,8 @@ struct AwareWriter {
         }
     }
 
-    private func footer(meetings: Int, dictations: Int, dropped d: AwareDropCounts) -> String {
-        "Swept \(meetings) \(meetings == 1 ? "meeting" : "meetings"), \(dictations) \(dictations == 1 ? "dictation" : "dictations"). "
+    private func footer(meetings: Int, dropped d: AwareDropCounts) -> String {
+        "Swept \(meetings) \(meetings == 1 ? "meeting" : "meetings"). "
             + "Dropped: \(d.byRules) by rules, \(d.noProject) no project, \(d.lowConfidence) low confidence, "
             + "\(d.duplicate) duplicate, \(d.quoteNotFound) quote not found, \(d.unreadable) unreadable, \(d.belowCut) below the cut."
     }
@@ -116,19 +114,18 @@ struct AwareWriter {
         }.count
     }
 
-    /// "Aware: 4 items from 1 meeting and 12 dictations": items, and the sources summed from the section footers.
+    /// "Aware: 4 items from 2 meetings": items, and the meetings summed from the section footers.
     private static func description(_ text: String) -> String {
-        var meetings = 0, dictations = 0
+        var meetings = 0
         for l in text.components(separatedBy: "\n") where l.hasPrefix("Swept ") {
-            let re = try! NSRegularExpression(pattern: #"^Swept (\d+) meetings?, (\d+) dictations?\."#)
+            let re = try! NSRegularExpression(pattern: #"^Swept (\d+) meetings?\."#)
             let ns = l as NSString
             if let m = re.firstMatch(in: l, range: NSRange(location: 0, length: ns.length)) {
                 meetings += Int(ns.substring(with: m.range(at: 1))) ?? 0
-                dictations += Int(ns.substring(with: m.range(at: 2))) ?? 0
             }
         }
         let n = itemLines(text)
-        return "Aware: \(n) \(n == 1 ? "item" : "items") from \(meetings) \(meetings == 1 ? "meeting" : "meetings") and \(dictations) \(dictations == 1 ? "dictation" : "dictations")"
+        return "Aware: \(n) \(n == 1 ? "item" : "items") from \(meetings) \(meetings == 1 ? "meeting" : "meetings")"
     }
 
     private static func setFrontmatter(_ text: String, description: String, updated: String) -> String {

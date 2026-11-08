@@ -3,69 +3,51 @@ import Foundation
 /// The settings the Aware page's top part depends on.
 struct AwarePageSettings: Equatable {
     var on: Bool
-    var intervalHours: Int
-    var pausedUntil: Date?
 }
 
 /// Copy of the Aware page (F3). Calm, no hype.
 enum AwarePage {
     static let headline = "It keeps what matters."
-    static let lead = "Flow reads your meetings and dictations on this Mac and proposes to-dos, decisions and facts to your brain."
+    static let lead = "Flow reads your finished meetings on this Mac and proposes to-dos, decisions and facts to your brain."
     static let kindLines: [(AwareCategory, String)] = [
         (.todo, "Things you or someone else agreed to do."),
         (.decision, "Choices that were settled."),
         (.fact, "Names, numbers and dates worth keeping."),
     ]
     static let kindTitles: [AwareCategory: String] = [.todo: "To-dos", .decision: "Decisions", .fact: "Facts"]
-    static let meetingsDetail = "Read right after they end."
-    static let dictationsDetail = "Collected as you dictate, read in batches."
-    static let excludedNote = "Dictations from these apps are never stored. Password managers are on the list from the start."
-    static let sweepDetail = "Read what is waiting now."
-    static let pauseDetail = "Nothing is stored and no sweep runs for an hour."
+    static let sweepDetail = "Read waiting meetings now."
     static let noBrainPath = "No Brain connected yet"
-    static let pitch = "Say it once. Aware keeps the to-dos, decisions and facts."
-    static let intervals = [1, 2, 3, 6]
-
-    static func intervalTitle(_ hours: Int) -> String { hours == 1 ? "Every hour" : "Every \(hours) hours" }
+    static let pitch = "Say it in a meeting. Aware keeps the to-dos, decisions and facts."
 
     /// Every sentence that is not built from data, for the copy test.
     static var otherCopy: [String] {
-        [meetingsDetail, dictationsDetail, excludedNote, sweepDetail, pauseDetail, noBrainPath, pitch, AwareApp.notABrain,
-         AwareApp.getBrainPill, AwareApp.connectBrainTitle, AwareApp.noBrainDetail, AwareApp.noModelDetail, AwareApp.toggleDetail] + intervals.map(intervalTitle)
+        [sweepDetail, noBrainPath, pitch, lead, AwareApp.notABrain,
+         AwareApp.getBrainPill, AwareApp.connectBrainTitle, AwareApp.noBrainDetail, AwareApp.noModelDetail, AwareApp.toggleDetail]
     }
 }
 
 /// What the Aware page shows, from the settings, the brain, the model, the state file, the clock and
-/// today's item count (F3.2, F3.11, F3.12). No SwiftUI.
+/// today's item count (F3.2, F3.12). No SwiftUI.
 struct AwarePageState: Equatable {
     var switchOn = false
     /// No Brain: the top section invites with the one ink pill and a link to connect one (F3.15).
     var invite = false
     /// The cleanup model is missing: one plain sentence (F3.12).
     var problem: String?
-    /// Last sweep, next, items waiting; empty while off or blocked.
+    /// Last sweep, meetings waiting, items waiting; empty while off or blocked.
     var statusLines: [String] = []
-    var pausedLine: String?
     var brainPath: String?
     var canOpenInbox = false
-    /// The actions only exist with a Brain; there is nothing to sweep or pause before.
+    /// The actions only exist with a Brain; there is nothing to sweep before.
     var showsActions = false
     var canSweep = false
-    var canPause = false
-    /// The Sweep now button: off while paused or already reading, and it says why (F3.16).
+    /// The Sweep now button: off while already reading.
     var sweepEnabled = false
     var sweepTitle = "Sweep now"
     var sweepDetail = AwarePage.sweepDetail
-    var isPaused = false
-
-    struct ExcludedApp: Equatable, Identifiable {
-        var bundle: String
-        var name: String
-        var id: String { bundle }
-    }
 
     static func make(settings: AwarePageSettings, brain: URL?, cleanupInstalled: Bool, state: AwareState,
-                     now: Date, itemsToday: Int, collected: Int = 0, sweeping: Bool = false,
+                     now: Date, itemsToday: Int, pending: Int = 0, sweeping: Bool = false,
                      home: String = NSHomeDirectory(), timeZone: TimeZone = .current) -> AwarePageState {
         let row = AwareApp.row(brainFound: brain != nil, on: settings.on, cleanupInstalled: cleanupInstalled)
         var s = AwarePageState()
@@ -75,42 +57,25 @@ struct AwarePageState: Equatable {
         s.brainPath = brain.map { path($0, home: home) }
         s.canOpenInbox = brain != nil
         s.showsActions = brain != nil
-        s.canPause = settings.on
         s.canSweep = settings.on && brain != nil && cleanupInstalled
-        s.pausedLine = AwareApp.pausedLine(until: settings.pausedUntil, now: now, timeZone: timeZone)
-        s.isPaused = s.pausedLine != nil
-        s.sweepEnabled = s.canSweep && !s.isPaused && !sweeping
+        s.sweepEnabled = s.canSweep && !sweeping
         if sweeping { s.sweepTitle = "Reading" }
-        if let line = s.pausedLine { s.sweepDetail = line + ". Resume to read now." }
         if s.canSweep {
-            s.statusLines = [
-                sweeping ? "Reading now" : lastSweepLine(state, now: now, timeZone: timeZone),
-                next(last: state.lastSweep, hours: settings.intervalHours, pausedUntil: settings.pausedUntil, now: now, timeZone: timeZone),
-                itemsToday == 0 ? "Nothing waiting" : "\(itemsToday) \(itemsToday == 1 ? "item" : "items") waiting",
-            ]
-            if collected > 0 { s.statusLines.append("\(collected) \(collected == 1 ? "dictation" : "dictations") collected") }
+            s.statusLines = [sweeping ? "Reading now" : lastSweepLine(state, now: now, timeZone: timeZone)]
+            if pending > 0 { s.statusLines.append("\(pending) \(pending == 1 ? "meeting" : "meetings") waiting") }
+            s.statusLines.append(itemsToday == 0 ? "Nothing waiting" : "\(itemsToday) \(itemsToday == 1 ? "item" : "items") waiting")
         }
         return s
     }
 
-    /// What the last sweep did, when that is known (F1.40). A meeting sweep has no `lastSweep`, so the result's own time counts.
+    /// What the last sweep did, when that is known (F1.40). 
     private static func lastSweepLine(_ state: AwareState, now: Date, timeZone: TimeZone) -> String {
-        guard let r = state.lastResult else {
-            return state.lastSweep.map { "Last sweep " + when($0, now: now, timeZone: timeZone) } ?? "No sweep yet"
-        }
+        guard let r = state.lastResult else { return "No sweep yet" }
         let head = "Last sweep " + when(r.at, now: now, timeZone: timeZone)
         if r.failed { return head + " could not read. Nothing was lost, it tries again soon." }
-        guard let read = AwareApp.readText(meetings: r.meetings, dictations: r.dictations) else { return head + ": nothing new to read" }
+        guard let read = AwareApp.readText(meetings: r.meetings) else { return head + ": nothing new to read" }
         if r.written == 0 { return head + ": read \(read), nothing to propose" }
         return head + ": read \(read), wrote \(r.written) \(r.written == 1 ? "proposal" : "proposals")"
-    }
-
-    /// The scheduler's rule (F1.9) in words: the interval after the last sweep, not before the pause ends.
-    private static func next(last: Date?, hours: Int, pausedUntil: Date?, now: Date, timeZone: TimeZone) -> String {
-        var due = last.map { $0.addingTimeInterval(Double(max(hours, 1)) * 3600) }
-        if let until = pausedUntil, until > now { due = max(due ?? until, until) }
-        guard let due, due > now else { return "Next sweep soon" }
-        return "Next around " + when(due, now: now, timeZone: timeZone)
     }
 
     /// "12:00", "yesterday 23:00", "tomorrow 01:00" or "3 Nov 12:00".
@@ -135,10 +100,5 @@ struct AwarePageState: Equatable {
     static func path(_ url: URL, home: String) -> String {
         let p = url.path
         return p == home ? "~" : p.hasPrefix(home + "/") ? "~" + p.dropFirst(home.count) : p
-    }
-
-    /// The excluded apps by name: the default names, then what the system knows, then the bundle id itself.
-    static func excludedRows(_ bundles: [String], resolve: (String) -> String?) -> [ExcludedApp] {
-        bundles.map { ExcludedApp(bundle: $0, name: AwareRules.knownAppNames[$0] ?? resolve($0) ?? $0) }
     }
 }

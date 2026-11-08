@@ -1,7 +1,7 @@
 import Foundation
 @testable import IonianFlow
 
-/// Invented meetings and dictations for the Gemma model tests. All names are made up.
+/// Invented meetings for the Gemma model tests. All names are made up.
 enum AwareGemmaFixtures {
     struct SplitMix { var s: UInt64
         mutating func next() -> UInt64 { s &+= 0x9E3779B97F4A7C15; var z = s; z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9; z = (z ^ (z >> 27)) &* 0x94D049BB133111EB; return z ^ (z >> 31) }
@@ -159,55 +159,10 @@ enum AwareGemmaFixtures {
         }
     }
 
-    /// Labels of the five dictations worth keeping, by text.
-    static let dictationLabels: [Label] = [
-        Label(frac: 0, speaker: .you, text: "Remind me to renew the vendor contract by Friday.", category: .todo, project: nil, due: "2026-11-06"),
-        Label(frac: 0, speaker: .you, text: "Note to self: rotate the staging key every month.", category: .todo, project: nil, due: nil),
-        Label(frac: 0, speaker: .you, text: "For the record, the audit is on the third of March.", category: .fact, project: nil, due: "2027-03-03"),
-        Label(frac: 0, speaker: .you, text: "We decided to use Postgres for the ledger.", category: .decision, project: "alpha", due: nil),
-        Label(frac: 0, speaker: .you, text: "Don't forget to send Marta the invoice on Monday.", category: .todo, project: nil, due: "2026-11-09"),
-    ]
-
     static let projects = [
         AwareProjectHint(slug: "alpha", description: "Rewrite of the export job and the legacy export", focus: "Drop the legacy export and ship the new one in Q1"),
         AwareProjectHint(slug: "orchid", description: "The reporting service and its dashboards", focus: "Private beta in January"),
     ]
-
-    /// 20 dictations: 5 worth keeping (marked), 15 not.
-    static let dictations: [(app: String, bundle: String, text: String, keep: Bool)] = [
-        ("Notes", "com.apple.Notes", "Remind me to renew the vendor contract by Friday.", true),
-        ("Notes", "com.apple.Notes", "Note to self: rotate the staging key every month.", true),
-        ("Notes", "com.apple.Notes", "For the record, the audit is on the third of March.", true),
-        ("Messages", "com.apple.MobileSMS", "We decided to use Postgres for the ledger.", true),
-        ("Notes", "com.apple.Notes", "Don't forget to send Marta the invoice on Monday.", true),
-        ("Mail", "com.apple.mail", "Hi Anna, thanks for the update, see you tomorrow.", false),
-        ("Messages", "com.apple.MobileSMS", "Sounds good, let's do that.", false),
-        ("Slack", "com.tinyspeck.slackmacgap", "Haha yes I saw that, pretty funny.", false),
-        ("Mail", "com.apple.mail", "Thank you for your patience, I hope you have a great week.", false),
-        ("Slack", "com.tinyspeck.slackmacgap", "I think the new layout is kind of busy but fine.", false),
-        ("Notes", "com.apple.Notes", "We could maybe look at caching someday.", false),
-        ("Messages", "com.apple.MobileSMS", "How was your weekend?", false),
-        ("Slack", "com.tinyspeck.slackmacgap", "I think the API is kind of slow.", false),
-        ("Mail", "com.apple.mail", "Good morning everyone, the meeting notes are attached for reference.", false),
-        ("Safari", "com.apple.Safari", "Best Italian restaurants near the main station.", false),
-        ("Messages", "com.apple.MobileSMS", "Running ten minutes late, sorry.", false),
-        ("Slack", "com.tinyspeck.slackmacgap", "Looks good to me, nice work on that.", false),
-        ("Notes", "com.apple.Notes", "The weather was lovely during the walk today.", false),
-        ("Mail", "com.apple.mail", "Could you please confirm that you received my last message?", false),
-        ("Slack", "com.tinyspeck.slackmacgap", "Interesting, I had not thought about it that way.", false),
-    ]
-
-    static func dictationSources(copies: Int = 1) -> [AwareSource] {
-        var out: [AwareSource] = []
-        let base = awareTestDate(2026, 11, 5, 8, 0)
-        for c in 0..<copies {
-            for (i, d) in dictations.enumerated() {
-                let n = c * dictations.count + i
-                out.append(AwareSource(id: "d\(n)", kind: .dictation(app: d.app, bundle: d.bundle), time: base.addingTimeInterval(Double(n) * 90), speaker: nil, text: d.text))
-            }
-        }
-        return out
-    }
 
     static func source(_ id: String, _ speaker: AwareSpeaker, _ text: String, day: Date = awareTestDate(2026, 11, 5, 10, 14)) -> AwareSource {
         AwareSource(id: id, kind: .transcript(fileName: "t.md"), time: day, speaker: speaker, text: text)

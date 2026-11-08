@@ -4,22 +4,20 @@ import Foundation
 struct AwareSweepResult: Codable, Equatable {
     var at: Date
     var meetings: Int
-    var dictations: Int
     var written: Int
     var failed = false
     /// The day file that got the proposals.
     var file: String?
 }
 
-/// `state.json` in the Aware folder: when Aware was turned on, which transcripts are swept, the last sweep.
+/// `state.json` in the Aware folder: when Aware was turned on, which transcripts are swept, the last result.
 struct AwareState: Codable, Equatable {
     var enabledAt: Date?
     var swept: [String] = []
-    var lastSweep: Date?
     var lastResult: AwareSweepResult?
 
-    init(enabledAt: Date? = nil, swept: [String] = [], lastSweep: Date? = nil) {
-        self.enabledAt = enabledAt; self.swept = swept; self.lastSweep = lastSweep
+    init(enabledAt: Date? = nil, swept: [String] = []) {
+        self.enabledAt = enabledAt; self.swept = swept
     }
 
     static let fileName = "state.json"
@@ -43,13 +41,12 @@ struct AwareState: Codable, Equatable {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
-    // The encoder omits nil keys; the file always carries the first three.
-    enum CodingKeys: String, CodingKey { case enabledAt, swept, lastSweep, lastResult }
+    // The encoder omits nil keys; the file always carries the first two.
+    enum CodingKeys: String, CodingKey { case enabledAt, swept, lastResult }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(enabledAt, forKey: .enabledAt)
         try c.encode(swept, forKey: .swept)
-        try c.encode(lastSweep, forKey: .lastSweep)
         try c.encodeIfPresent(lastResult, forKey: .lastResult)
     }
 }

@@ -72,9 +72,8 @@ final class SchedulerEnv {
     var power = AwarePower(onBattery: false, percent: 100)
     var brain = true
     var model = true
-    var hours = 3
-    var pausedUntil: Date?
-    var state = AwareState(enabledAt: SchedulerEnv.date(2026, 11, 1, 8, 0), swept: [], lastSweep: SchedulerEnv.date(2026, 11, 5, 9, 0))
+    /// Transcripts waiting (F1.42).
+    var pending = 1
     let sweeper = FakeSweeper()
     let gate = AwareGate()
     lazy var scheduler = AwareScheduler(
@@ -84,10 +83,7 @@ final class SchedulerEnv {
         power: { [unowned self] in MainActor.assumeIsolated { self.power } },
         brainReady: { [unowned self] in MainActor.assumeIsolated { self.brain } },
         modelReady: { [unowned self] in MainActor.assumeIsolated { self.model } },
-        intervalHours: { [unowned self] in MainActor.assumeIsolated { self.hours } },
-        pausedUntil: { [unowned self] in MainActor.assumeIsolated { self.pausedUntil } },
-        loadState: { [unowned self] in MainActor.assumeIsolated { self.state } },
-        saveState: { [unowned self] s in MainActor.assumeIsolated { self.state = s } })
+        pendingMeetings: { [unowned self] in MainActor.assumeIsolated { self.pending } })
 
     static func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
         Calendar.current.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
@@ -101,49 +97,53 @@ final class SchedulerEnv {
 }
 
 @MainActor @Suite struct AwareSchedulerTests {
-    // F1.9: lastSweep 09:00, interval 3
-    @Test func sweepStartsAtTwelveAndNotAtElevenFiftyNine() async {
+    // F1.42
+    @Test func catchUpRunsWhenSomethingIsPendingAndFlowIsIdle() async {
         let e = SchedulerEnv()
-        e.now = SchedulerEnv.date(2026, 11, 5, 11, 59)
+        e.scheduler.tick()
+        await e.settle()
+        #expect(e.sweeper.runs == [.catchUp])
+    }
+
+    @Test func launchRunsCatchUpForMeetingsLeftFromBefore() async {
+        let e = SchedulerEnv()
+        e.scheduler.launch()
+        await e.settle()
+        #expect(e.sweeper.runs == [.catchUp])
+    }
+
+    @Test func noCatchUpWhenNothingIsPending() async {
+        let e = SchedulerEnv()
+        e.pending = 0
         e.scheduler.tick()
         await e.settle()
         #expect(e.sweeper.runs == [])
-        e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
-        e.scheduler.tick()
-        await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
     }
 
-    @Test func doneSetsLastSweepSoMissedSweepRunsOnlyOnce() async {
+    @Test func noCatchUpWhileBusy() async {
         let e = SchedulerEnv()
-        e.now = SchedulerEnv.date(2026, 11, 5, 20, 0) // slept for 11 hours
-        e.scheduler.launch()
-        await e.settle()
+        e.busy = true
         e.scheduler.tick()
         await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
-        #expect(e.state.lastSweep == e.now)
-        #expect(e.state.enabledAt == SchedulerEnv.date(2026, 11, 1, 8, 0))
+        #expect(e.sweeper.runs == [])
     }
 
-    @Test func noLastSweepIsDue() async {
+    @Test func noCatchUpWhileASweepRuns() async {
         let e = SchedulerEnv()
-        e.state.lastSweep = nil
+        e.sweeper.blocking = true
         e.scheduler.tick()
-        await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
-    }
-
-    @Test func failedSweepKeepsLastSweep() async {
-        let e = SchedulerEnv()
-        e.sweeper.outcome = .failed
+        await e.waitUntil { e.sweeper.runs.count == 1 }
         e.scheduler.tick()
+        e.scheduler.tick()
+        #expect(e.sweeper.runs == [.catchUp])
+        e.sweeper.blocking = false
+        e.sweeper.finish()
         await e.settle()
-        #expect(e.state.lastSweep == SchedulerEnv.date(2026, 11, 5, 9, 0))
+        #expect(e.sweeper.runs == [.catchUp])
     }
 
     // F1.10
-    @Test func batteryBelowThirtySkipsDueSweepAndLaterCheckRunsIt() async {
+    @Test func batteryBelowThirtySkipsCatchUpAndLaterCheckRunsIt() async {
         let e = SchedulerEnv()
         e.power = AwarePower(onBattery: true, percent: 29)
         e.scheduler.tick()
@@ -152,28 +152,15 @@ final class SchedulerEnv {
         e.power = AwarePower(onBattery: true, percent: 30)
         e.scheduler.tick()
         await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.sweeper.runs == [.catchUp])
     }
 
-    @Test func chargerConnectedRunsDueSweepAtLowPercent() async {
+    @Test func chargerConnectedRunsCatchUpAtLowPercent() async {
         let e = SchedulerEnv()
         e.power = AwarePower(onBattery: false, percent: 10)
         e.scheduler.tick()
         await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
-    }
-
-    // F1.4
-    @Test func pausedUntilInTheFutureBlocksSweeps() async {
-        let e = SchedulerEnv()
-        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
-        e.scheduler.tick()
-        await e.settle()
-        #expect(e.sweeper.runs == [])
-        e.now = SchedulerEnv.date(2026, 11, 5, 13, 0)
-        e.scheduler.tick()
-        await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.sweeper.runs == [.catchUp])
     }
 
     // F1.31
@@ -196,7 +183,7 @@ final class SchedulerEnv {
     }
 
     // F1.28
-    @Test func capReachedStatusUntilMidnightAndScheduledSweepsStillRun() async {
+    @Test func capReachedStatusUntilMidnightAndCatchUpsStillRun() async {
         let e = SchedulerEnv()
         e.sweeper.outcome = .done(capReached: true)
         e.scheduler.tick()
@@ -229,22 +216,12 @@ final class SchedulerEnv {
         #expect(passed.value)
     }
 
-    @Test func dueSweepDoesNotStartWhileBusy() async {
-        let e = SchedulerEnv()
-        e.busy = true
-        e.scheduler.tick()
-        await e.settle()
-        #expect(e.sweeper.runs == [])
-    }
-
     // F1.36
-    @Test func meetingEndedWhenIdleStartsAtOnceEvenIfScheduledNotDue() async {
+    @Test func meetingEndedWhenIdleStartsAtOnce() async {
         let e = SchedulerEnv()
-        e.now = SchedulerEnv.date(2026, 11, 5, 10, 45)
         e.scheduler.meetingEnded(m1)
         await e.settle()
         #expect(e.sweeper.runs == [.meeting(m1)])
-        #expect(e.state.lastSweep == SchedulerEnv.date(2026, 11, 5, 9, 0))
     }
 
     @Test func meetingEndedWhileBusyStartsWhenBusyEnds() async {
@@ -260,34 +237,49 @@ final class SchedulerEnv {
         #expect(e.sweeper.runs == [.meeting(m1)])
     }
 
-    // F1.36 with F1.10
-    @Test func meetingOnLowBatteryIsDroppedNotQueued() async {
+    // F1.36 with F1.10, F1.42: the meeting that could not run at its end is read by the next tick
+    @Test func meetingOnLowBatteryIsDroppedAndTheNextTickReadsIt() async {
         let e = SchedulerEnv()
         e.power = AwarePower(onBattery: true, percent: 20)
         e.scheduler.meetingEnded(m1)
         await e.settle()
+        #expect(e.sweeper.runs == [])
         e.power = AwarePower(onBattery: false, percent: 100)
-        e.now = SchedulerEnv.date(2026, 11, 5, 12, 0)
         e.scheduler.tick()
         await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.sweeper.runs == [.catchUp])
     }
 
-    @Test func meetingIsDroppedWhilePausedOrWithoutBrain() async {
+    @Test func meetingWithoutBrainOrModelIsDroppedAndTheNextTickReadsIt() async {
         let e = SchedulerEnv()
-        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
-        e.scheduler.meetingEnded(m1)
-        e.pausedUntil = nil
         e.brain = false
-        e.scheduler.meetingEnded(m2)
+        e.scheduler.meetingEnded(m1)
         e.brain = true
+        e.model = false
+        e.scheduler.meetingEnded(m2)
+        e.model = true
         e.scheduler.busyEnded()
         await e.settle()
         #expect(e.sweeper.runs == [])
+        e.scheduler.tick()
+        await e.settle()
+        #expect(e.sweeper.runs == [.catchUp])
+    }
+
+    @Test func meetingThatFailedIsReadByTheNextTick() async {
+        let e = SchedulerEnv()
+        e.sweeper.outcome = .failed
+        e.scheduler.meetingEnded(m1)
+        await e.settle()
+        #expect(e.sweeper.runs == [.meeting(m1)])
+        e.sweeper.outcome = .done(capReached: false)
+        e.scheduler.tick()
+        await e.settle()
+        #expect(e.sweeper.runs == [.meeting(m1), .catchUp])
     }
 
     // F1.37
-    @Test func meetingDuringScheduledSweepQueuesInOrderWithoutDuplicates() async {
+    @Test func meetingDuringCatchUpQueuesInOrderWithoutDuplicates() async {
         let e = SchedulerEnv()
         e.sweeper.blocking = true
         e.scheduler.tick()
@@ -295,13 +287,13 @@ final class SchedulerEnv {
         e.scheduler.meetingEnded(m1)
         e.scheduler.meetingEnded(m2)
         e.scheduler.meetingEnded(m1)
-        #expect(e.sweeper.runs == [.scheduled])
+        #expect(e.sweeper.runs == [.catchUp])
         e.sweeper.finish()
         await e.waitUntil { e.sweeper.runs.count == 2 }
-        #expect(e.sweeper.runs == [.scheduled, .meeting(m1)])
+        #expect(e.sweeper.runs == [.catchUp, .meeting(m1)])
         e.sweeper.finish()
         await e.waitUntil { e.sweeper.runs.count == 3 }
-        #expect(e.sweeper.runs == [.scheduled, .meeting(m1), .meeting(m2)])
+        #expect(e.sweeper.runs == [.catchUp, .meeting(m1), .meeting(m2)])
         e.sweeper.blocking = false
         e.sweeper.finish()
         await e.settle()
@@ -309,26 +301,22 @@ final class SchedulerEnv {
     }
 
     // Interfaces: Sweep now
-    @Test func sweepNowIgnoresIntervalAndBatteryAndResetsLastSweep() async {
+    @Test func sweepNowRunsACatchUpEvenOnLowBatteryAndWithNothingPending() async {
         let e = SchedulerEnv()
-        e.now = SchedulerEnv.date(2026, 11, 5, 9, 30)
+        e.pending = 0
         e.power = AwarePower(onBattery: true, percent: 5)
-        e.scheduler.sweepNow()
+        #expect(e.scheduler.sweepNow())
         await e.settle()
-        #expect(e.sweeper.runs == [.scheduled])
-        #expect(e.state.lastSweep == e.now)
+        #expect(e.sweeper.runs == [.catchUp])
     }
 
-    @Test func sweepNowHonoursPauseBrainModelAndBusy() async {
+    @Test func sweepNowHonoursBrainModelAndBusy() async {
         let e = SchedulerEnv()
-        e.pausedUntil = SchedulerEnv.date(2026, 11, 5, 13, 0)
-        e.scheduler.sweepNow()
-        e.pausedUntil = nil
         e.brain = false
-        e.scheduler.sweepNow()
+        #expect(!e.scheduler.sweepNow())
         e.brain = true
         e.model = false
-        e.scheduler.sweepNow()
+        #expect(!e.scheduler.sweepNow())
         e.model = true
         e.busy = true
         e.scheduler.sweepNow()

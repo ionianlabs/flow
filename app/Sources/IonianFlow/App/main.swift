@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import ServiceManagement
 import UserNotifications
@@ -18,7 +19,10 @@ if let i = CommandLine.arguments.firstIndex(of: "--wordfreq-zipf"), CommandLine.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     /// recording: key held (or locked hands-free). tapPending: a short tap that may become a double-tap.
     /// transcribing: transcription mode (double-tap); dictation is off until it stops.
-    private enum State { case idle, recording(Date, locked: Bool), tapPending, finishing, transcribing }
+    private enum State {
+        case idle, recording(Date, locked: Bool), tapPending, finishing, transcribing
+        var isIdle: Bool { if case .idle = self { return true } else { return false } }
+    }
 
     private let engine: SpeechEngine = NativeEngine(finalizer: ParakeetFinalizer())
     private let hotkey = HotkeyMonitor()
@@ -51,7 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             disconnect: { [weak self] in self?.sweeper.disconnect() },
             rescan: { [weak self] in self?.sweeper.scan(requested: true) },
             setUseVocabulary: { [weak self] in self?.setUseVocabulary($0) }
-        )
+        ),
+        aware: awareActions()
     ))
     private var scanWatch: AnyCancellable?
     private var onboardingStep = 0
@@ -68,9 +73,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private var state = State.idle {
         didSet {
             if case .idle = state { sweeper.resume() } else { sweeper.pause() }
+            if oldValue.isIdle, !state.isIdle { MainActor.assumeIsolated { aware?.busyStarted() } }
+            if !oldValue.isIdle, state.isIdle { MainActor.assumeIsolated { aware?.busyEnded() } }
             if case .transcribing = state { appModel.transcribing = true } else { appModel.transcribing = false }
         }
     }
+    /// Aware: built while the setting is on; its tick runs every 10 minutes.
+    private var aware: AwareScheduler?
+    private var awareTimer: Timer?
     private var session = 0
     /// Engine session of the current dictation; events from older sessions are ignored.
     private var dictation = DictationFlow()
@@ -123,6 +133,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         sweeper.onFinished = { [weak self] in self?.notifyScanned($0) }
         transcriber.onFinished = { [weak self] in self?.countTranscript() }
+        transcriber.onFileFinal = { [weak self] url in MainActor.assumeIsolated { self?.aware?.meetingEnded(url) } }
+        awareTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.aware?.tick() }
+        }
+        if Settings.aware { startAware() }
         sweeper.start()
         // The menu bar icon shows a dot while a scan runs.
         scanWatch = sweeper.$running.receive(on: DispatchQueue.main).sink { [weak self] running in
@@ -388,6 +403,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         paste(text)
     }
 
+    private func startAware() {
+        guard aware == nil else { return }
+        let scheduler = MainActor.assumeIsolated { AwareScheduler(
+            sweeper: AwareSweepAdapter(build: { AwareApp.liveSweep($0) }), gate: AwareGate(),
+            isBusy: { [weak self] in !(self?.state.isIdle ?? true) },
+            brainReady: { BrainLocator.current() != nil },
+            modelReady: { [weak self] in (self?.engine.capabilities.contains(.polish) ?? false) && AwareApp.makeModel != nil },
+            pendingMeetings: { Self.pending().forScheduler }) }
+        MainActor.assumeIsolated { scheduler.onFinished = { [weak self] manual in self?.awareSweepEnded(manual: manual) } }
+        aware = scheduler
+        MainActor.assumeIsolated { scheduler.launch() }
+    }
+
+    private func setAware(_ on: Bool) {
+        Settings.aware = on
+        if on {
+            AwareApp.enable(folder: Settings.awareFolder, now: Date())
+            startAware()
+        } else {
+            aware = nil
+        }
+    }
+
+    @objc private func sweepAwareNow() {
+        MainActor.assumeIsolated {
+            guard let aware else { return }
+            if !aware.sweepNow() {  // F3.16: never drop a click silently
+                let why = aware.status ?? "Aware cannot read right now."
+                postAwareNotice(AwareApp.Notice(title: why, body: "Open the Aware page for details."), file: nil)
+            }
+        }
+    }
+
+    /// F1.42: the transcripts waiting, read once per call.
+    private static func pending() -> TranscriptSource.Pending {
+        TranscriptSource.pending(in: Settings.transcriptsFolder, state: AwareState.load(from: Settings.awareFolder))
+    }
+
+    /// F1.40, F1.41: log the counts, notify when there is something to say.
+    private func awareSweepEnded(manual: Bool) {
+        guard let r = AwareState.load(from: Settings.awareFolder).lastResult else { return }
+        NSLog("Ionian Flow: Aware sweep: %d meetings, %d written, failed %d, manual %d",
+              r.meetings, r.written, r.failed ? 1 : 0, manual ? 1 : 0)
+        if let notice = AwareApp.notice(r, manual: manual) { postAwareNotice(notice, file: r.file) }
+    }
+
+    private func postAwareNotice(_ notice: AwareApp.Notice, file: String?) {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        content.body = notice.body
+        if let file { content.userInfo = ["file": file] }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert]) { granted, _ in
+            guard granted else { return }
+            center.add(UNNotificationRequest(identifier: "aware", content: content, trigger: nil))
+        }
+    }
+
+    /// The Aware page: the same actions as the menu items, plus the Brain (F3).
+    private func awareActions() -> AwareActions {
+        var a = AwareActions()
+        a.setOn = { [weak self] in self?.setAware($0) }
+        a.chooseBrain = { [weak self] in self?.chooseAwareBrain() }
+        a.openInbox = { NSWorkspace.shared.open(AwareApp.inbox(of: $0)) }
+        a.sweepNow = { [weak self] in self?.sweepAwareNow() }
+        a.snapshot = { [weak self] in
+            guard let self else { return AwareSnapshot(brain: nil, state: AwareState(), itemsToday: 0, now: Date()) }
+            let now = Date(), brain = BrainLocator.current()
+            let items = brain.map { AwareWriter(brainRoot: $0, transcriptsFolder: Settings.transcriptsFolder).itemsToday(on: now) } ?? 0
+            let running = MainActor.assumeIsolated { self.aware?.running != nil }
+            return AwareSnapshot(brain: brain, state: AwareState.load(from: Settings.awareFolder), itemsToday: items, now: now,
+                                 pending: Self.pending().forPage, sweeping: running)
+        }
+        return a
+    }
+
+    private func chooseAwareBrain() -> AwareActions.BrainChoice? {
+        let panel = NSOpenPanel()
+        panel.title = "Ionian Brain"
+        panel.message = "Pick the folder of your Ionian Brain."
+        panel.prompt = "Choose"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.directoryURL = BrainLocator.current()
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        return AwareApp.chooseBrain(url) { Settings.awareBrainFolder = $0 } ? .accepted : .refused
+    }
+
     private func paste(_ text: String) {
         let needsSpace = Settings.trailingSpace && !(text.last?.isWhitespace ?? true)
         TextInserter.insert(needsSpace ? text + " " : text)
@@ -433,6 +537,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             menu.addItem(item("Hands-free dictation", #selector(startHandsFree)))
         }
         menu.addItem(.separator())
+
+        if Settings.aware {
+            let lines = AwareApp.menuLines(status: MainActor.assumeIsolated { aware?.status })
+            if let line = lines.status {
+                let status = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+                status.isEnabled = false
+                menu.addItem(status)
+            }
+            for title in lines.actions { menu.addItem(item(title, #selector(sweepAwareNow))) }
+            menu.addItem(.separator())
+        }
 
         let last = item("Paste last dictation", #selector(pasteHistory(_:)))
         last.tag = 0
@@ -622,7 +737,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
-        DispatchQueue.main.async { self.openVocabulary() }
+        let request = response.notification.request
+        DispatchQueue.main.async {
+            guard request.identifier == "aware" else { return self.openVocabulary() }
+            // The day file with the proposals, else the Aware page.
+            if let file = request.content.userInfo["file"] as? String {
+                NSWorkspace.shared.open(URL(fileURLWithPath: file))
+            } else {
+                self.mainWindow.show(.aware)
+            }
+        }
         done()
     }
 
@@ -672,6 +796,8 @@ if CommandLine.arguments.contains("--demo") {
     runTranscriptDemo()
 } else if let i = CommandLine.arguments.firstIndex(of: "--onboarding-demo") {
     runOnboardingDemo(step: CommandLine.arguments.dropFirst(i + 1).first.flatMap { Int($0) } ?? 0)
+} else if let i = CommandLine.arguments.firstIndex(of: "--aware-stage-demo") {
+    runAwareStageDemo(mode: CommandLine.arguments.dropFirst(i + 1).first ?? "teaser")
 } else if let i = CommandLine.arguments.firstIndex(of: "--vocabulary-demo") {
     runVocabularyDemo(file: CommandLine.arguments.dropFirst(i + 1).first)
 } else {

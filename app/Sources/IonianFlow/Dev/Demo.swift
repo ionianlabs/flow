@@ -129,3 +129,40 @@ func runOnboardingDemo(step: Int) {
 struct DemoBackdrop: View {
     var body: some View { ChromeStill(name: "breeze") }
 }
+
+private var retainedStageDemo: NSWindow?
+
+/// `--aware-stage-demo [teaser|enable|on|sweeping]`: the Aware stage alone in a small window, to watch it move.
+/// Teaser and enable replay every 8 seconds, so you can watch the moment again. No settings are read or changed.
+func runAwareStageDemo(mode: String) {
+    struct Demo: View {
+        let mode: String
+        @State private var started: Date? = nil
+        var body: some View {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                AwareStageView(on: mode == "on" || mode == "sweeping" || (mode == "enable" && started != nil),
+                                  enableStartedAt: mode == "enable" ? started : nil, sweeping: mode == "sweeping",
+                                  teaserStartedAt: mode == "teaser" ? started : nil)
+                MonoLabel("Stage preview · \(mode)", color: Color.muted)
+            }
+            .padding(Space.s5).frame(width: 560).background(Color.bg)
+            .task {
+                guard mode == "teaser" || mode == "enable" else { return }
+                while !Task.isCancelled {
+                    if mode == "enable" { started = nil }
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    started = Date()
+                    try? await Task.sleep(nanoseconds: 5_500_000_000)
+                }
+            }
+        }
+    }
+    IonianFont.register()
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 230), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+    window.title = "Aware stage"
+    window.contentView = NSHostingView(rootView: Demo(mode: mode))
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+    NSApp.activate()
+    retainedStageDemo = window
+}

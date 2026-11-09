@@ -135,6 +135,9 @@ final class Transcriber {
     private(set) var isActive = false
     /// Called once everything is final and saved after stop().
     var onFinished: () -> Void = {}
+    /// Called with the transcript file once it is final on disk: after its summary arrived or failed, or right
+    /// after saving when no summary is made. Aware's meeting sweep starts from here.
+    var onFileFinal: (URL) -> Void = { _ in }
 
     private let mic: AudioCapture
     private let system = SystemAudioCapture()
@@ -474,15 +477,17 @@ final class Transcriber {
         model.finishing = false
         model.ended = Date()
         save()
-        requestSummary()
+        let summarizing = requestSummary()
         onFinished()
+        if !summarizing, let url = model.fileURL { onFileFinal(url) }
     }
 
     /// The finished transcript goes to the LLM for its frontmatter and summary; the file gets them
     /// when they arrive (also if a new transcription has started meanwhile).
-    private func requestSummary() {
+    /// True when a summary was requested; `onFileFinal` then follows from `addSummary`.
+    private func requestSummary() -> Bool {
         guard Settings.summarizeTranscripts, engine.capabilities.contains(.summary),
-              !model.segments.isEmpty, let url = model.fileURL else { return }
+              !model.segments.isEmpty, let url = model.fileURL else { return false }
         summaryID += 1
         let id = summaryID
         pendingSummaries[id] = url
@@ -493,10 +498,12 @@ final class Transcriber {
             DispatchQueue.main.async { self?.engine.summarize(id: id, transcript: transcript, tags: tags) }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in self?.addSummary(id: id, nil) }
+        return true
     }
 
     private func addSummary(id: Int, _ summary: TranscriptSummary?) {
         guard let url = pendingSummaries.removeValue(forKey: id) else { return }
+        defer { onFileFinal(url) }
         if model.fileURL == url {
             model.summarizing = false
             guard let summary else { return }

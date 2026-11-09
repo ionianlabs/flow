@@ -15,6 +15,7 @@ enum Settings {
             "useVocabulary": true,
             "parakeetFinals": true,
             "summarizeTranscripts": true,
+            "aware": false,
         ])
     }
 
@@ -74,6 +75,29 @@ enum Settings {
     static var transcriptsFolder: URL {
         get { d.string(forKey: "transcriptsFolder").map { URL(fileURLWithPath: $0, isDirectory: true) } ?? defaultTranscriptsFolder }
         set { d.set(newValue.path, forKey: "transcriptsFolder") }
+    }
+
+    /// Aware: propose to-dos, decisions and facts from finished meetings to the brain's inbox.
+    static var aware: Bool {
+        get { d.bool(forKey: "aware") }
+        set { d.set(newValue, forKey: "aware") }
+    }
+
+    /// A folder chosen on the Aware page; tried before the other places a Brain can be (F3.3).
+    static var awareBrainFolder: URL? {
+        get { d.string(forKey: "awareBrainFolder").map { URL(fileURLWithPath: $0, isDirectory: true) } }
+        set { d.set(newValue?.path, forKey: "awareBrainFolder") }
+    }
+
+    /// What Aware looks for: "todo", "decision", "fact". Default all three (F3.5).
+    static var awareKinds: Set<AwareCategory> {
+        get { AwareApp.kinds(stored: d.stringArray(forKey: "awareKinds")) }
+        set { d.set(AwareCategory.allCases.filter(newValue.contains).map(\.rawValue), forKey: "awareKinds") }
+    }
+
+    /// State and nothing else of Aware's own; the proposals go to the brain.
+    static var awareFolder: URL {
+        AwareApp.folder(testDir: testDir, home: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     /// Names, acronyms and jargon the recognizer should get right (format: see VocabularyParser.swift).

@@ -23,6 +23,21 @@ import SwiftUI
         "settings-general-shot": generalSurface(.normal, width: 820, height: 540),
         "settings-general-fresh": generalSurface(.fresh, width: 820),
         "settings-general-cleanup-off": generalSurface(.cleanupOff, width: 820),
+        "stage-teaser-0": stageSurface(.teaser, since: 0),
+        "stage-teaser-play": stageSurface(.teaser, since: 1.8),
+        "stage-teaser": stageSurface(.teaser, since: 99),
+        "stage-enable-0": stageSurface(.enabling, since: 0),
+        "stage-enable-05": stageSurface(.enabling, since: 0.9),
+        "stage-enable-1": stageSurface(.enabling, since: 1.5),
+        "stage-on": stageSurface(.on, since: 99),
+        "stage-sweeping": stageSurface(.on, since: 4, sweeping: true),
+        "stage-reduced": stageSurface(.teaser, reduceMotion: true),
+        "settings-aware-on": awareSurface(.awareOn, width: 820),
+        "settings-aware-off": awareSurface(.awareOff, width: 820),
+        "settings-aware-nobrain": awareSurface(.awareNoBrain, width: 820),
+        "settings-aware-nomodel": awareSurface(.awareNoModel, width: 820),
+        "settings-aware-on-min": awareSurface(.awareOn, width: 700),
+        "settings-aware-nobrain-min": awareSurface(.awareNoBrain, width: 700),
         "settings-general-min": generalSurface(.normal, width: 700),
         "settings-general-fresh-min": generalSurface(.fresh, width: 700),
         "settings-general-cleanup-off-min": generalSurface(.cleanupOff, width: 700),
@@ -69,6 +84,26 @@ import SwiftUI
             domain["statsTranscribedSeconds"] = state == .fresh ? 0 : 1380
             UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
             return AnyView(mainViewForRender(page: .general, state: state))
+        })
+    }
+
+    /// The stage alone at a fixed instant, `since` seconds into the enable moment.
+    private static func stageSurface(_ mode: AwareStage.Mode, since: Double = 0, sweeping: Bool = false, reduceMotion: Bool = false) -> Surface {
+        Surface(size: CGSize(width: 520, height: 172), make: {
+            AnyView(AwareStageView(on: mode != .teaser, enableStartedAt: nil, sweeping: sweeping,
+                                      forceStill: reduceMotion, fixed: reduceMotion ? nil : (mode: mode, since: since))
+                .padding(Space.s5).background(Color.bg))
+        })
+    }
+
+    /// The Aware page on sample state only: never the user's defaults, brain or files.
+    private static func awareSurface(_ state: RenderState, width: CGFloat) -> Surface {
+        Surface(size: CGSize(width: width, height: 1100), make: {
+            var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            domain["aware"] = state != .awareOff
+            domain["awareBrainFolder"] = nil
+            UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+            return AnyView(mainViewForRender(page: .aware, state: state).environment(\.awareStageClock, 99))
         })
     }
 

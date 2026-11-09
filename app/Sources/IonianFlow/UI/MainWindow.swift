@@ -5,7 +5,7 @@ import SwiftUI
 /// State the Ionian Flow window shows; the app delegate keeps it current.
 final class AppModel: ObservableObject {
     enum Page: String, CaseIterable, Identifiable {
-        case general = "General", shortcuts = "Shortcuts", dictation = "Dictation", transcription = "Transcription", vocabulary = "Vocabulary"
+        case general = "General", aware = "Aware", shortcuts = "Shortcuts", dictation = "Dictation", transcription = "Transcription", vocabulary = "Vocabulary"
         var id: String { rawValue }
     }
 
@@ -35,6 +35,7 @@ struct AppActions {
     var showSetupGuide: () -> Void
     var models: ModelSetupModel
     var vocabulary: VocabularyActions
+    var aware = AwareActions()
 }
 
 /// The Ionian Flow window: settings and the vocabulary, one page each, in Ionian Flow's brand skin (see
@@ -123,6 +124,7 @@ extension AppModel.Page {
     var title: String {
         switch self {
         case .general: return "Talk, and it types."
+        case .aware: return AwarePage.headline
         case .shortcuts: return "Your keys."
         case .dictation: return "Hold, talk, let go."
         case .transcription: return "Meetings as Markdown."
@@ -133,6 +135,7 @@ extension AppModel.Page {
     var subtitle: String {
         switch self {
         case .general: return "Ionian Flow turns your voice into text at your cursor. It runs on this Mac."
+        case .aware: return AwarePage.lead
         case .shortcuts: return "Hold a key to dictate. Press keys to transcribe or cancel."
         case .dictation: return "Your text lands where the cursor is."
         case .transcription: return "Written while you talk: you and the other side."
@@ -170,6 +173,7 @@ private struct MainView: View {
             Group {
                 switch model.page {
                 case .general: GeneralPage(model: model, actions: actions)
+                case .aware: AwareSettingsPage(models: actions.models, actions: actions.aware)
                 case .shortcuts: ShortcutsPage(model: model, actions: actions)
                 case .dictation: DictationPage(actions: actions)
                 case .transcription: TranscriptionPage(model: model, actions: actions)
@@ -185,6 +189,7 @@ extension AppModel.Page {
     var symbol: String {
         switch self {
         case .general: return "gearshape"
+        case .aware: return awareSymbol
         case .shortcuts: return "keyboard"
         case .dictation: return "mic"
         case .transcription: return "text.bubble"
@@ -526,7 +531,7 @@ private struct TranscriptionPage: View {
 }
 
 /// The states `--render settings-general*` can show: the totals, the models and the permissions differ.
-enum RenderState { case normal, fresh, cleanupOff }
+enum RenderState { case normal, fresh, cleanupOff, awareNoBrain, awareOn, awareOff, awareNoModel }
 
 /// The window's content for the offscreen renderer (`--render settings-general`): a running app, no ASR.
 @MainActor func mainViewForRender(page: AppModel.Page, vocabulary file: URL? = nil, query: String = "", category: String? = nil,
@@ -536,7 +541,7 @@ enum RenderState { case normal, fresh, cleanupOff }
     model.page = page
     model.status = state == .fresh ? "ASR: downloading models" : "ASR: ready"
     model.hotkeyActive = state != .fresh
-    let fake = FakeModelStore(installed: state == .normal ? [.speech, .cleanup] : state == .cleanupOff ? [.speech] : [])
+    let fake = FakeModelStore(installed: [.normal, .awareNoBrain, .awareOn, .awareOff].contains(state) ? [.speech, .cleanup] : [.cleanupOff, .awareNoModel].contains(state) ? [.speech] : [])
     let models = ModelSetupModel(store: fake)
     if state == .fresh {
         models.start(.speech)  // sits at 40 % (the fake holds it)
@@ -548,6 +553,23 @@ enum RenderState { case normal, fresh, cleanupOff }
         toggleTranscription: {}, reloadEngine: {}, chooseTranscriptsFolder: {}, openTranscripts: {},
         setMicrophone: { _ in }, setKeepMicWarm: { _ in }, applyShortcuts: {}, showSetupGuide: {},
         models: models,
-        vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }))
+        vocabulary: VocabularyActions(connect: { _ in }, chooseFolder: {}, disconnect: {}, rescan: {}, setUseVocabulary: { _ in }),
+        aware: sampleAwareActions(state))
     return MainView(model: model, store: store, sweeper: sweeper, actions: actions, query: query, category: category)
+}
+
+/// Sample state for the Aware page renders: a made-up brain path and clock, never the user's brain or files.
+@MainActor func sampleAwareActions(_ state: RenderState) -> AwareActions {
+    var cal = Calendar.current
+    cal.timeZone = .current
+    let today = cal.startOfDay(for: Date())
+    func at(_ h: Int, _ m: Int) -> Date { cal.date(bySettingHour: h, minute: m, second: 0, of: today)! }
+    var a = AwareActions()
+    a.snapshot = {
+        var sample = AwareState(enabledAt: at(8, 0), swept: [])
+        sample.lastResult = AwareSweepResult(at: at(12, 0), meetings: 2, written: 4)
+        return AwareSnapshot(brain: state == .awareNoBrain ? nil : URL(fileURLWithPath: NSHomeDirectory() + "/Ionian/brain", isDirectory: true),
+                             state: sample, itemsToday: 4, now: at(13, 10), pending: 1, sweeping: false)
+    }
+    return a
 }

@@ -371,7 +371,7 @@ private struct OverlayLine: View {
 private struct RevealRenderer: TextRenderer {
     var phase: Double
     let epoch: Date
-    private static let softOut = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.2, y: 0.7), endControlPoint: UnitPoint(x: 0.2, y: 1))
+    private static let softOut = MotionEasing.softOut
 
     var animatableData: Double {
         get { phase }

@@ -602,18 +602,36 @@ struct BrandField: View {
 /// The one filled control: `btn-bg` and `btn-fg` on a pill, 48 pt or 38 pt in dense rows (BTN-01..04).
 struct PrimaryButtonStyle: ButtonStyle {
     var compact = false
+    /// A round icon-only button of this side length (the pill's Stop); nil is the text button.
+    var iconSide: CGFloat? = nil
 
     func makeBody(configuration: Configuration) -> some View {
-        Label(configuration: configuration, compact: compact)
+        Label(configuration: configuration, compact: compact, iconSide: iconSide)
     }
 
     private struct Label: View {
         let configuration: Configuration
         let compact: Bool
+        let iconSide: CGFloat?
         @Environment(\.isEnabled) private var enabled
         @State private var hovering = false
 
         var body: some View {
+            if let side = iconSide {
+                configuration.label
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.btnFg)
+                    .frame(width: side, height: side)
+                    .background(Circle().fill(Color.btnBg))
+                    .opacity(!enabled ? 0.4 : (configuration.isPressed || hovering) ? 0.9 : 1)
+                    .contentShape(Circle())
+                    .onHover { hovering = $0 }
+            } else {
+                textBody
+            }
+        }
+
+        private var textBody: some View {
             configuration.label
                 .ionianText(IonianType.body, weight: 500)
                 .font(.ionian(IonianType.body, weight: 500, size: compact ? 14 : 16))
@@ -652,6 +670,7 @@ struct MonoLinkButtonStyle: ButtonStyle {
 extension ButtonStyle where Self == PrimaryButtonStyle {
     static var primary: PrimaryButtonStyle { PrimaryButtonStyle() }
     static var primaryCompact: PrimaryButtonStyle { PrimaryButtonStyle(compact: true) }
+    static func primaryIcon(side: CGFloat) -> PrimaryButtonStyle { PrimaryButtonStyle(compact: true, iconSide: side) }
 }
 
 extension ButtonStyle where Self == MonoLinkButtonStyle {

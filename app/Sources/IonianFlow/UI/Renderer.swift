@@ -71,6 +71,10 @@ import SwiftUI
         "panel-min-live": Surface(size: CGSize(width: 400, height: 460), backdrop: true, make: {
             AnyView(transcriptPreview().frame(width: WindowLayout.transcriptMin.width, height: WindowLayout.transcriptMin.height))
         }),
+        "pill": Surface(size: CGSize(width: 360, height: 100), backdrop: true, make: { AnyView(pillPreview()) }),
+        "pill-finishing": Surface(size: CGSize(width: 360, height: 100), backdrop: true, make: { AnyView(pillPreview(finishing: true)) }),
+        "pill-notice": Surface(size: CGSize(width: 360, height: 100), backdrop: true, make: { AnyView(pillPreview(notice: true)) }),
+        "pill-consent": Surface(size: CGSize(width: 360, height: 100), backdrop: true, make: { AnyView(pillPreview(consent: true)) }),
         "panel": Surface(size: CGSize(width: 560, height: 700), backdrop: true, make: {
             AnyView(transcriptPreview().frame(width: 400, height: 640))
         }),

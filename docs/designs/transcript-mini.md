@@ -25,7 +25,7 @@ In transcription (meeting) mode, Ionian Flow shows `TranscriptPanel` (`app/Sourc
 ## Terms
 - **Panel**: the one `NSPanel` owned by `TranscriptPanel` (existing). It has two **modes**.
 - **Full mode**: today's layout: header, transcript, footer, full height, on the right edge.
-- **Mini mode** (the **pill**): a small panel of exactly 260 x 44 pt showing the You wave, the Them wave and the elapsed time. Never any transcript text.
+- **Mini mode** (the **pill**): a small panel of exactly 300 x 44 pt showing the You wave, the Them wave and the elapsed time. Never any transcript text.
 - **Corner**: one of `topLeft`, `topRight`, `bottomLeft`, `bottomRight` of a screen's `visibleFrame`, inset by the 12 pt margin. There is one global stored corner (`transcriptPillCorner`), not one per screen.
 - **Target screen**: the screen under the mouse, else `NSScreen.main` (how today's full panel picks its screen).
 - **Consent line**: "Always get consent when transcribing others."
@@ -40,7 +40,7 @@ Why: removes the screen cost of the full panel while keeping proof that transcri
 Story: As the user presenting or working, I want to shrink the panel to a small pill that shows both voices live, so that it stays out of my way and I can still see that it works.
 
 Scenarios:
-- F1.1 Given full mode with `model.ended == nil` and visibleFrame (0, 0, 1440, 875), when the user clicks the minimize button in the header, then the panel animates to a 260 x 44 pt pill; with no stored corner (bottom-right), `PillCorner.frame(size:in:margin:)` gives frame (1168, 12, 260, 44) (x = 1440 - 12 - 260, y = 0 + 12), and the mode `mini` is stored. The pill goes on the screen the full panel is on when minimizing mid-session, and on the target screen when the panel opens as a pill (F3.1). The minimize button shows only while `model.ended == nil`; once the session has ended it is not shown.
+- F1.1 Given full mode with `model.ended == nil` and visibleFrame (0, 0, 1440, 875), when the user clicks the minimize button in the header, then the panel animates to a 300 x 44 pt pill; with no stored corner (bottom-right), `PillCorner.frame(size:in:margin:)` gives frame (1128, 12, 300, 44) (x = 1440 - 12 - 300, y = 0 + 12), and the mode `mini` is stored. The pill goes on the screen the full panel is on when minimizing mid-session, and on the target screen when the panel opens as a pill (F3.1). The minimize button shows only while `model.ended == nil`; once the session has ended it is not shown.
 - F1.2 Given the pill, then it shows the You wave (accent colour, from `model.level`), the Them wave (`Color.muted`, the colour of today's Them meter, from `model.themLevel`) and the elapsed time, and no transcript text, except during the F3.1 reminder.
 - F1.3 Given the pill and the pointer outside it, then the Stop and expand controls are hidden (`controlsVisible(hovering: false)` is false); when the pointer enters, they appear (`controlsVisible(hovering: true)` is true).
 - F1.4 Given the pill, when the user clicks the expand control or the pill body (not Stop), then the panel returns to full mode on the screen the pill is on, at the remembered width (`transcriptPanelWidth`, capped at half the screen's visibleFrame width, as `TranscriptPanel.show()` does today), and the mode `full` is stored. Example: `TranscriptPanel.fullFrame(savedWidth: 400, in: (0, 0, 1440, 875))` returns (1028, 12, 400, 851).
@@ -51,7 +51,7 @@ Scenarios:
 - F1.8 Given the pill and `model.notice` is non-empty (for example a permission problem), then a marker shows on the pill: SF Symbol `exclamationmark.circle` in `Color.accent`, always at the leading edge of the pill, before whatever label is shown (time, "Finishing" or the Consent line). After expanding, the notice shows in the footer as today. Clearing the notice removes the marker.
 - F1.9 Given Reduce Motion is on (`reduceMotionEnabled`), when the mode changes, then `TranscriptPanel.modeChangeDuration(reduceMotion: true)` is 0 and the frame and content change with no animation; with Reduce Motion off it returns `MotionDuration.hover`.
 - F1.10 Given the pill, then Stop and expand have help tooltips (Stop uses `ShortcutHints.transcribe`) and accessibility labels, and Stop in the pill uses the same `.primaryCompact` style as Stop in the full header. Stop and expand stay in the accessibility tree while visually hidden, so VoiceOver can reach them. Keyboard focus does not apply, because the panel is non-activating.
-- F1.11 Given mini mode, then `.resizable` is removed from the panel's style mask, `minSize` is the pill size (260 x 44 pt) and `transcriptPanelWidth` is never written. When `setMode(.full)` runs, `.resizable` and `WindowLayout.transcriptMin` are restored.
+- F1.11 Given mini mode, then `.resizable` is removed from the panel's style mask, `minSize` is the pill size (300 x 44 pt) and `transcriptPanelWidth` is never written. When `setMode(.full)` runs, `.resizable` and `WindowLayout.transcriptMin` are restored.
 
 Testability:
 - unit. Tested on its own by calling `PillCorner.frame`, `TranscriptPanel.fullFrame(savedWidth:in:)`, the style-mask/minSize setters on a created panel, `TranscriptPillState` built from model values, `PillClick.isClick(down:up:)` at 3, 4 and 5 pt, the mode state with a fake `onStop`, and `modeChangeDuration(reduceMotion:)`; shows, for F1.1, F1.4, F1.4a, F1.5, F1.7, F1.9 and F1.11, the frames, flags, one `onStop` call with no expand, the expand on `ended`, and 0 and 0.25 s; and, for F1.2, F1.3, F1.6, F1.8 and F1.10, that `TranscriptPillState` exposes no transcript text, `controlsVisible(hovering:)`, label text, Stop enabled, marker shown, Stop help text and accessibility labels, and wave colours accent and muted.
@@ -77,9 +77,9 @@ Why: the pill must not cover whatever the user presents, so they choose where it
 Story: As the user, I want to drag the pill to any screen corner and have it stay there, so that it never hides what I am showing.
 
 Scenarios:
-- F2.1 Given the pill in the bottom-right corner and visibleFrame (0, 0, 1440, 875), when the user drops it with its centre at (300, 700), then it snaps to `topLeft`, frame (12, 819, 260, 44) (AppKit's y-origin is at the bottom, so y = maxY - margin - height = 875 - 12 - 44), and `TranscriptPanelPrefs` (new) stores `topLeft` under `transcriptPillCorner`. Quarters are taken from the `visibleFrame` of the screen that contains the pill's centre at drop; if the centre is on no screen, the screen under the pointer, else `NSScreen.main`.
-- F2.2 Given the same visibleFrame, a drop with the centre exactly at (720, 437.5) gives `bottomRight`, frame (1168, 12, 260, 44). Ties are resolved per axis: exactly on the vertical midline counts as right, exactly on the horizontal midline as bottom.
-- F2.3 Given a second screen with visibleFrame (1440, 0, 1920, 1055) and a drop with the centre at (1500, 1000), then the pill snaps to `topLeft` of that screen, frame (1452, 999, 260, 44), and `topLeft` is stored as the one global corner.
+- F2.1 Given the pill in the bottom-right corner and visibleFrame (0, 0, 1440, 875), when the user drops it with its centre at (300, 700), then it snaps to `topLeft`, frame (12, 819, 300, 44) (AppKit's y-origin is at the bottom, so y = maxY - margin - height = 875 - 12 - 44), and `TranscriptPanelPrefs` (new) stores `topLeft` under `transcriptPillCorner`. Quarters are taken from the `visibleFrame` of the screen that contains the pill's centre at drop; if the centre is on no screen, the screen under the pointer, else `NSScreen.main`.
+- F2.2 Given the same visibleFrame, a drop with the centre exactly at (720, 437.5) gives `bottomRight`, frame (1128, 12, 300, 44). Ties are resolved per axis: exactly on the vertical midline counts as right, exactly on the horizontal midline as bottom.
+- F2.3 Given a second screen with visibleFrame (1440, 0, 1920, 1055) and a drop with the centre at (1500, 1000), then the pill snaps to `topLeft` of that screen, frame (1452, 999, 300, 44), and `topLeft` is stored as the one global corner.
 - F2.4 Given no stored corner in `TranscriptPanelPrefs`, then the pill opens in `bottomRight`. Given a stored value that is not one of the four names, then it is treated as absent.
 - F2.5 Given the stored corner and the screen changes size or a display is unplugged between sessions, then the next show places the pill on the target screen in the stored corner.
 - F2.6 Given the pill is visible and `NSApplication.didChangeScreenParametersNotification` fires: if the pill's own screen still exists but its `visibleFrame` changed, the pill moves to the stored corner of that same screen; only if its own screen was removed does it move to the stored corner of the target screen; changes to other screens do nothing.
@@ -120,7 +120,7 @@ Testability:
 - integration. Tested on its own by running the renderer for each surface (F5.1 to F5.3) and for an unknown name; shows the output file exists, has the surface size multiplied by the renderer's existing scale factor, as for the existing surfaces, and is not blank, and the unknown name fails as today.
 
 ## Success criteria
-- SC1 Mini mode occupies exactly 260 x 44 pt, under 1% of the area of a 1440 x 900 pt screen, against the default full size of about 400 x 851 pt (`WindowLayout.transcript.width` 400).
+- SC1 Mini mode occupies exactly 300 x 44 pt, about 1% of the area of a 1440 x 900 pt screen, against the default full size of about 400 x 851 pt (`WindowLayout.transcript.width` 400).
 - SC2 Switching modes takes at most `MotionDuration.hover` (0.25 s) and at most 0 s with Reduce Motion on (asserted on `modeChangeDuration(reduceMotion:)`).
 - SC3 Mode and corner persist in 100% of the cases tested: a unit test writes the values through `TranscriptPanelPrefs` on an isolated `UserDefaults` suite, creates a new `TranscriptPanelPrefs` on the same suite and reads the same values back (no real relaunch).
 - SC4 In the pill, no transcript character is ever shown (the view model exposes no transcript text).
@@ -151,9 +151,10 @@ Testability:
 - Snap to the nearest corner on drop. Rejected: free placement, because it needs a stored point per screen and can end off-screen.
 - On session end the pill expands to full mode without changing the stored mode, so the user sees the result as today.
 - In mini mode the panel is not resizable, so the pill size is fixed and the saved full width cannot be overwritten.
+- Stop in the pill is an icon button (SF Symbol `stop.fill`) of about 24 pt in the `.primaryCompact` style, so that the waves and the time keep their spacing.
 
 ## Assumptions
-- Pill size of 260 x 44 pt is small enough. If wrong: trim the time label or the wave bar count.
+- Pill size of 300 x 44 pt is small enough. If wrong: trim the time label or the wave bar count.
 - `sharingType = .none` is honoured by Teams and Zoom on macOS 15 and later. Newer capture paths (ScreenCaptureKit) may ignore it. If wrong: ship anyway, list the limitation in the README and mark F4 partial (F4.3, SC6b); the pill's small size is the only mitigation.
 - `sharingType = .none` also hides the panel from the user's own screenshots and screen recordings, which is acceptable because docs images come from the offscreen renderer. If wrong: add a debug override for screenshots.
 - Bottom-right does not collide badly with a Dock on the right, because `visibleFrame` already excludes the Dock. If wrong: the user drags the pill to another corner.
@@ -168,3 +169,4 @@ none
 - Round 2 (2026-11-10): paraphrase context sufficient, 0 divergences, 9 guesses (1 Blocker P2-6, 8 Nits); critic B0 new, 0 open; readiness B0 new, 1 open (R1-2). Fixed 10, rejected 0, escalated 0. Not run: none.
 - Fixes after round 2 (not re-reviewed): R1-2 testability lines; P2-6 screen resize keeps the pill on its own screen; P2-1 `TranscriptPanelPrefs` store; P2-2 to P2-9 wording.
 - Approved (2026-11-10): user said "approve".
+- Change with user consent (2026-11-10): pill widened from 260 to 300 pt and Stop shrunk to a ~24 pt icon; the user said "it looks a bit munched together and could need a bit more spacing…like more weidth and the stop button is too large". Changed: Terms, F1.1, F1.11, F2.1–F2.3, SC1, Assumptions, Decisions.

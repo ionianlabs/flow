@@ -17,9 +17,10 @@ struct LevelMeter: View {
     let level: Float
     let active: Bool
     var bars = 8
+    var spacing = Space.s2
 
     var body: some View {
-        HStack(spacing: Space.s2) {
+        HStack(spacing: spacing) {
             MonoLabel(label, color: color)
             Wave(level: level, bars: bars, active: active, scale: 0.5)
         }
@@ -95,7 +96,7 @@ struct TranscriptPillView: View {
 
     var body: some View {
         content
-            .padding(.horizontal, Space.s3)
+            .padding(.horizontal, Space.s2)
             .frame(width: Self.size.width, height: Self.size.height)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
@@ -118,13 +119,13 @@ struct TranscriptPillView: View {
         TranscriptPillState(model: model, reminder: reminder, now: now)
     }
 
-    /// Marker, then the waves (or the Consent line), then one trailing slot: the time, which the Stop and
-    /// expand controls take over on hover. The time yields to the controls; the waves never do.
+    /// Marker, then the waves (or the Consent line), then the time and the Stop and expand controls, which
+    /// show on hover. Nothing is dropped on hover: waves and time stay (F1.2, F1.3).
     private var content: some View {
         let s = state(at: stillNow ?? model.started)
         let showControls = s.controlsVisible(hovering: hovering || forceControls)
         let reminding = !s.showsWaves
-        return HStack(spacing: Space.s2) {
+        return HStack(spacing: Space.s1) {
             if s.markerShown {
                 Image(systemName: "exclamationmark.circle")
                     .font(.system(size: 13, weight: .medium))
@@ -132,40 +133,38 @@ struct TranscriptPillView: View {
                     .accessibilityLabel("Notice")
             }
             if reminding {
-                Text(s.label).ionianText(IonianType.small).foregroundStyle(Color.ink)
-                    .lineLimit(2).minimumScaleFactor(0.7)
+                Text(s.label).ionianText(IonianType.caption).foregroundStyle(Color.ink)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ForEach(s.meters, id: \.label) { m in
                     LevelMeter(label: m.label, color: m.color, level: m.label == "You" ? model.level : model.themLevel,
-                               active: s.wavesActive, bars: 5)
+                               active: s.wavesActive, bars: 5, spacing: Space.s1)
                         .fixedSize()
                 }
                 Spacer(minLength: 0)
+                timeView
             }
-            ZStack(alignment: .trailing) {
-                if !reminding { timeView.opacity(showControls ? 0 : 1) }
-                controls(s, visible: showControls)
-            }
-            // During the reminder the controls take no room until they show.
-            .frame(width: reminding && !showControls ? 0 : nil, alignment: .trailing)
+            // The controls take no room until they show, but stay in the tree (F1.10).
+            controls(s, visible: showControls)
+                .frame(width: showControls ? nil : 0)
         }
     }
 
     @ViewBuilder private var timeView: some View {
         if still {
-            MonoLabel(state(at: stillNow ?? model.started).label, color: Color.muted).lineLimit(1).fixedSize()
+            MonoLabel(state(at: stillNow ?? model.started).label, color: Color.muted).lineLimit(1).minimumScaleFactor(0.8)
         } else {
             TimelineView(.periodic(from: model.started, by: 1)) { t in
-                MonoLabel(state(at: t.date).label, color: Color.muted).lineLimit(1).fixedSize()
+                MonoLabel(state(at: t.date).label, color: Color.muted).lineLimit(1).minimumScaleFactor(0.8)
             }
         }
     }
 
     /// Hidden with opacity and hit testing, not removed, so VoiceOver can still reach them (F1.10).
     private func controls(_ s: TranscriptPillState, visible: Bool) -> some View {
-        HStack(spacing: Space.s1) {
-            Button("Stop", action: onStop)
+        HStack(spacing: 0) {
+            Button(action: onStop) { Image(systemName: "stop.fill").frame(width: 4) }
                 .buttonStyle(.primaryCompact)
                 .disabled(!s.stopEnabled)
                 .help(s.stopHelp)

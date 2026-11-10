@@ -10,14 +10,14 @@ extension IonianFlowTests {
     let size = TranscriptLayout.pillSize
 
     @Test func bottomRightFrame() {  // F1.1
-        #expect(PillCorner.bottomRight.frame(size: size, in: vf) == CGRect(x: 1168, y: 12, width: 260, height: 44))
+        #expect(PillCorner.bottomRight.frame(size: size, in: vf) == CGRect(x: 1128, y: 12, width: 300, height: 44))
     }
 
     @Test func nearestCornerAndFrames() {  // F2.1
         #expect(PillCorner.nearest(point: CGPoint(x: 300, y: 700), in: vf) == .topLeft)
-        #expect(PillCorner.topLeft.frame(size: size, in: vf) == CGRect(x: 12, y: 819, width: 260, height: 44))
-        #expect(PillCorner.topRight.frame(size: size, in: vf) == CGRect(x: 1168, y: 819, width: 260, height: 44))
-        #expect(PillCorner.bottomLeft.frame(size: size, in: vf) == CGRect(x: 12, y: 12, width: 260, height: 44))
+        #expect(PillCorner.topLeft.frame(size: size, in: vf) == CGRect(x: 12, y: 819, width: 300, height: 44))
+        #expect(PillCorner.topRight.frame(size: size, in: vf) == CGRect(x: 1128, y: 819, width: 300, height: 44))
+        #expect(PillCorner.bottomLeft.frame(size: size, in: vf) == CGRect(x: 12, y: 12, width: 300, height: 44))
     }
 
     @Test func ties() {  // F2.2
@@ -30,7 +30,7 @@ extension IonianFlowTests {
         let vf2 = CGRect(x: 1440, y: 0, width: 1920, height: 1055)
         let c = PillCorner.nearest(point: CGPoint(x: 1500, y: 1000), in: vf2)
         #expect(c == .topLeft)
-        #expect(c.frame(size: size, in: vf2) == CGRect(x: 1452, y: 999, width: 260, height: 44))
+        #expect(c.frame(size: size, in: vf2) == CGRect(x: 1452, y: 999, width: 300, height: 44))
     }
 
     @Test func fullFrame() {  // F1.4
@@ -57,7 +57,7 @@ extension IonianFlowTests {
         #expect(!TranscriptPanel.styleMask(for: .mini).contains(.resizable))
         #expect(TranscriptPanel.styleMask(for: .mini).contains(.nonactivatingPanel))
         #expect(TranscriptPanel.styleMask(for: .full).contains(.resizable))
-        #expect(TranscriptPanel.minSize(for: .mini) == CGSize(width: 260, height: 44))
+        #expect(TranscriptPanel.minSize(for: .mini) == CGSize(width: 300, height: 44))
         #expect(TranscriptPanel.minSize(for: .full) == WindowLayout.transcriptMin)
     }
 

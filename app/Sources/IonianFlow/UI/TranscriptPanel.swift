@@ -287,10 +287,13 @@ private struct BlockView: View {
 
 /// A compact square icon button: muted glyph, ink with a faint well on hover. Fixed size, never wraps.
 struct IconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Label(configuration: configuration) }
+    var side: CGFloat = 28
+
+    func makeBody(configuration: Configuration) -> some View { Label(configuration: configuration, side: side) }
 
     private struct Label: View {
         let configuration: Configuration
+        let side: CGFloat
         @Environment(\.isEnabled) private var enabled
         @State private var hovering = false
 
@@ -298,7 +301,7 @@ struct IconButtonStyle: ButtonStyle {
             configuration.label
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(hovering || configuration.isPressed ? Color.ink : Color.muted)
-                .frame(width: 28, height: 28)
+                .frame(width: side, height: side)
                 .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                     .fill(hovering || configuration.isPressed ? Color.codeBg : .clear))
                 .opacity(enabled ? 1 : 0.4)

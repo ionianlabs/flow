@@ -4,7 +4,7 @@ import AppKit
 enum TranscriptLayout {
     static let margin: CGFloat = 12
     /// Size of the mini pill (SC1).
-    static let pillSize = CGSize(width: 260, height: 44)
+    static let pillSize = CGSize(width: 300, height: 44)
 }
 
 /// Full side panel or the small pill.

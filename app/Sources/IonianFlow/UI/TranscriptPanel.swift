@@ -45,6 +45,10 @@ final class TranscriptPanel {
     private var reminderTimer: Timer?
     /// The screen the panel was last placed on (F1.1, F2.6).
     private var ownScreen: ScreenRect?
+    /// Test seam: where the panel looks for screens when its own is gone.
+    var screensProvider: () -> [ScreenRect] = { ScreenRect.all }
+    var mainProvider: () -> ScreenRect? = { ScreenRect.main }
+    var panelScreenProvider: (() -> ScreenRect?)?
     private var dragStartOrigin: CGPoint?
     private var isDragging = false
     private var observers: [NSObjectProtocol] = []
@@ -119,6 +123,7 @@ final class TranscriptPanel {
     /// Everything `show()` does except ordering the window front: mode, frame, reminder (F3.1, F3.2, F3.6, F2.5).
     func prepareShow(now: Date, pointer: CGPoint, screens: [ScreenRect], main: ScreenRect?) {
         let target = PillPlacement.targetScreen(pointer: pointer, screens: screens, main: main)
+        resetDrag()
         mode = prefs.mode
         ui.mode = mode
         panel.styleMask = Self.styleMask(for: mode)
@@ -132,16 +137,20 @@ final class TranscriptPanel {
             reminder.start(at: now)
             ui.reminder = reminder.isShowing(at: now)
             if let end = reminder.endsAt() {
-                reminderTimer = Timer.scheduledTimer(withTimeInterval: max(0, end.timeIntervalSince(now)), repeats: false) { [weak self] _ in
+                let timer = Timer(timeInterval: max(0, end.timeIntervalSince(now)), repeats: false) { [weak self] _ in
                     guard let self else { return }
                     self.ui.reminder = self.reminder.isShowing(at: Date())
                 }
+                RunLoop.main.add(timer, forMode: .common)  // fires during drag tracking too
+                reminderTimer = timer
             }
         }
     }
 
+    func handleHide() { cancelReminder() }
+
     func hide() {
-        cancelReminder()
+        handleHide()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = reduceMotionEnabled ? 0 : MotionDuration.faq
             panel.animator().alphaValue = 0
@@ -161,9 +170,14 @@ final class TranscriptPanel {
 
     /// The screen the panel sits on: the one it was placed on (fresh from the system if it still exists), else where it is.
     private func currentScreen() -> ScreenRect? {
-        if let own = ownScreen { return ScreenRect.all.first { $0.id == own.id } ?? own }
-        return panel.screen.map(ScreenRect.init)
+        let all = screensProvider()
+        if let own = ownScreen, let fresh = all.first(where: { $0.id == own.id }) { return fresh }
+        let current = panelScreenProvider.map { $0() } ?? panel.screen.map(ScreenRect.init)
+        return current
+            ?? PillPlacement.targetScreen(pointer: NSEvent.mouseLocation, screens: all, main: mainProvider())
     }
+
+    private func resetDrag() { isDragging = false; dragStartOrigin = nil }
 
     private func cancelReminder() {
         reminder.cancel()
@@ -188,11 +202,12 @@ final class TranscriptPanel {
 
     func setMode(_ new: TranscriptPanelMode, store: Bool = true) {
         let screen = currentScreen()
+        resetDrag()
         mode = new
         ui.mode = new
         if new == .mini { panel.minSize = Self.minSize(for: .mini) }  // before the frame shrinks
         panel.styleMask = Self.styleMask(for: new)
-        let restoreMin = { [panel] in if new == .full { panel.minSize = Self.minSize(for: .full) } }
+        let restoreMin: () -> Void = { [weak self] in self?.finishGrow() }
         if let screen {
             ownScreen = screen
             move(to: frame(for: new, on: screen), then: restoreMin)
@@ -203,6 +218,9 @@ final class TranscriptPanel {
     }
 
     /// The remembered width is only ever written in full mode (F1.11).
+    /// Completion of the grow animation; a late one must not undo a minimize in between.
+    func finishGrow() { if mode == .full { panel.minSize = Self.minSize(for: .full) } }
+
     func handleLiveResizeEnd() {
         guard mode == .full else { return }
         prefs.defaults.set(Double(panel.frame.width), forKey: Self.widthKey)
@@ -227,7 +245,8 @@ final class TranscriptPanel {
     /// A click on the body expands; the end of a drag snaps to the nearest corner (F1.4a, F2.1 to F2.3).
     func handlePillRelease(down: CGPoint, up: CGPoint, pointer: CGPoint = NSEvent.mouseLocation,
                            screens: [ScreenRect] = ScreenRect.all, main: ScreenRect? = ScreenRect.main) {
-        defer { isDragging = false; dragStartOrigin = nil }
+        defer { resetDrag() }
+        if model.finishing && !isDragging { return }  // a stray click while finishing must not expand
         if !isDragging && PillClick.isClick(down: down, up: up) {
             handleExpand()
             return

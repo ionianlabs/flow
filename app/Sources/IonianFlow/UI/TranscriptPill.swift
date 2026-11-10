@@ -150,6 +150,7 @@ struct TranscriptPillView: View {
             // The controls take no room until they show, but stay in the tree (F1.10).
             controls(s, visible: showControls)
                 .frame(width: showControls ? nil : 0)
+                // Cancels the HStack spacing above: it must be the same token (`Space.s3`).
                 .padding(.leading, showControls ? 0 : -Space.s3)
         }
     }
@@ -180,6 +181,8 @@ struct TranscriptPillView: View {
         .fixedSize()
         .opacity(visible ? 1 : 0)
         .allowsHitTesting(visible)
+        .accessibilityElement(children: .contain)
+        .modifier(SwallowClicks(active: visible))
     }
 }
 
@@ -194,4 +197,13 @@ struct TranscriptPillView: View {
     if notice { model.notice = "Allow Ionian Flow to record system audio in System Settings." }
     return TranscriptPillView(model: model, reminder: consent, still: true, forceControls: !(notice || consent), stillNow: now)
         .frame(width: 360, height: 100)
+}
+
+/// While the controls show, their area (buttons and the gap) takes its own clicks, so a disabled Stop
+/// or the gap never counts as a body release. Hidden, the body underneath keeps working.
+private struct SwallowClicks: ViewModifier {
+    let active: Bool
+    func body(content: Content) -> some View {
+        if active { content.contentShape(Rectangle()).onTapGesture {} } else { content }
+    }
 }

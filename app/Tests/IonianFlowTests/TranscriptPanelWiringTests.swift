@@ -35,6 +35,9 @@ extension IonianFlowTests {
         let panel = TranscriptPanel(model: model, prefs: prefs)
         let c = StopCounter()
         panel.onStop = { c.n += 1 }
+        panel.screensProvider = { [screen, second] }
+        panel.mainProvider = { screen }
+        panel.panelScreenProvider = { nil }  // the hidden panel may sit on a real screen
         return Rig(panel: panel, model: model, prefs: prefs, defaults: d, stops: c)
     }
 
@@ -174,6 +177,69 @@ extension IonianFlowTests {
         #expect(r.panel.panelFrame == PillCorner.topRight.frame(size: pill, in: resized.visibleFrame))
         r.panel.handleScreenChange(pointer: CGPoint(x: 2000, y: 500), screens: [second], main: second)
         #expect(r.panel.panelFrame == PillCorner.topRight.frame(size: pill, in: second.visibleFrame))
+    }
+
+    @Test func aStrayBodyReleaseWhileFinishingDoesNotExpand() {  // review 1
+        let r = rig(mode: "mini")
+        start(r)
+        r.model.finishing = true
+        r.panel.handlePillRelease(down: CGPoint(x: 500, y: 500), up: CGPoint(x: 500, y: 500),
+                                  pointer: pointer, screens: [screen], main: screen)
+        #expect(r.panel.mode == .mini)
+        r.panel.handleExpand()
+        #expect(r.panel.mode == .full)
+    }
+
+    @Test func aLateGrowCompletionDoesNotRestoreTheFullMinSizeInMini() {  // review 3
+        let r = rig()
+        start(r)
+        r.panel.setMode(.full)
+        r.panel.setMode(.mini)
+        r.panel.finishGrow()
+        #expect(r.panel.panelMinSize == pill)
+        r.panel.setMode(.full)
+        r.panel.finishGrow()
+        #expect(r.panel.panelMinSize == WindowLayout.transcriptMin)
+    }
+
+    @Test func modeChangesDropAStaleDrag() {  // review 4
+        let r = rig(mode: "mini")
+        start(r)
+        r.panel.handlePillDrag(down: CGPoint(x: 1300, y: 30), current: CGPoint(x: 400, y: 800))
+        r.panel.setMode(.full)
+        r.panel.setMode(.mini)
+        r.panel.handlePillRelease(down: CGPoint(x: 500, y: 500), up: CGPoint(x: 500, y: 500),
+                                  pointer: pointer, screens: [screen], main: screen)
+        #expect(r.panel.mode == .full)
+    }
+
+    @Test func aRemovedOwnScreenFallsBackToTheFallbackScreen() {  // review 5
+        let r = rig(mode: "mini", corner: "topLeft")
+        r.panel.prepareShow(now: Date(), pointer: CGPoint(x: 2000, y: 500), screens: [second], main: second)
+        r.panel.screensProvider = { [screen] }  // second is gone
+        r.panel.setMode(.full)
+        r.panel.setMode(.mini)
+        #expect(r.panel.panelFrame == PillCorner.topLeft.frame(size: pill, in: screen.visibleFrame))
+    }
+
+    @Test func aRestartedSessionShowsTheReminderInMiniAgain() {  // review 7
+        let r = rig(mode: "mini")
+        start(r)
+        r.model.ended = Date()
+        r.panel.setMode(.full, store: false)
+        r.model.ended = nil
+        start(r)
+        #expect(r.panel.mode == .mini)
+        #expect(r.panel.isReminderShowing)
+        #expect(!r.panel.panelStyleMask.contains(.resizable))
+    }
+
+    @Test func hidingCancelsTheReminder() {  // review 7
+        let r = rig(mode: "mini")
+        start(r)
+        #expect(r.panel.isReminderShowing)
+        r.panel.handleHide()
+        #expect(!r.panel.isReminderShowing)
     }
 }
 }

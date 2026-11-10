@@ -195,7 +195,7 @@ The app follows the Ionian Labs brand (the brand repo's `patterns/app-macos.md`,
 - **Menu bar icon.** A template image of the Flow sign, as macOS requires.
 
 Images in this repo come only from the app's offscreen renderer or from headless Chromium, never from a screen capture:
-- `--render <surface|all> <out> [--dark]` draws a surface offscreen at 2x. Nothing is shown on screen. Surfaces: `hud`, `hud-empty`, `hud-handsfree`, `hud-long`, `panel`, `panel-empty`, `settings-general`, `settings-shortcuts`, `settings-dictation`, `settings-transcription`, `vocabulary`, `vocabulary-empty`, `vocabulary-review` and `onboarding-0` to `onboarding-4`. Renders use made-up data only.
+- `--render <surface|all> <out> [--dark]` draws a surface offscreen at 2x. Nothing is shown on screen. Surfaces: `hud`, `hud-empty`, `hud-handsfree`, `hud-long`, `panel`, `panel-empty`, `pill`, `pill-finishing`, `pill-notice`, `pill-consent`, `settings-general`, `settings-shortcuts`, `settings-dictation`, `settings-transcription`, `vocabulary`, `vocabulary-empty`, `vocabulary-review` and `onboarding-0` to `onboarding-4`. Renders use made-up data only.
 - `scripts/make-banner.mjs` renders the README banners in `docs/images/` with headless Chromium, from the brand's `tokens.css`, fonts, chrome stills and the Flow sign. It needs Playwright: `npm i playwright && npx playwright install chromium`, then `PLAYWRIGHT_DIR=<folder with node_modules> IONIAN_BRAND=../brand node scripts/make-banner.mjs`.
 
 ## Commands

@@ -146,7 +146,7 @@ private struct TranscriptView: View {
                     VStack(alignment: .leading, spacing: Space.s1) {
                         Text(model.finishing ? "Finishing" : "Transcript").ionianText(IonianType.card).foregroundStyle(Color.ink)
                         TimelineView(.periodic(from: model.started, by: 1)) { t in
-                            MonoLabel(Self.elapsed(from: model.started, to: t.date), color: Color.muted)
+                            MonoLabel(TranscriptClock.elapsed(from: model.started, to: t.date), color: Color.muted)
                         }
                     }
                     Spacer(minLength: Space.s2)
@@ -156,26 +156,14 @@ private struct TranscriptView: View {
                         .help("Stop (or \(ShortcutHints.transcribe.lowercasedFirst))")
                 }
                 HStack(spacing: Space.s6) {
-                    meter("You", color: Color.accent, level: model.level)
+                    LevelMeter(label: "You", color: Color.accent, level: model.level, active: !model.finishing)
                         .help("Your microphone")
-                    meter("Them", color: Color.muted, level: model.themLevel)
+                    LevelMeter(label: "Them", color: Color.muted, level: model.themLevel, active: !model.finishing)
                         .help("What your Mac plays. Flat while nothing plays. If it stays flat while others talk, allow "
                             + "Ionian Flow in System Settings, Privacy & Security, Screen & System Audio Recording.")
                 }
             }
         }
-    }
-
-    private func meter(_ label: String, color: Color, level: Float) -> some View {
-        HStack(spacing: Space.s2) {
-            MonoLabel(label, color: color)
-            Wave(level: level, bars: 8, active: !model.finishing, scale: 0.5)
-        }
-    }
-
-    static func elapsed(from start: Date, to now: Date) -> String {
-        let s = max(0, Int(now.timeIntervalSince(start)))
-        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
 
     // MARK: Transcript
@@ -298,7 +286,7 @@ private struct BlockView: View {
 }
 
 /// A compact square icon button: muted glyph, ink with a faint well on hover. Fixed size, never wraps.
-private struct IconButtonStyle: ButtonStyle {
+struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View { Label(configuration: configuration) }
 
     private struct Label: View {

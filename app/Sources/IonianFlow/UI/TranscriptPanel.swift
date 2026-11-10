@@ -1,21 +1,61 @@
 import AppKit
+import Combine
 import SwiftUI
 
+/// What the panel's root view shows (spec transcript-mini): the mode and the pill's Consent reminder.
+final class TranscriptPanelUI: ObservableObject {
+    @Published var mode: TranscriptPanelMode = .full
+    @Published var reminder = false
+}
+
+private struct TranscriptPanelRoot: View {
+    @ObservedObject var ui: TranscriptPanelUI
+    let model: TranscriptModel
+    let onStop: () -> Void
+    let onClose: () -> Void
+    let onMinimize: () -> Void
+    let onExpand: () -> Void
+    let onBodyDrag: (CGPoint, CGPoint) -> Void
+    let onBodyRelease: (CGPoint, CGPoint) -> Void
+
+    var body: some View {
+        switch ui.mode {
+        case .full:
+            TranscriptView(model: model, onStop: onStop, onClose: onClose, onMinimize: onMinimize)
+        case .mini:
+            TranscriptPillView(model: model, reminder: ui.reminder, onStop: onStop, onExpand: onExpand,
+                               onBodyDrag: onBodyDrag, onBodyRelease: onBodyRelease)
+        }
+    }
+}
+
 /// Side panel for transcription mode: full height on the right edge of the screen with the mouse,
-/// resizable from its edges (the width is remembered). It never activates Ionian Flow (the meeting
-/// app keeps focus) but takes clicks and scrolling.
+/// resizable from its edges (the width is remembered), or a small pill in a screen corner (mini mode).
+/// It never activates Ionian Flow (the meeting app keeps focus) but takes clicks and scrolling, and it
+/// is left out of screen sharing.
 final class TranscriptPanel {
     var onStop: () -> Void = {}
     private let model: TranscriptModel
     private let panel: NSPanel
+    private let prefs: TranscriptPanelPrefs
+    private let ui = TranscriptPanelUI()
     private static let widthKey = "transcriptPanelWidth"
-    private static let margin: CGFloat = 12
+    private(set) var mode: TranscriptPanelMode = .full
+    private var reminder = ConsentReminder()
+    private var reminderTimer: Timer?
+    /// The screen the panel was last placed on (F1.1, F2.6).
+    private var ownScreen: ScreenRect?
+    private var dragStartOrigin: CGPoint?
+    private var isDragging = false
+    private var observers: [NSObjectProtocol] = []
+    private var endedSub: AnyCancellable?
 
-    init(model: TranscriptModel) {
+    init(model: TranscriptModel, prefs: TranscriptPanelPrefs = TranscriptPanelPrefs()) {
         self.model = model
+        self.prefs = prefs
         panel = ClickablePanel(
             contentRect: NSRect(x: 0, y: 0, width: WindowLayout.transcript.width, height: WindowLayout.transcript.height),
-            styleMask: [.nonactivatingPanel, .borderless, .resizable],
+            styleMask: TranscriptPanel.styleMask(for: .full),
             backing: .buffered,
             defer: true
         )
@@ -26,29 +66,48 @@ final class TranscriptPanel {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false  // the glass draws its own
-        let host = NSHostingView(rootView: TranscriptView(
-            model: model,
-            onStop: { [weak self] in self?.onStop() },
-            onClose: { [weak self] in self?.hide() }
+        panel.sharingType = .none  // F4.1: neither mode is visible to people watching a screen share
+        let host = NSHostingView(rootView: TranscriptPanelRoot(
+            ui: ui, model: model,
+            onStop: { [weak self] in self?.handlePillStop() },
+            onClose: { [weak self] in self?.hide() },
+            onMinimize: { [weak self] in self?.handleMinimize() },
+            onExpand: { [weak self] in self?.handleExpand() },
+            onBodyDrag: { [weak self] down, current in self?.handlePillDrag(down: down, current: current) },
+            onBodyRelease: { [weak self] down, up in self?.handlePillRelease(down: down, up: up) }
         ))
         host.sizingOptions = []
         panel.contentView = host
-        panel.minSize = WindowLayout.transcriptMin
-        NotificationCenter.default.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: panel, queue: .main) { [panel] _ in
-            UserDefaults.standard.set(Double(panel.frame.width), forKey: Self.widthKey)
+        panel.minSize = TranscriptPanel.minSize(for: .full)
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: panel, queue: .main) { [weak self] _ in
+            self?.handleLiveResizeEnd()
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.panel.isVisible, self.mode == .mini else { return }
+            self.handleScreenChange(pointer: NSEvent.mouseLocation, screens: ScreenRect.all, main: ScreenRect.main)
+        })
+        // F1.7: a finished session shows its transcript and summary in the full panel.
+        endedSub = model.$ended.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] ended in
+            guard let self, ended != nil, self.mode == .mini else { return }
+            self.cancelReminder()
+            self.setMode(.full, store: false)
         }
     }
 
+    deinit {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        reminderTimer?.invalidate()
+    }
+
     var isVisible: Bool { panel.isVisible }
+    var sharingType: NSWindow.SharingType { panel.sharingType }
+    var isReminderShowing: Bool { ui.reminder }
+    var panelFrame: CGRect { panel.frame }
+    var panelStyleMask: NSWindow.StyleMask { panel.styleMask }
+    var panelMinSize: CGSize { panel.minSize }
 
     func show() {
-        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
-        if let f = screen?.visibleFrame {
-            let saved = CGFloat(UserDefaults.standard.double(forKey: Self.widthKey))
-            let width = min(max(saved > 0 ? saved : WindowLayout.transcript.width, panel.minSize.width), f.width / 2)
-            panel.setFrame(NSRect(x: f.maxX - width - Self.margin, y: f.minY + Self.margin,
-                                  width: width, height: f.height - 2 * Self.margin), display: true)
-        }
+        prepareShow(now: Date(), pointer: NSEvent.mouseLocation, screens: ScreenRect.all, main: ScreenRect.main)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
@@ -57,12 +116,146 @@ final class TranscriptPanel {
         }
     }
 
+    /// Everything `show()` does except ordering the window front: mode, frame, reminder (F3.1, F3.2, F3.6, F2.5).
+    func prepareShow(now: Date, pointer: CGPoint, screens: [ScreenRect], main: ScreenRect?) {
+        let target = PillPlacement.targetScreen(pointer: pointer, screens: screens, main: main)
+        mode = prefs.mode
+        ui.mode = mode
+        panel.styleMask = Self.styleMask(for: mode)
+        panel.minSize = Self.minSize(for: mode)
+        cancelReminder()
+        if let target {
+            ownScreen = target
+            panel.setFrame(frame(for: mode, on: target), display: true)
+        }
+        if mode == .mini {
+            reminder.start(at: now)
+            ui.reminder = reminder.isShowing(at: now)
+            if let end = reminder.endsAt() {
+                reminderTimer = Timer.scheduledTimer(withTimeInterval: max(0, end.timeIntervalSince(now)), repeats: false) { [weak self] _ in
+                    guard let self else { return }
+                    self.ui.reminder = self.reminder.isShowing(at: Date())
+                }
+            }
+        }
+    }
+
     func hide() {
+        cancelReminder()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = reduceMotionEnabled ? 0 : MotionDuration.faq
             panel.animator().alphaValue = 0
         }, completionHandler: { [panel] in panel.orderOut(nil) })
     }
+
+    // MARK: Modes
+
+    private func frame(for mode: TranscriptPanelMode, on screen: ScreenRect) -> CGRect {
+        switch mode {
+        case .mini: return prefs.corner.frame(size: TranscriptLayout.pillSize, in: screen.visibleFrame)
+        case .full:
+            let saved = CGFloat(prefs.defaults.double(forKey: Self.widthKey))
+            return Self.fullFrame(savedWidth: saved, in: screen.visibleFrame)
+        }
+    }
+
+    /// The screen the panel sits on: the one it was placed on (fresh from the system if it still exists), else where it is.
+    private func currentScreen() -> ScreenRect? {
+        if let own = ownScreen { return ScreenRect.all.first { $0.id == own.id } ?? own }
+        return panel.screen.map(ScreenRect.init)
+    }
+
+    private func cancelReminder() {
+        reminder.cancel()
+        reminderTimer?.invalidate()
+        reminderTimer = nil
+        ui.reminder = false
+    }
+
+    /// Moves the panel to `frame`, animated unless Reduce Motion is on or nothing is on screen yet.
+    private func move(to frame: CGRect, then done: @escaping () -> Void) {
+        let duration = panel.isVisible ? Self.modeChangeDuration(reduceMotion: reduceMotionEnabled) : 0
+        if duration == 0 {
+            panel.setFrame(frame, display: true)
+            done()
+        } else {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = duration
+                panel.animator().setFrame(frame, display: true)
+            }, completionHandler: done)
+        }
+    }
+
+    func setMode(_ new: TranscriptPanelMode, store: Bool = true) {
+        let screen = currentScreen()
+        mode = new
+        ui.mode = new
+        if new == .mini { panel.minSize = Self.minSize(for: .mini) }  // before the frame shrinks
+        panel.styleMask = Self.styleMask(for: new)
+        let restoreMin = { [panel] in if new == .full { panel.minSize = Self.minSize(for: .full) } }
+        if let screen {
+            ownScreen = screen
+            move(to: frame(for: new, on: screen), then: restoreMin)
+        } else {
+            restoreMin()
+        }
+        if store { prefs.mode = new }
+    }
+
+    /// The remembered width is only ever written in full mode (F1.11).
+    func handleLiveResizeEnd() {
+        guard mode == .full else { return }
+        prefs.defaults.set(Double(panel.frame.width), forKey: Self.widthKey)
+    }
+
+    func handleMinimize() { setMode(.mini) }  // F1.1, F3.5: no reminder
+
+    func handleExpand() {  // F1.4, F3.3
+        cancelReminder()
+        setMode(.full)
+    }
+
+    func handlePillStop() { onStop() }  // F1.5: no mode change
+
+    func handlePillDrag(down: CGPoint, current: CGPoint) {
+        if dragStartOrigin == nil { dragStartOrigin = panel.frame.origin }
+        guard let start = dragStartOrigin, !PillClick.isClick(down: down, up: current) || isDragging else { return }
+        isDragging = true
+        panel.setFrameOrigin(CGPoint(x: start.x + current.x - down.x, y: start.y + current.y - down.y))
+    }
+
+    /// A click on the body expands; the end of a drag snaps to the nearest corner (F1.4a, F2.1 to F2.3).
+    func handlePillRelease(down: CGPoint, up: CGPoint, pointer: CGPoint = NSEvent.mouseLocation,
+                           screens: [ScreenRect] = ScreenRect.all, main: ScreenRect? = ScreenRect.main) {
+        defer { isDragging = false; dragStartOrigin = nil }
+        if !isDragging && PillClick.isClick(down: down, up: up) {
+            handleExpand()
+            return
+        }
+        let center = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        guard let screen = PillPlacement.dropScreen(center: center, pointer: pointer, screens: screens, main: main) else { return }
+        let corner = PillCorner.nearest(point: center, in: screen.visibleFrame)
+        prefs.corner = corner
+        ownScreen = screen
+        move(to: corner.frame(size: TranscriptLayout.pillSize, in: screen.visibleFrame), then: {})
+    }
+
+    /// F2.6: stay on the own screen at the stored corner; only a removed screen sends the pill to the target screen.
+    func handleScreenChange(pointer: CGPoint, screens: [ScreenRect], main: ScreenRect?) {
+        guard mode == .mini, let own = ownScreen,
+              let screen = PillPlacement.screenAfterChange(ownID: own.id, pointer: pointer, screens: screens, main: main) else { return }
+        ownScreen = screen
+        panel.setFrame(prefs.corner.frame(size: TranscriptLayout.pillSize, in: screen.visibleFrame), display: true)
+    }
+}
+
+extension ScreenRect {
+    init(_ s: NSScreen) {
+        let number = s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        self.init(id: number?.uint32Value ?? 0, frame: s.frame, visibleFrame: s.visibleFrame)
+    }
+    static var all: [ScreenRect] { NSScreen.screens.map(ScreenRect.init) }
+    static var main: ScreenRect? { NSScreen.main.map(ScreenRect.init) }
 }
 
 /// Borderless panels refuse key status by default; this one may take it for a click
@@ -75,6 +268,7 @@ private struct TranscriptView: View {
     @ObservedObject var model: TranscriptModel
     var onStop: () -> Void
     var onClose: () -> Void
+    var onMinimize: () -> Void
     /// Offscreen rendering: no scroll view, so the whole transcript is laid out at once.
     var still = false
     @State private var following = true
@@ -150,6 +344,10 @@ private struct TranscriptView: View {
                         }
                     }
                     Spacer(minLength: Space.s2)
+                    Button(action: onMinimize) { Image(systemName: "arrow.down.right.and.arrow.up.left") }
+                        .buttonStyle(IconButtonStyle())
+                        .help("Minimize")
+                        .accessibilityLabel("Minimize")
                     Button("Stop", action: onStop)
                         .buttonStyle(.primaryCompact)
                         .disabled(model.finishing)
@@ -335,5 +533,5 @@ struct IconButtonStyle: ButtonStyle {
         model.ended = now
         model.fileURL = URL(fileURLWithPath: "/tmp/2026-11-02 Release sync.md")
     }
-    return TranscriptView(model: model, onStop: {}, onClose: {}, still: true)
+    return TranscriptView(model: model, onStop: {}, onClose: {}, onMinimize: {}, still: true)
 }

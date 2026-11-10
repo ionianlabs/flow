@@ -70,6 +70,7 @@ Double-tap right ⌥ to start, and again to stop.
 - The transcript saves as Markdown in `~/Documents/Ionian Flow/Transcripts` while it runs. You can change the folder.
 - When you stop, Flow adds a summary with key points, decisions and action items.
 - The panel never takes focus from your meeting app.
+- Minimize the panel to a small pill that shows only the live voice levels and the time. The panel and the pill are hidden from screen sharing.
 
 Always get consent before you transcribe other people.
 
